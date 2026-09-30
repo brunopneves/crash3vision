@@ -122,6 +122,11 @@ Six crush ordinates define five intervals across the damaged width.
 
 The methodology can also use a structural offset associated with the bumper reinforcement or crossmember when appropriate.
 
+### Further documentation
+
+- [Methodology](docs/methodology.md)
+- [Experimental validation](docs/validation.md)
+
 ---
 
 ## Features
@@ -236,6 +241,11 @@ crash3vision/
 │   └── assets/
 │       ├── welcome.png
 │       └── crash3_icon.ico
+├── docs/
+│   ├── methodology.md
+│   ├── validation.md
+│   └── images/
+│       └── crash3vision-overview.png
 ├── CHANGELOG.md
 ├── CITATION.cff
 ├── LICENSE
