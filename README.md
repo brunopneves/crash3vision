@@ -8,6 +8,7 @@ The project combines **forensic engineering, digital image analysis, vehicle col
 
 > **Current status:** v1.0.0 — public research release  
 > **Research stage:** preliminary experimental validation / proof-of-concept  
+> **Current validation scope:** frontal vehicle deformation  
 > **License:** PolyForm Noncommercial License 1.0.0
 
 <p align="center">
@@ -15,6 +16,15 @@ The project combines **forensic engineering, digital image analysis, vehicle col
        alt="CRASH3Vision semi-assisted vehicle deformation measurement using NHTSA crash-test imagery"
        width="900">
 </p>
+
+## Quick links
+
+- [Methodology](docs/methodology.md)
+- [Experimental validation](docs/validation.md)
+- [Citation metadata](CITATION.cff)
+- [License](LICENSE)
+- [Third-party notices](THIRD_PARTY_NOTICES)
+- [Release v1.0.0](https://github.com/brunopneves/crash3vision/releases/tag/v1.0.0)
 
 ---
 
@@ -51,18 +61,13 @@ The research behind CRASH3Vision investigates whether a low-cost, semi-assisted 
 
 ## Experimental evaluation
 
-The methodology was preliminarily evaluated in two complementary phases.
+The methodology was preliminarily evaluated in two complementary phases designed to address different questions.
 
-The two phases were designed to address different questions:
-
-- **Phase 1** evaluated the error associated with obtaining deformation measurements from images against controlled NHTSA reference results.
-- **Phase 2** evaluated the workflow under real-world field conditions, using conventional manual measurements as the reference.
-
-### Phase 1 — Controlled crash-test data
+### Phase 1 — Controlled NHTSA crash-test data
 
 Official NHTSA crash-test imagery was used as a technical reference.
 
-The Phase 1 sample was constrained by the availability of NHTSA tests with overhead or near-nadir camera views suitable for image-based deformation measurements. Five compatible vehicle tests were identified.
+The sample was constrained by the limited availability of NHTSA tests with overhead or near-nadir camera views suitable for image-based deformation measurements. Five compatible vehicle tests were identified.
 
 To increase measurement replication within this limited sample, three forensic examiners performed three independent measurements per vehicle.
 
@@ -78,7 +83,7 @@ The purpose of this phase was to estimate the error associated with replacing co
 
 Images of damaged vehicles acquired using unmanned aerial vehicles (UAVs) were analyzed and compared with conventional field measurements.
 
-The field sample was limited to three suitable damaged vehicles available during the study period. This phase was therefore designed as a preliminary proof-of-concept of the method under operational conditions rather than as a large-scale validation study.
+The field sample was limited to three suitable damaged vehicles available during the study period. This phase was therefore designed as a preliminary proof-of-concept under operational conditions rather than as a large-scale validation study.
 
 - **3 real vehicles**
 - **3 forensic examiners**
@@ -99,7 +104,7 @@ The image-based workflow also reduced the average time required to obtain deform
 | Total independent measurements | **72** |
 | Average measurement-time reduction | **40.9%** |
 
-These results should be interpreted within the experimental scope and limitations described below.
+These results should be interpreted within the experimental scope and limitations described in [Experimental validation](docs/validation.md).
 
 ---
 
@@ -107,7 +112,7 @@ These results should be interpreted within the experimental scope and limitation
 
 The workflow implemented in CRASH3Vision follows the general sequence:
 
-1. Load reference and/or damaged vehicle image.
+1. Load a reference image and/or damaged-vehicle image.
 2. Align images when a reference image is available.
 3. Calibrate image scale.
 4. Define the damaged width (**W**).
@@ -118,14 +123,11 @@ The workflow implemented in CRASH3Vision follows the general sequence:
 9. Estimate EES.
 10. Save measurements, project data and technical outputs.
 
-Six crush ordinates define five intervals across the damaged width.
+Six crush ordinates define five intervals across the damaged width; therefore the interval width is **W/5**.
 
 The methodology can also use a structural offset associated with the bumper reinforcement or crossmember when appropriate.
 
-### Further documentation
-
-- [Methodology](docs/methodology.md)
-- [Experimental validation](docs/validation.md)
+For a more detailed description, see [Methodology](docs/methodology.md).
 
 ---
 
@@ -175,7 +177,9 @@ EES is then obtained from:
 EES = √(2E / m)
 ```
 
-Stiffness coefficients A and B can be derived from NHTSA crash-test data using the methodology implemented by the software and documented in the associated research.
+Stiffness coefficients A and B can be derived from documented NHTSA crash-test data using the workflow implemented by the software.
+
+For the complete methodological description, see [docs/methodology.md](docs/methodology.md).
 
 ---
 
@@ -303,6 +307,8 @@ For these reasons, the current results should be interpreted as a **preliminary 
 
 CRASH3Vision should therefore be used as an **experimental support and research tool**, not as an autonomous substitute for technical reconstruction analysis.
 
+See [Experimental validation](docs/validation.md) for the detailed study design, results and limitations.
+
 ---
 
 ## Research roadmap
@@ -361,6 +367,8 @@ Suggested software citation:
 > Neves, B. P. (2026). **CRASH3Vision (Version 1.0.0)**. Research software for semi-assisted image-based vehicle deformation measurement and CRASH3/EES estimation.
 
 The associated scientific study should also be cited when the methodology itself is used.
+
+A DOI may be added in a future archived release if the software is deposited in a research repository such as Zenodo.
 
 ---
 
