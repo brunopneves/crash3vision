@@ -1,15 +1,40 @@
-{
-  "cff-version": "1.2.0",
-  "message": "If you use this software, please cite it using this metadata.",
-  "type": "software",
-  "title": "CRASH3Vision",
-  "version": "1.0.0",
-  "authors": [
-    {
-      "family-names": "Neves",
-      "given-names": "Bruno P.",
-      "email": "brunopessoa@pci.rn.gov.br"
-    }
-  ],
-  "license": "PolyForm-Noncommercial-1.0.0"
-}
+cff-version: 1.2.0
+message: "If you use CRASH3Vision in research, technical work, or academic publications, please cite this software using the metadata below."
+type: software
+title: "CRASH3Vision"
+version: "1.0.0"
+date-released: 2026-09-30
+
+authors:
+  - family-names: "Neves"
+    given-names: "Bruno P."
+    email: "bpn.bruno@gmail.com"
+
+abstract: >-
+  CRASH3Vision is experimental research software for semi-assisted measurement
+  of vehicle structural deformation from calibrated digital images and
+  estimation of deformation energy and Energy Equivalent Speed (EES) using
+  CRASH3-derived methods. The software supports image calibration, reference
+  and damaged-image alignment, W and C1-C6 deformation measurements, structural
+  offset visualization, stiffness-coefficient management, deformation-energy
+  calculation, EES estimation, project persistence, technical reporting, and
+  traceable review of measurements. The current release accompanies a
+  preliminary proof-of-concept evaluated with controlled NHTSA crash-test
+  imagery and real-world UAV imagery.
+
+keywords:
+  - "CRASH3"
+  - "Energy Equivalent Speed"
+  - "EES"
+  - "vehicle deformation"
+  - "crash reconstruction"
+  - "forensic engineering"
+  - "traffic accident reconstruction"
+  - "image-based measurement"
+  - "UAV"
+  - "research software"
+
+repository-code: "https://github.com/brunopneves/crash3vision"
+url: "https://github.com/brunopneves/crash3vision"
+
+license: "PolyForm-Noncommercial-1.0.0"
