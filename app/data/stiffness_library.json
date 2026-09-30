@@ -1,0 +1,575 @@
+{
+    "units": "kgf/cm_kgf/cm2",
+    "stiffness_classes": {
+        "subcompact": {
+            "A": 70,
+            "B": 11
+        },
+        "compact": {
+            "A": 85,
+            "B": 12
+        },
+        "midsize": {
+            "A": 95,
+            "B": 14
+        },
+        "fullsize": {
+            "A": 110,
+            "B": 16
+        },
+        "small_suv": {
+            "A": 130,
+            "B": 20
+        },
+        "midsize_suv": {
+            "A": 150,
+            "B": 25
+        },
+        "large_suv": {
+            "A": 170,
+            "B": 30
+        },
+        "pickup_light": {
+            "A": 160,
+            "B": 28
+        },
+        "pickup_heavy": {
+            "A": 180,
+            "B": 35
+        }
+    },
+    "vehicles": [
+        {
+            "make": "Toyota",
+            "model": "Corolla",
+            "year": 2008,
+            "A": 88,
+            "B": 13
+        },
+        {
+            "make": "Toyota",
+            "model": "Corolla",
+            "year": 2012,
+            "A": 90,
+            "B": 14
+        },
+        {
+            "make": "Toyota",
+            "model": "Corolla",
+            "year": 2016,
+            "A": 92,
+            "B": 14
+        },
+        {
+            "make": "Toyota",
+            "model": "Corolla",
+            "year": 2020,
+            "A": 95,
+            "B": 15
+        },
+        {
+            "make": "Toyota",
+            "model": "Camry",
+            "year": 2007,
+            "A": 100,
+            "B": 15
+        },
+        {
+            "make": "Toyota",
+            "model": "Camry",
+            "year": 2012,
+            "A": 105,
+            "B": 16
+        },
+        {
+            "make": "Toyota",
+            "model": "Camry",
+            "year": 2018,
+            "A": 110,
+            "B": 17
+        },
+        {
+            "make": "Toyota",
+            "model": "Yaris",
+            "year": 2010,
+            "A": 75,
+            "B": 11
+        },
+        {
+            "make": "Toyota",
+            "model": "Yaris",
+            "year": 2016,
+            "A": 78,
+            "B": 11
+        },
+        {
+            "make": "Toyota",
+            "model": "Prius",
+            "year": 2012,
+            "A": 90,
+            "B": 14
+        },
+        {
+            "make": "Toyota",
+            "model": "Prius",
+            "year": 2018,
+            "A": 95,
+            "B": 15
+        },
+        {
+            "make": "Toyota",
+            "model": "RAV4",
+            "year": 2010,
+            "A": 130,
+            "B": 20
+        },
+        {
+            "make": "Toyota",
+            "model": "RAV4",
+            "year": 2016,
+            "A": 135,
+            "B": 22
+        },
+        {
+            "make": "Toyota",
+            "model": "RAV4",
+            "year": 2021,
+            "A": 140,
+            "B": 23
+        },
+        {
+            "make": "Toyota",
+            "model": "Highlander",
+            "year": 2012,
+            "A": 150,
+            "B": 25
+        },
+        {
+            "make": "Toyota",
+            "model": "Highlander",
+            "year": 2020,
+            "A": 160,
+            "B": 27
+        },
+        {
+            "make": "Toyota",
+            "model": "Hilux",
+            "year": 2012,
+            "A": 165,
+            "B": 30
+        },
+        {
+            "make": "Toyota",
+            "model": "Hilux",
+            "year": 2018,
+            "A": 170,
+            "B": 32
+        },
+        {
+            "make": "Honda",
+            "model": "Civic",
+            "year": 2008,
+            "A": 88,
+            "B": 13
+        },
+        {
+            "make": "Honda",
+            "model": "Civic",
+            "year": 2014,
+            "A": 92,
+            "B": 14
+        },
+        {
+            "make": "Honda",
+            "model": "Civic",
+            "year": 2019,
+            "A": 95,
+            "B": 15
+        },
+        {
+            "make": "Honda",
+            "model": "Accord",
+            "year": 2010,
+            "A": 105,
+            "B": 16
+        },
+        {
+            "make": "Honda",
+            "model": "Accord",
+            "year": 2018,
+            "A": 110,
+            "B": 17
+        },
+        {
+            "make": "Honda",
+            "model": "Fit",
+            "year": 2012,
+            "A": 80,
+            "B": 12
+        },
+        {
+            "make": "Honda",
+            "model": "Fit",
+            "year": 2018,
+            "A": 82,
+            "B": 12
+        },
+        {
+            "make": "Honda",
+            "model": "CRV",
+            "year": 2010,
+            "A": 135,
+            "B": 22
+        },
+        {
+            "make": "Honda",
+            "model": "CRV",
+            "year": 2018,
+            "A": 140,
+            "B": 23
+        },
+        {
+            "make": "Ford",
+            "model": "Fiesta",
+            "year": 2011,
+            "A": 78,
+            "B": 11
+        },
+        {
+            "make": "Ford",
+            "model": "Fiesta",
+            "year": 2017,
+            "A": 80,
+            "B": 12
+        },
+        {
+            "make": "Ford",
+            "model": "Focus",
+            "year": 2010,
+            "A": 90,
+            "B": 14
+        },
+        {
+            "make": "Ford",
+            "model": "Focus",
+            "year": 2016,
+            "A": 95,
+            "B": 15
+        },
+        {
+            "make": "Ford",
+            "model": "Fusion",
+            "year": 2012,
+            "A": 105,
+            "B": 16
+        },
+        {
+            "make": "Ford",
+            "model": "Fusion",
+            "year": 2019,
+            "A": 110,
+            "B": 17
+        },
+        {
+            "make": "Ford",
+            "model": "Escape",
+            "year": 2015,
+            "A": 135,
+            "B": 22
+        },
+        {
+            "make": "Ford",
+            "model": "Escape",
+            "year": 2020,
+            "A": 140,
+            "B": 23
+        },
+        {
+            "make": "Ford",
+            "model": "Explorer",
+            "year": 2013,
+            "A": 150,
+            "B": 26
+        },
+        {
+            "make": "Ford",
+            "model": "Explorer",
+            "year": 2021,
+            "A": 160,
+            "B": 28
+        },
+        {
+            "make": "Ford",
+            "model": "F150",
+            "year": 2012,
+            "A": 175,
+            "B": 32
+        },
+        {
+            "make": "Ford",
+            "model": "F150",
+            "year": 2020,
+            "A": 180,
+            "B": 35
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Spark",
+            "year": 2014,
+            "A": 75,
+            "B": 11
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Sonic",
+            "year": 2015,
+            "A": 82,
+            "B": 12
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Cruze",
+            "year": 2012,
+            "A": 95,
+            "B": 15
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Cruze",
+            "year": 2018,
+            "A": 98,
+            "B": 15
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Malibu",
+            "year": 2013,
+            "A": 105,
+            "B": 16
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Malibu",
+            "year": 2020,
+            "A": 110,
+            "B": 17
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Equinox",
+            "year": 2017,
+            "A": 140,
+            "B": 23
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Tahoe",
+            "year": 2018,
+            "A": 165,
+            "B": 28
+        },
+        {
+            "make": "Chevrolet",
+            "model": "Silverado",
+            "year": 2016,
+            "A": 175,
+            "B": 34
+        },
+        {
+            "make": "Volkswagen",
+            "model": "Polo",
+            "year": 2014,
+            "A": 80,
+            "B": 12
+        },
+        {
+            "make": "Volkswagen",
+            "model": "Golf",
+            "year": 2012,
+            "A": 90,
+            "B": 14
+        },
+        {
+            "make": "Volkswagen",
+            "model": "Golf",
+            "year": 2019,
+            "A": 95,
+            "B": 15
+        },
+        {
+            "make": "Volkswagen",
+            "model": "Passat",
+            "year": 2015,
+            "A": 105,
+            "B": 16
+        },
+        {
+            "make": "Volkswagen",
+            "model": "Passat",
+            "year": 2021,
+            "A": 110,
+            "B": 17
+        },
+        {
+            "make": "Volkswagen",
+            "model": "Tiguan",
+            "year": 2017,
+            "A": 138,
+            "B": 22
+        },
+        {
+            "make": "Volkswagen",
+            "model": "Atlas",
+            "year": 2020,
+            "A": 155,
+            "B": 26
+        },
+        {
+            "make": "Hyundai",
+            "model": "Accent",
+            "year": 2014,
+            "A": 80,
+            "B": 12
+        },
+        {
+            "make": "Hyundai",
+            "model": "Elantra",
+            "year": 2013,
+            "A": 92,
+            "B": 14
+        },
+        {
+            "make": "Hyundai",
+            "model": "Elantra",
+            "year": 2020,
+            "A": 98,
+            "B": 15
+        },
+        {
+            "make": "Hyundai",
+            "model": "Sonata",
+            "year": 2015,
+            "A": 105,
+            "B": 16
+        },
+        {
+            "make": "Hyundai",
+            "model": "Sonata",
+            "year": 2021,
+            "A": 110,
+            "B": 17
+        },
+        {
+            "make": "Hyundai",
+            "model": "Tucson",
+            "year": 2018,
+            "A": 138,
+            "B": 22
+        },
+        {
+            "make": "Hyundai",
+            "model": "SantaFe",
+            "year": 2019,
+            "A": 150,
+            "B": 25
+        },
+        {
+            "make": "Kia",
+            "model": "Rio",
+            "year": 2015,
+            "A": 80,
+            "B": 12
+        },
+        {
+            "make": "Kia",
+            "model": "Cerato",
+            "year": 2016,
+            "A": 92,
+            "B": 14
+        },
+        {
+            "make": "Kia",
+            "model": "Cerato",
+            "year": 2021,
+            "A": 95,
+            "B": 15
+        },
+        {
+            "make": "Kia",
+            "model": "Optima",
+            "year": 2017,
+            "A": 105,
+            "B": 16
+        },
+        {
+            "make": "Kia",
+            "model": "Sportage",
+            "year": 2018,
+            "A": 138,
+            "B": 22
+        },
+        {
+            "make": "Kia",
+            "model": "Sorento",
+            "year": 2019,
+            "A": 150,
+            "B": 25
+        },
+        {
+            "make": "BMW",
+            "model": "320i",
+            "year": 2014,
+            "A": 110,
+            "B": 18
+        },
+        {
+            "make": "BMW",
+            "model": "320i",
+            "year": 2019,
+            "A": 115,
+            "B": 19
+        },
+        {
+            "make": "BMW",
+            "model": "530i",
+            "year": 2016,
+            "A": 120,
+            "B": 20
+        },
+        {
+            "make": "BMW",
+            "model": "X3",
+            "year": 2018,
+            "A": 145,
+            "B": 24
+        },
+        {
+            "make": "Mercedes",
+            "model": "C200",
+            "year": 2014,
+            "A": 110,
+            "B": 18
+        },
+        {
+            "make": "Mercedes",
+            "model": "C300",
+            "year": 2019,
+            "A": 115,
+            "B": 19
+        },
+        {
+            "make": "Mercedes",
+            "model": "E300",
+            "year": 2017,
+            "A": 125,
+            "B": 20
+        },
+        {
+            "make": "Mercedes",
+            "model": "GLC",
+            "year": 2019,
+            "A": 150,
+            "B": 26
+        }
+    ]
+}

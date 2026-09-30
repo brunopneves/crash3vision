@@ -1,0 +1,85 @@
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# -----------------------------
+# Virtual environments
+# -----------------------------
+.venv/
+venv/
+env/
+
+# -----------------------------
+# VS Code
+# -----------------------------
+.vscode/
+
+# -----------------------------
+# Build / Packaging
+# -----------------------------
+build/
+dist/
+*.spec
+build_obfuscated/        # ← novo: pasta do PyArmor
+
+# -----------------------------
+# PyArmor
+# -----------------------------
+.pyarmor/                # ← novo
+pyarmor_runtime_000000/  # ← novo
+
+# -----------------------------
+# OS files
+# -----------------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+# Temporary / debug
+# -----------------------------
+*.tmp
+*.bak
+
+# -----------------------------
+# Excel / outputs (opcional)
+# -----------------------------
+*.xlsx
+
+# -----------------------------
+# Reports (TXT gerados)
+# -----------------------------
+*.txt
+!requirements.txt
+
+# -----------------------------
+# Dados do usuário
+# -----------------------------
+.crash3vision/          
+.crash3mvp/
+
+# -----------------------------
+# ⚠️ NÃO IGNORAR (IMPORTANTE)
+# -----------------------------
+!app/report/
+!app/report/*.py
+!app/data/
+!app/data/*.json
+!CHANGELOG.md
+!README.md
+!requirements-build.txt
+!app/requirements.txt
+
+# -----------------------------
+# Projetos gerados pelo usuário
+# (se quiser ignorar)
+# -----------------------------
+Projects/
+
+# Fotos e arquivos de imagem de campo
+Fotos/
+*.zip
