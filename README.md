@@ -11,7 +11,7 @@ The project combines **forensic engineering, digital image analysis, vehicle col
 > **License:** PolyForm Noncommercial License 1.0.0
 
 <p align="center">
-  <img src="docs/images/JeepComMarcacoesEstabilizado.png"
+  <img src="docs/images/crash3vision-overview.png"
        alt="CRASH3Vision semi-assisted vehicle deformation measurement using NHTSA crash-test imagery"
        width="900">
 </p>
