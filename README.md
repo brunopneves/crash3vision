@@ -149,7 +149,7 @@ For a more detailed description, see [Methodology](docs/methodology.md).
   - internal NHTSA A/B library;
   - import/export of A/B records in JSON
 - Bilingual interface (Portuguese / English)
-- Technical report export with audit trail
+- Technical report export with recorded measurement inputs, coefficient provenance, calculation parameters and results for later review and technical audit
 - Project save/load
 - PNG canvas export
 
@@ -378,7 +378,7 @@ A DOI may be added in a future archived release if the software is deposited in 
 2. Vangi, D. *Simplified method for evaluating energy loss in vehicle collisions*. Accident Analysis & Prevention, 41, 633–641 (2009).
 3. NHTSA. *Vehicle Crash Test Database*. U.S. Department of Transportation.
 4. Silva Neto, J.G.; Andrade, T.L.; Silva, L.G.C. *Utilização de drone de baixo custo em local de acidente de trânsito: um estudo de caso*. Revista Brasileira de Criminalística, 14: 567–572 (2025).
-5. Toresan Jr., W.; Didyk, M. *Reconstrução de colisões veiculares*. 2. ed. Instituto de Ciências Forenses, 2026.
+5. Toresan Jr., W.; Didyk, N. *Reconstrução de colisões veiculares*. 2. ed. Instituto de Ciências Forenses, 2026.
 
 ---
 

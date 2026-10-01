@@ -46,7 +46,7 @@ The global Mean Absolute Percentage Error (MAPE) for EES was:
 
 **3.52%**
 
-The mean standard deviation across the evaluated vehicles was approximately:
+The mean standard deviation of the absolute error across the evaluated vehicles was approximately:
 
 **0.94 km/h**
 
@@ -115,7 +115,7 @@ The global MAPE for EES was:
 
 **4.60%**
 
-The mean standard deviation was:
+The mean standard deviation of the absolute error was:
 
 **0.505 km/h**
 
@@ -150,11 +150,9 @@ These results must be interpreted together with the small number of vehicle-leve
 
 Three forensic examiners independently performed the image-based measurements after brief operational training and alignment of general interpretation criteria.
 
-The study observed relatively low dispersion among the repeated measurements within the evaluated conditions.
+Across the repeated measurements, the results showed relatively low dispersion under the evaluated conditions. This qualitative observation is consistent with operational repeatability, but the standard-deviation values reported above describe the dispersion of the absolute error and should not be interpreted as standalone inter-rater reliability coefficients.
 
-This suggests that the workflow can support repeatable measurements when operators use a common geometric interpretation protocol.
-
-However, manual landmark placement remains subjective, and inter-examiner variability should be expected, particularly when:
+Manual landmark placement remains subjective, and inter-examiner variability should be expected, particularly when:
 
 - image resolution is limited;
 - contrast is poor;
@@ -188,7 +186,7 @@ This result applies only to the tested conditions and should not be generalized 
 | Examiners | 3 | 3 |
 | Measurements per examiner/vehicle | 3 | 3 |
 | Global MAPE | **3.52%** | **4.60%** |
-| Mean standard deviation | **0.94 km/h** | **0.505 km/h** |
+| Mean standard deviation of absolute error | **0.94 km/h** | **0.505 km/h** |
 | Paired t-test | p = 0.116 | p = 0.774 |
 | Reference | NHTSA EES | Manual field measurement |
 
@@ -208,7 +206,7 @@ The experimental results support the feasibility of using calibrated digital ima
 The findings suggest that:
 
 - image-based measurements can approximate controlled and field reference values;
-- repeated measurements can remain relatively stable across different examiners;
+- repeated measurements remained relatively stable across the evaluated operators and conditions;
 - image quality materially affects measurement performance;
 - digital-image workflows can improve traceability and reduce measurement time.
 
