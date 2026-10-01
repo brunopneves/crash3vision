@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.1] - 2026-10-01
+
+Documentation and public-release metadata maintenance release. No change to the CRASH3/EES calculation methodology.
+
+### Changed
+- Update public software version and citation metadata to v1.0.1.
+- Update README release references to v1.0.1.
+- Clarify validation terminology for the reported standard deviation of absolute error.
+- Refine the description of technical-report traceability and audit support.
+- Correct the bibliographic author entry from `Didyk, M.` to `Didyk, N.`.
+- Clean public changelog entries to describe artifacts available in the public repository.
+- Simplify `.gitignore` and correct private-build artifact patterns.
+- Simplify third-party notices by removing references to private build tooling.
+
+### Legal / attribution
+- Add the PolyForm `Required Notice` identifying the copyright holder.
+
+---
+
 ## [1.0.0]
 
 First public source-available release.

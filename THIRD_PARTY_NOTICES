@@ -1,4 +1,4 @@
-CRASH3Vision v1.0.0 — Third-party notices
+CRASH3Vision v1.0.1 — Third-party notices
 
 Scope
 -----
@@ -60,8 +60,6 @@ notices and license texts, and satisfy the corresponding license conditions,
 including applicable LGPL source and library-replacement requirements.
 No commercial Qt license or completed binary compliance review is asserted.
 
-PyArmor and PyInstaller are private build tools, not dependencies included in
-this source snapshot. A future binary release requires a separate review.
 The original project assets and illustrative generic library are described
 below. This notice grants no rights over third-party datasets or images.
 

@@ -6,7 +6,7 @@ CRASH3Vision is experimental research software developed to support the extracti
 
 The project combines **forensic engineering, digital image analysis, vehicle collision reconstruction and reproducible research software**.
 
-> **Current status:** v1.0.0 — public research release  
+> **Current status:** v1.0.1 — public research release  
 > **Research stage:** preliminary experimental validation / proof-of-concept  
 > **Current validation scope:** frontal vehicle deformation  
 > **License:** PolyForm Noncommercial License 1.0.0
@@ -24,7 +24,7 @@ The project combines **forensic engineering, digital image analysis, vehicle col
 - [Citation metadata](CITATION.cff)
 - [License](LICENSE)
 - [Third-party notices](THIRD_PARTY_NOTICES)
-- [Release v1.0.0](https://github.com/brunopneves/crash3vision/releases/tag/v1.0.0)
+- [Release v1.0.1](https://github.com/brunopneves/crash3vision/releases/tag/v1.0.1)
 
 ---
 
@@ -320,7 +320,7 @@ Completed:
 - [x] Real-world UAV evaluation
 - [x] Multi-examiner measurements
 - [x] Save/load and traceability workflow
-- [x] Public research software release v1.0.0
+- [x] Public research software release v1.0.1
 
 Research directions:
 
@@ -364,7 +364,7 @@ GitHub supports the repository's [`CITATION.cff`](CITATION.cff) file through the
 
 Suggested software citation:
 
-> Neves, B. P. (2026). **CRASH3Vision (Version 1.0.0)**. Research software for semi-assisted image-based vehicle deformation measurement and CRASH3/EES estimation.
+> Neves, B. P. (2026). **CRASH3Vision (Version 1.0.1)**. Research software for semi-assisted image-based vehicle deformation measurement and CRASH3/EES estimation.
 
 The associated scientific study should also be cited when the methodology itself is used.
 

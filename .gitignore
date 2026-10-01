@@ -20,18 +20,16 @@ env/
 .vscode/
 
 # -----------------------------
-# Build / Packaging
+# Build / packaging
 # -----------------------------
 build/
 dist/
 *.spec
-build_obfuscated/        # ← novo: pasta do PyArmor
 
-# -----------------------------
-# PyArmor
-# -----------------------------
-.pyarmor/                # ← novo
-pyarmor_runtime_000000/  # ← novo
+# Private build artifacts
+build_obfuscated/
+.pyarmor/
+pyarmor_runtime_000000/
 
 # -----------------------------
 # OS files
@@ -46,24 +44,24 @@ Thumbs.db
 *.bak
 
 # -----------------------------
-# Excel / outputs (opcional)
+# Spreadsheet / generated outputs
 # -----------------------------
 *.xlsx
 
 # -----------------------------
-# Reports (TXT gerados)
+# Generated text reports
 # -----------------------------
 *.txt
 !requirements.txt
 
 # -----------------------------
-# Dados do usuário
+# User data
 # -----------------------------
-.crash3vision/          
+.crash3vision/
 .crash3mvp/
 
 # -----------------------------
-# ⚠️ NÃO IGNORAR (IMPORTANTE)
+# Explicitly tracked public files
 # -----------------------------
 !app/report/
 !app/report/*.py
@@ -71,15 +69,12 @@ Thumbs.db
 !app/data/*.json
 !CHANGELOG.md
 !README.md
-!requirements-build.txt
-!app/requirements.txt
 
 # -----------------------------
-# Projetos gerados pelo usuário
-# (se quiser ignorar)
+# User-generated projects
 # -----------------------------
 Projects/
 
-# Fotos e arquivos de imagem de campo
+# Field photographs and archive files
 Fotos/
 *.zip

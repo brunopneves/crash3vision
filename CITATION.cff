@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use CRASH3Vision in research, technical work, or academic publications, please cite this software using the metadata below."
 type: software
 title: "CRASH3Vision"
-version: "1.0.0"
-date-released: 2026-09-30
+version: "1.0.1"
+date-released: 2026-10-01
 
 authors:
   - family-names: "Neves"
