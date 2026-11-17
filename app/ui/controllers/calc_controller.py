@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import math
+from app.core.crash3 import compute_ees, compute_energy
 
 
 class CalcController:
@@ -50,33 +50,17 @@ class CalcController:
         # G = A² / (2B)
         G_n = (A_n_per_m * A_n_per_m) / (2.0 * B_n_per_m2)
 
-        weighted_linear = c1 + 2.0 * c2 + 2.0 * c3 + 2.0 * c4 + 2.0 * c5 + c6
-
-        weighted_quadratic = (
-            c1 * c1
-            + 2.0 * c2 * c2
-            + 2.0 * c3 * c3
-            + 2.0 * c4 * c4
-            + 2.0 * c5 * c5
-            + c6 * c6
-            + c1 * c2
-            + c2 * c3
-            + c3 * c4
-            + c4 * c5
-            + c5 * c6
-        )
-
-        alpha_rad = math.radians(alpha_deg)
-        angle_factor = 1.0 + math.tan(alpha_rad) ** 2
-
-        total_energy_j = (
-            (L_m / 5.0)
-            * (
-                (A_n_per_m / 2.0) * weighted_linear
-                + (B_n_per_m2 / 6.0) * weighted_quadratic
-                + 5.0 * G_n
-            )
-            * angle_factor
+        total_energy_j = compute_energy(
+            L_m,
+            c1,
+            c2,
+            c3,
+            c4,
+            c5,
+            c6,
+            A_n_per_m,
+            B_n_per_m2,
+            alpha_deg,
         )
 
         return {
@@ -101,7 +85,7 @@ class CalcController:
 
         total_energy_j = float(project.total_energy_j)
 
-        speed_mps = math.sqrt((2.0 * total_energy_j) / float(mass_kg))
+        speed_mps = compute_ees(total_energy_j, float(mass_kg))
         speed_kmh = speed_mps * 3.6
 
         return {
