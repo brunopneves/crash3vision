@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 from PySide6.QtGui import QAction
@@ -380,29 +381,67 @@ class CalcPanel(QGroupBox):
             if filtered:
                 records = filtered
 
-        options: list[str] = []
-        record_map: dict[str, dict] = {}
+        entries: list[tuple[str, dict]] = []
+        missing_value = "—"
 
         for rec in records:
-            rec_id = rec.get("id") or ""
-            test_number = rec.get("test_number") or "-"
-            report_number = rec.get("report_number") or "-"
-            test_label = rec.get("test_label") or "-"
+            vehicle = " ".join(
+                str(value).strip()
+                for value in (rec.get("make"), rec.get("model"), rec.get("year"))
+                if value is not None and str(value).strip()
+            ) or missing_value
+
+            test_configuration = rec.get("test_configuration")
+            if test_configuration:
+                config_key = f"nhtsa.config.{test_configuration}"
+                config_label = tr(config_key)
+                if config_label == config_key:
+                    config_label = str(test_configuration)
+            else:
+                config_label = missing_value
+
+            test_speed = rec.get("test_speed_mps")
+            try:
+                speed_label = f"{float(test_speed):.3f} m/s"
+            except (TypeError, ValueError):
+                speed_label = missing_value
+
+            test_number = rec.get("test_number") or missing_value
+            report_number = rec.get("report_number") or missing_value
             a_val = rec.get("A_n_per_m")
             b_val = rec.get("B_n_per_m2")
 
             label = (
-                f"{test_label} | "
-                f"test={test_number} | "
-                f"report={report_number} | "
-                f"id={rec_id}"
+                f"{vehicle} | "
+                f"{config_label} | "
+                f"{speed_label} | "
+                f"{tr('calc.ab_list.test')}={test_number} | "
+                f"{tr('calc.ab_list.report')}={report_number}"
             )
 
             if a_val is None or b_val is None:
                 label += " | [no A/B]"
 
-            options.append(label)
-            record_map[label] = rec
+            entries.append((label, rec))
+
+        label_counts = Counter(label for label, _rec in entries)
+        options: list[str] = []
+        record_map: dict[str, dict] = {}
+
+        for index, (label, rec) in enumerate(entries, start=1):
+            display_label = label
+            if label_counts[label] > 1:
+                identifier = rec.get("id") or f"record-{index}"
+                display_label = f"{label} | id={identifier}"
+
+            unique_label = display_label
+            suffix = 2
+            while unique_label in record_map:
+                unique_label = f"{display_label} #{suffix}"
+                suffix += 1
+
+            options.append(unique_label)
+            record_map[unique_label] = rec
 
         if not options:
             QMessageBox.warning(

@@ -1202,8 +1202,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "sem_titulo",
     },
     "calc.ab_menu": {
-        "en": "Library / A/B files...",
-        "pt": "Biblioteca / Arquivos A/B...",
+        "en": "Library: A/B files...",
+        "pt": "Biblioteca: Arquivos A/B...",
+    },
+    "calc.ab_list.test": {
+        "en": "test",
+        "pt": "teste",
+    },
+    "calc.ab_list.report": {
+        "en": "report",
+        "pt": "relatório",
     },
     "calc.ab_menu.load_library": {
         "en": "Load from NHTSA library",
