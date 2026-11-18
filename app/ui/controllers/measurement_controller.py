@@ -141,6 +141,13 @@ class MeasurementController:
             (ci_px * self.host._m_per_px) if self.host._m_per_px is not None else ci_m
         )
         self.update_ci_values_label()
+
+        if idx < self.SLICE_COUNT:
+            self.host._current_ci_index = idx + 1
+            self.host.canvas.set_ci_index(self.host._current_ci_index)
+            self.host._sync_ci_radio_buttons()
+            self.host._update_ci_label()
+
         self.host.workflow.invalidate_energy()
         self.host._refresh_summary()
 
