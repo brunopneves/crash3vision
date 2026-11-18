@@ -276,6 +276,14 @@ This notice concerns the generic library; NHTSA-derived records are documented s
 
 ---
 
+## Example data
+
+An NHTSA pre-/post-impact image pair is available in [`examples/nhtsa_jeep_compass_2024_m20240300/`](examples/nhtsa_jeep_compass_2024_m20240300/).
+
+It can be used for familiarization with CRASH3Vision and manual testing of the image-based workflow.
+
+---
+
 ## User data
 
 The application stores user data, including the personal A/B library, at:
