@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.2] - 2026-11-17
+
+### Changed
+- Refactored CRASH3 and EES calculations into pure core functions without changing the mathematical model or numerical results.
+- Clarified the marking convention in the interface: vehicle front facing upward, with C1–C6 marked from left to right.
+
 ## [1.0.1] - 2026-10-01
 
 Documentation and public-release metadata maintenance release. No change to the CRASH3/EES calculation methodology.

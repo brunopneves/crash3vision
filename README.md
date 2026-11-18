@@ -6,7 +6,7 @@ CRASH3Vision is experimental research software developed to support the extracti
 
 The project combines **forensic engineering, digital image analysis, vehicle collision reconstruction and reproducible research software**.
 
-> **Current status:** v1.0.1 — public research release  
+> **Current status:** v1.0.2 — public research release
 > **Research stage:** preliminary experimental validation / proof-of-concept  
 > **Current validation scope:** frontal vehicle deformation  
 > **License:** PolyForm Noncommercial License 1.0.0
@@ -24,7 +24,7 @@ The project combines **forensic engineering, digital image analysis, vehicle col
 - [Citation metadata](CITATION.cff)
 - [License](LICENSE)
 - [Third-party notices](THIRD_PARTY_NOTICES)
-- [Release v1.0.1](https://github.com/brunopneves/crash3vision/releases/tag/v1.0.1)
+- [Release v1.0.2](https://github.com/brunopneves/crash3vision/releases/tag/v1.0.2)
 
 ---
 
@@ -122,6 +122,8 @@ The workflow implemented in CRASH3Vision follows the general sequence:
 8. Calculate deformation energy.
 9. Estimate EES.
 10. Save measurements, project data and technical outputs.
+
+For marking consistency, the vehicle should be oriented with the front facing upward, with C1–C6 assigned from left to right.
 
 Six crush ordinates define five intervals across the damaged width; therefore the interval width is **W/5**.
 
@@ -320,7 +322,7 @@ Completed:
 - [x] Real-world UAV evaluation
 - [x] Multi-examiner measurements
 - [x] Save/load and traceability workflow
-- [x] Public research software release v1.0.1
+- [x] Public research software release v1.0.2
 
 Research directions:
 
@@ -364,7 +366,7 @@ GitHub supports the repository's [`CITATION.cff`](CITATION.cff) file through the
 
 Suggested software citation:
 
-> Neves, B. P. (2026). **CRASH3Vision (Version 1.0.1)**. Research software for semi-assisted image-based vehicle deformation measurement and CRASH3/EES estimation.
+> Neves, B. P. (2026). **CRASH3Vision (Version 1.0.2)**. Research software for semi-assisted image-based vehicle deformation measurement and CRASH3/EES estimation.
 
 The associated scientific study should also be cited when the methodology itself is used.
 

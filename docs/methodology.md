@@ -25,6 +25,8 @@ The workflow implemented in CRASH3Vision follows the sequence below:
 9. Estimate the Energy Equivalent Speed (**EES**).
 10. Save project data, measurements and technical outputs.
 
+For marking consistency, the vehicle should be oriented with the front facing upward, with C1–C6 assigned from left to right.
+
 Because six crush ordinates are defined across the damaged width, they delimit **five equal intervals**. Accordingly, the interval width used in the energy formulation is **W/5**.
 
 ---
