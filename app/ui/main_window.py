@@ -364,6 +364,10 @@ class MainWindow(QMainWindow):
         self.mark_group = QGroupBox(tr("group.marking"))
         mark_layout = QVBoxLayout(self.mark_group)
 
+        self.lbl_marking_orientation = QLabel(tr("label.marking_orientation"))
+        self.lbl_marking_orientation.setWordWrap(True)
+        mark_layout.addWidget(self.lbl_marking_orientation)
+
         self.chk_set_w_mode = QCheckBox(tr("check.set_w_mode"))
         mark_layout.addWidget(self.chk_set_w_mode)
         self.lbl_w = QLabel(tr("label.w_default"))
@@ -567,6 +571,7 @@ class MainWindow(QMainWindow):
 
         self.mark_group.setTitle(tr("group.marking"))
         self.ci_select_box.setTitle(tr("group.select_c"))
+        self.lbl_marking_orientation.setText(tr("label.marking_orientation"))
         self.chk_set_w_mode.setText(tr("check.set_w_mode"))
         self.btn_generate_slices.setText(tr("button.generate_slices"))
         self.chk_set_guide_mode.setText(tr("check.set_guide_mode"))

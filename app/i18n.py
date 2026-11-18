@@ -173,6 +173,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Marking (W + C1..C6)",
         "pt": "Marcação (W + C1..C6)",
     },
+    "label.marking_orientation": {
+        "en": "Recommended orientation: keep the vehicle front facing upward. Mark C1–C6 from left to right.",
+        "pt": "Orientação recomendada: mantenha a dianteira do veículo voltada para cima. Marque C1–C6 da esquerda para a direita.",
+    },
     "check.set_w_mode": {
         "en": "Set W mode (click 2 points: left/right)",
         "pt": "Modo definir W (2 cliques: esquerda/direita)",
