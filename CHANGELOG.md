@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3] - 2026-11-18
+
+### Added
+- Added an NHTSA Jeep Compass 2024 example dataset for workflow familiarization and manual testing.
+
+### Changed
+- Improved A/B library selection labels with clearer vehicle, test configuration, speed, test and report information.
+
 ## [1.0.2] - 2026-11-17
 
 ### Changed
