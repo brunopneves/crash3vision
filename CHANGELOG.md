@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.4] - 2026-11-19
+
+### Added
+- Current-view WYSIWYG PNG export.
+- Portable project files using relative image paths.
+
+### Changed
+- Faster C1-C6 marking with automatic advancement and direct point dragging.
+- Improved overlay readability and export scaling.
+- Updated Jeep Compass example and project imagery.
+
 ## [1.0.3] - 2026-11-18
 
 ### Added
