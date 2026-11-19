@@ -2,6 +2,16 @@
 
 This directory contains two high-speed video frames provided as example input data for CRASH3Vision.
 
+## Example result
+
+![CRASH3Vision example measurement](crash3vision-example.png)
+
+## Reference project
+
+A preconfigured CRASH3Vision project is included as `crash3vision_reference_project.json`.
+
+It can be loaded directly to reproduce the example workflow without repeating image alignment, calibration and C1-C6 marking from scratch.
+
 ## Test identification
 
 - Agency: National Highway Traffic Safety Administration (NHTSA)

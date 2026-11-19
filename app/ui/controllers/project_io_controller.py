@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import math
 import json
+import math
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,30 @@ from app.i18n import tr
 
 if TYPE_CHECKING:
     from app.ui.main_window import MainWindow
+
+
+def _image_path_for_project(image_path: str | None, project_dir: Path) -> str | None:
+    if not image_path:
+        return image_path
+
+    path = Path(image_path)
+    try:
+        relative_path = os.path.relpath(path, project_dir)
+    except (OSError, ValueError):
+        return path.as_posix()
+    return Path(relative_path).as_posix()
+
+
+def _resolve_project_image_path(
+    stored_path: str | None, project_dir: Path
+) -> str | None:
+    if not stored_path:
+        return stored_path
+
+    path = Path(stored_path)
+    if not path.is_absolute():
+        path = project_dir / path
+    return str(path.resolve())
 
 
 class ProjectIOController:
@@ -109,8 +134,17 @@ class ProjectIOController:
         self.host.project.name = Path(path).stem
         self.host._update_window_title()
 
+        project_dir = Path(path).parent
+        project_data = self.host.project.to_dict()
+        project_data["ref_path"] = _image_path_for_project(
+            self.host.project.ref_path, project_dir
+        )
+        project_data["dam_path"] = _image_path_for_project(
+            self.host.project.dam_path, project_dir
+        )
+
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.host.project.to_dict(), f, ensure_ascii=False, indent=2)
+            json.dump(project_data, f, ensure_ascii=False, indent=2)
 
         self.host._current_project_path = path
         self.host._refresh_summary()
@@ -132,6 +166,14 @@ class ProjectIOController:
 
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
+
+        project_dir = Path(path).parent
+        data["ref_path"] = _resolve_project_image_path(
+            data.get("ref_path"), project_dir
+        )
+        data["dam_path"] = _resolve_project_image_path(
+            data.get("dam_path"), project_dir
+        )
 
         try:
             project = Project.from_dict(data)
