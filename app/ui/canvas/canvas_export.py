@@ -29,8 +29,12 @@ class CanvasExport:
         img.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(img)
-        self.scene.render(painter)
-        painter.end()
+        try:
+            self.renderer.apply_export_scaling(w, h)
+            self.scene.render(painter)
+        finally:
+            painter.end()
+            self.renderer.apply_scaling()
 
         img.save(path)
 

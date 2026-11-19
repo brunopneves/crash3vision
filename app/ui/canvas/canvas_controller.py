@@ -41,6 +41,7 @@ class CanvasController:
         emit_calibration_px: Callable[[float], None],
         emit_w_px: Callable[[float], None],
         emit_ci: Callable[[int, float, float], None],
+        emit_ci_selected: Callable[[int], None],
         emit_w_cleared: Callable[[], None],
     ) -> None:
         self.host = host_view
@@ -58,7 +59,8 @@ class CanvasController:
 
         self.state = OverlayState()
         self.renderer = OverlayRenderer(
-            self.scene, get_zoom_factor=lambda: self._zoom_factor
+            self.scene,
+            get_zoom_factor=lambda: abs(float(self.host.transform().m11())) or 1.0,
         )
 
         self.alignment_locked: bool = False
@@ -80,6 +82,7 @@ class CanvasController:
             get_bounds_rect=self._bounds_rect,
             emit_w_px=lambda v: self._emit_w_px(v),
             emit_ci=lambda i, px, cm: self._emit_ci(i, px, cm),
+            emit_ci_selected=emit_ci_selected,
             emit_w_cleared=emit_w_cleared,
         )
 

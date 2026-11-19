@@ -30,8 +30,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Carregar projeto (.json)",
     },
     "menu.export_overlay": {
-        "en": "Export overlay PNG",
-        "pt": "Exportar overlay PNG",
+        "en": "Export annotated image...",
+        "pt": "Exportar imagem anotada...",
+    },
+    "menu.export_current_view": {
+        "en": "Export current view...",
+        "pt": "Exportar visualização atual...",
     },
     "menu.export_report": {
         "en": "Export report (.txt)",
@@ -648,12 +652,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Carregado: {path}",
     },
     "project.export_png.dialog_title": {
-        "en": "Export overlay PNG",
-        "pt": "Exportar overlay PNG",
+        "en": "Export annotated image",
+        "pt": "Exportar imagem anotada",
     },
     "project.export_png.saved": {
         "en": "PNG exported: {path}",
         "pt": "PNG exportado: {path}",
+    },
+    "project.export_current_view.dialog_title": {
+        "en": "Export current view",
+        "pt": "Exportar visualização atual",
+    },
+    "project.export_current_view.saved": {
+        "en": "Current view exported: {path}",
+        "pt": "Visualização atual exportada: {path}",
     },
     "project.select_image.dialog_title": {
         "en": "Select image",

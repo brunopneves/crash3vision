@@ -424,6 +424,32 @@ class ProjectIOController:
                 str(e),
             )
 
+    def export_current_view_png(self) -> None:
+        out_path, _ = QFileDialog.getSaveFileName(
+            self.host,
+            tr("project.export_current_view.dialog_title"),
+            "",
+            "PNG Image (*.png)",
+        )
+        if not out_path:
+            return
+        if not out_path.lower().endswith(".png"):
+            out_path += ".png"
+
+        try:
+            self.host.canvas.export_current_view_png(out_path)
+            QMessageBox.information(
+                self.host,
+                tr("project.export_current_view.dialog_title"),
+                tr("project.export_current_view.saved", path=out_path),
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self.host,
+                tr("project.export_current_view.dialog_title"),
+                str(e),
+            )
+
     def pick_image_file(self) -> str | None:
         path, _ = QFileDialog.getOpenFileName(
             self.host,

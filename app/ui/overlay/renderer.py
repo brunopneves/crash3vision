@@ -39,6 +39,10 @@ class OverlayRenderer:
       - zoom IN  -> overlay (texts/lines) should shrink
     """
 
+    EXPORT_REFERENCE_LONG_EDGE_PX = 1920.0
+    EXPORT_SCALE_MIN = 1.0
+    EXPORT_SCALE_MAX = 2.5
+
     def __init__(
         self, scene: QGraphicsScene, get_zoom_factor: Callable[[], float]
     ) -> None:
@@ -50,40 +54,40 @@ class OverlayRenderer:
         self._line_meta: Dict[str, _LineMeta] = {}
 
         # base sizes (scaled by apply_scaling)
-        self._legend_base_pt = 22.0
-        self._c_label_base_pt = 24.0  # larger "C1..C6" labels on image
+        self._legend_base_pt = 11.25
+        self._c_label_base_pt = 11.25
 
         # pens
         self._pen_cal_line = QPen(QColor(255, 255, 0, 220))
         self._pen_cal_line.setStyle(Qt.PenStyle.SolidLine)
-        self._pen_cal_line.setWidthF(3.0)
+        self._pen_cal_line.setWidthF(2.75)
 
         self._pen_cal_point = QPen(QColor(255, 255, 0, 220))
         self._pen_cal_point.setWidthF(2.0)
 
         self._pen_w_dashed = QPen(QColor(0, 150, 255, 220))
         self._pen_w_dashed.setStyle(Qt.PenStyle.DashLine)
-        self._pen_w_dashed.setWidthF(3.0)
+        self._pen_w_dashed.setWidthF(2.0)
 
         self._pen_slice_dashed = QPen(QColor(0, 150, 255, 220))
         self._pen_slice_dashed.setStyle(Qt.PenStyle.DashLine)
-        self._pen_slice_dashed.setWidthF(3.0)
+        self._pen_slice_dashed.setWidthF(2.0)
 
         self._pen_guide = QPen(QColor(255, 220, 0, 220))
         self._pen_guide.setStyle(Qt.PenStyle.DashLine)
-        self._pen_guide.setWidthF(3.0)
+        self._pen_guide.setWidthF(2.0)
 
         self._pen_ci = QPen(QColor(220, 0, 0, 230))
         self._pen_ci.setStyle(Qt.PenStyle.SolidLine)
-        self._pen_ci.setWidthF(4.0)
+        self._pen_ci.setWidthF(2.75)
 
         self._pen_ci_profile = QPen(QColor(255, 170, 0, 220))
         self._pen_ci_profile.setStyle(Qt.PenStyle.SolidLine)
-        self._pen_ci_profile.setWidthF(3.0)
+        self._pen_ci_profile.setWidthF(2.5)
 
         self._pen_crossmember = QPen(QColor(0, 255, 255, 220))
         self._pen_crossmember.setStyle(Qt.PenStyle.DashLine)
-        self._pen_crossmember.setWidthF(3.0)
+        self._pen_crossmember.setWidthF(2.0)
 
         # preview pen (slightly transparent)
         self._pen_preview = QPen(QColor(255, 80, 80, 190))
@@ -103,19 +107,28 @@ class OverlayRenderer:
         self._line_meta.clear()
 
     def apply_scaling(self) -> None:
-        z = float(self._get_zoom_factor() or 1.0)
+        z = abs(float(self._get_zoom_factor() or 1.0))
         if z <= 0:
             z = 1.0
 
-        ui_scale = 1.0 / z
-        ui_scale = max(0.6, min(5.0, ui_scale))
+        self._apply_visual_scale(1.0 / z)
 
+    def apply_export_scaling(self, output_width: int, output_height: int) -> None:
+        long_edge = max(1, int(output_width), int(output_height))
+        export_scale = float(long_edge) / self.EXPORT_REFERENCE_LONG_EDGE_PX
+        export_scale = max(
+            self.EXPORT_SCALE_MIN,
+            min(self.EXPORT_SCALE_MAX, export_scale),
+        )
+        self._apply_visual_scale(export_scale)
+
+    def _apply_visual_scale(self, visual_scale: float) -> None:
         # texts
         for key, meta in self._text_meta.items():
             it = self._items.get(key)
             if isinstance(it, QGraphicsSimpleTextItem):
                 f = it.font()
-                f.setPointSizeF(max(6.0, meta.base_pt * ui_scale))
+                f.setPointSizeF(meta.base_pt * visual_scale)
                 it.setFont(f)
 
         # line widths / outline widths
@@ -123,15 +136,15 @@ class OverlayRenderer:
             it = self._items.get(key)
             if isinstance(it, QGraphicsLineItem):
                 pen = it.pen()
-                pen.setWidthF(max(1.0, meta.base_width * ui_scale))
+                pen.setWidthF(meta.base_width * visual_scale)
                 it.setPen(pen)
             elif isinstance(it, QGraphicsEllipseItem):
                 pen = it.pen()
-                pen.setWidthF(max(1.0, meta.base_width * ui_scale))
+                pen.setWidthF(meta.base_width * visual_scale)
                 it.setPen(pen)
 
         # legend bg padding depends on zoom too
-        self._update_legend_bg(ui_scale=ui_scale)
+        self._update_legend_bg(ui_scale=visual_scale)
 
     def render_calibration(self, state: OverlayState) -> None:
         self._set_or_clear_point(
@@ -147,7 +160,7 @@ class OverlayRenderer:
                 state.cal_p1,
                 state.cal_p2,
                 pen=self._pen_cal_line,
-                base_width=3.0,
+                base_width=2.75,
                 z=30,
             )
         else:
@@ -217,7 +230,7 @@ class OverlayRenderer:
             p1=(left_x, y),
             p2=(right_x, y),
             pen=self._pen_guide,
-            base_width=3.0,
+            base_width=2.0,
             z=35,
         )
         self.apply_scaling()
@@ -244,7 +257,7 @@ class OverlayRenderer:
             p1=(left_x, y),
             p2=(right_x, y),
             pen=self._pen_crossmember,
-            base_width=3.0,
+            base_width=2.0,
             z=34,
         )
 
@@ -322,7 +335,7 @@ class OverlayRenderer:
                 p1=p1,
                 p2=p2,
                 pen=self._pen_ci,
-                base_width=4.0,
+                base_width=2.75,
                 z=40,
             )
 
@@ -369,7 +382,7 @@ class OverlayRenderer:
                 p1=profile_points[i],
                 p2=profile_points[i + 1],
                 pen=self._pen_ci_profile,
-                base_width=3.0,
+                base_width=2.5,
                 z=39,
             )
 

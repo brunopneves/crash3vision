@@ -12,6 +12,7 @@ class CanvasView(QGraphicsView):
     w_px_measured = Signal(float)
     w_cleared = Signal()
     ci_measured = Signal(int, float, float)
+    ci_selected = Signal(int)
 
     def __init__(self) -> None:
         super().__init__()
@@ -30,6 +31,7 @@ class CanvasView(QGraphicsView):
             emit_w_px=lambda v: self.w_px_measured.emit(v),
             emit_w_cleared=self.w_cleared.emit,
             emit_ci=lambda i, px, cm: self.ci_measured.emit(i, px, cm),
+            emit_ci_selected=self.ci_selected.emit,
         )
 
     # ---------------- public API passthrough ----------------
@@ -184,6 +186,11 @@ class CanvasView(QGraphicsView):
 
     def export_scene_png(self, path: str) -> None:
         self.ctrl.export_scene_png(path)
+
+    def export_current_view_png(self, path: str) -> None:
+        pixmap = self.viewport().grab()
+        if pixmap.isNull() or not pixmap.save(path):
+            raise OSError(f"Failed to export current view: {path}")
 
     def get_overlay_state(self):
         return self.ctrl.get_overlay_state()

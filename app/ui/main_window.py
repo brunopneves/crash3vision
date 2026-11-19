@@ -101,6 +101,7 @@ class MainWindow(QMainWindow):
         self.canvas.w_px_measured.connect(self.meas.on_w_px_measured)
         self.canvas.w_cleared.connect(self.meas.on_w_cleared)
         self.canvas.ci_measured.connect(self.meas.on_ci_measured)
+        self.canvas.ci_selected.connect(self._on_canvas_ci_selected)
 
         self._update_ci_label()
         self._sync_ci_radio_buttons()
@@ -126,6 +127,7 @@ class MainWindow(QMainWindow):
         act_load = file_menu.addAction(tr("menu.load_project"))
         file_menu.addSeparator()
         act_export = file_menu.addAction(tr("menu.export_overlay"))
+        act_export_current_view = file_menu.addAction(tr("menu.export_current_view"))
         act_export_report = file_menu.addAction(tr("menu.export_report"))
 
         lang_menu = m.addMenu(tr("menu.language"))
@@ -136,6 +138,7 @@ class MainWindow(QMainWindow):
         act_save.triggered.connect(self._on_save_project)
         act_load.triggered.connect(self._on_load_project)
         act_export.triggered.connect(self._on_export_png)
+        act_export_current_view.triggered.connect(self._on_export_current_view_png)
         act_export_report.triggered.connect(self._on_export_report)
 
         act_lang_en.triggered.connect(lambda: self._set_language_and_refresh("en"))
@@ -616,6 +619,9 @@ class MainWindow(QMainWindow):
     def _on_export_png(self) -> None:
         self.io.export_png()
 
+    def _on_export_current_view_png(self) -> None:
+        self.io.export_current_view_png()
+
     def _on_export_report(self) -> None:
         self._sync_ui_to_project()
 
@@ -714,9 +720,9 @@ class MainWindow(QMainWindow):
         self.canvas.set_ci_index(1)
 
         self.chk_measure_ci_mode.blockSignals(True)
-        self.chk_measure_ci_mode.setChecked(False)
+        self.chk_measure_ci_mode.setChecked(True)
         self.chk_measure_ci_mode.blockSignals(False)
-        self.canvas.set_measure_ci_mode(False)
+        self.canvas.set_measure_ci_mode(True)
 
     # ---------------- Calibration ----------------
     def _on_calibration_mode_toggled(self, checked: bool) -> None:
@@ -781,6 +787,11 @@ class MainWindow(QMainWindow):
             return
         self._current_ci_index = idx
         self.canvas.set_ci_index(self._current_ci_index)
+        self._update_ci_label()
+
+    def _on_canvas_ci_selected(self, idx: int) -> None:
+        self._current_ci_index = idx
+        self._sync_ci_radio_buttons()
         self._update_ci_label()
 
     def _sync_ci_radio_buttons(self) -> None:
