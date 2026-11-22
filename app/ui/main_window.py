@@ -875,6 +875,7 @@ class MainWindow(QMainWindow):
         self._last_applied_rigid_reference_regions = ()
         self._hide_finish_alignment()
         self._set_rigid_instruction(None)
+        self.workflow.apply_stage_gating()
 
     def _set_canvas_alignment_transforms(
         self,

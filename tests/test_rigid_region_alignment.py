@@ -546,6 +546,32 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertTrue(window.btn_rigid_try_again.isHidden())
         self.assertTrue(window.btn_rigid_cancel.isHidden())
 
+    def test_opacity_remains_available_after_alignment_and_tracks_images(
+        self,
+    ) -> None:
+        window = self._window()
+        ref_path = COMPASS / "reference_vehicle_frame_000.png"
+        dam_path = COMPASS / "deformed_vehicle_frame_300.png"
+
+        window.workflow.finish_alignment()
+
+        self.assertEqual(window.stage, window.Stage.CALIBRATION)
+        self.assertTrue(window.opacity_slider.isEnabled())
+        self.assertFalse(window.nudge_box.isEnabled())
+        window.opacity_slider.setValue(35)
+        self.assertAlmostEqual(window.project.opacity, 0.35)
+
+        window.canvas.load_reference(str(ref_path))
+        self.assertTrue(window.opacity_slider.isEnabled())
+
+        window.canvas.clear_images()
+        self.assertFalse(window.opacity_slider.isEnabled())
+
+        window.canvas.load_reference(str(ref_path))
+        self.assertFalse(window.opacity_slider.isEnabled())
+        window.canvas.load_deformed(str(dam_path))
+        self.assertTrue(window.opacity_slider.isEnabled())
+
     def test_single_start_button_routes_selected_method(self) -> None:
         window = self._window()
         with patch.object(window, "_on_auto_align") as auto_align:
@@ -821,7 +847,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         window._on_finish_alignment()
         self.assertEqual(window.stage, window.Stage.CALIBRATION)
         self.assertFalse(window.align_group.isEnabled())
-        self.assertFalse(window.fine_adjust_group.isEnabled())
+        self.assertTrue(window.opacity_slider.isEnabled())
+        self.assertFalse(window.nudge_box.isEnabled())
         self.assertTrue(window.cal_group.isEnabled())
         self.assertTrue(window.btn_finish_alignment.isHidden())
 

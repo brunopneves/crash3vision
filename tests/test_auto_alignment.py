@@ -479,7 +479,8 @@ class AutoAlignmentTests(unittest.TestCase):
         window._on_finish_alignment()
         self.assertEqual(window.stage, window.Stage.CALIBRATION)
         self.assertFalse(window.align_group.isEnabled())
-        self.assertFalse(window.fine_adjust_group.isEnabled())
+        self.assertTrue(window.opacity_slider.isEnabled())
+        self.assertFalse(window.nudge_box.isEnabled())
         self.assertTrue(window.cal_group.isEnabled())
 
     def test_low_result_does_not_offer_a_suggestion(self) -> None:
