@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.5] - 2026-11-22
+
+### Added
+- Automatic image alignment using translation, rotation and uniform scale.
+- Rigid-region assisted alignment with three user-guided anchor regions.
+- Automatic anchor suggestions and multiscale/structural fallback matching.
+
+### Changed
+- Improved alignment workflow and GUI organization.
+- Opacity control remains available after alignment.
+
 ## [1.0.4] - 2026-11-19
 
 ### Added
