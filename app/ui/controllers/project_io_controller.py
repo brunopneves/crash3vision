@@ -91,6 +91,7 @@ class ProjectIOController:
 
         self.host.canvas.clear_images()
         self.host.canvas.set_alignment_target("dam")
+        self.host._update_auto_align_availability()
 
         if hasattr(self.host, "cmb_alignment_target"):
             self.host.cmb_alignment_target.blockSignals(True)
@@ -213,6 +214,7 @@ class ProjectIOController:
         if "dam" in prepared_images:
             self.host.canvas.load_deformed(prepared_images["dam"])
             self.host.canvas.set_deformed_opacity(self.host.project.opacity)
+        self.host._update_auto_align_availability()
 
         ref_tr = self.host.project.ref_transform
         self.host.canvas.set_reference_transform(
@@ -541,6 +543,7 @@ class ProjectIOController:
             self.host.project.ref_path = path
 
             self.host.workflow.set_stage(self.host.Stage.ALIGNMENT)
+            self.host._update_auto_align_availability()
 
         except Exception as e:
             QMessageBox.critical(
@@ -566,6 +569,7 @@ class ProjectIOController:
             self.host.project.dam_path = path
 
             self.host.workflow.set_stage(self.host.Stage.ALIGNMENT)
+            self.host._update_auto_align_availability()
 
         except Exception as e:
             QMessageBox.critical(

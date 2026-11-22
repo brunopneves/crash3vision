@@ -13,6 +13,9 @@ class CanvasView(QGraphicsView):
     w_cleared = Signal()
     ci_measured = Signal(int, float, float)
     ci_selected = Signal(int)
+    alignment_state_changed = Signal()
+    images_changed = Signal()
+    rigid_region_selected = Signal(str, object)
 
     def __init__(self) -> None:
         super().__init__()
@@ -32,6 +35,9 @@ class CanvasView(QGraphicsView):
             emit_w_cleared=self.w_cleared.emit,
             emit_ci=lambda i, px, cm: self.ci_measured.emit(i, px, cm),
             emit_ci_selected=self.ci_selected.emit,
+            emit_alignment_state_changed=self.alignment_state_changed.emit,
+            emit_images_changed=self.images_changed.emit,
+            emit_rigid_region_selected=self.rigid_region_selected.emit,
         )
 
     # ---------------- public API passthrough ----------------
@@ -96,6 +102,18 @@ class CanvasView(QGraphicsView):
 
     def set_alignment_mode(self, enabled: bool) -> None:
         self.ctrl.set_alignment_mode(enabled)
+
+    def set_rigid_region_mode(self, enabled: bool, target: str = "ref") -> None:
+        self.ctrl.set_rigid_region_mode(enabled, target)  # type: ignore[arg-type]
+
+    def clear_rigid_region_visuals(self) -> None:
+        self.ctrl.clear_rigid_region_visuals()
+
+    def show_rigid_region_anchor(self, target: str, region) -> None:
+        self.ctrl.show_rigid_region_anchor(target, region)  # type: ignore[arg-type]
+
+    def show_rigid_region_suggestions(self, regions) -> None:
+        self.ctrl.show_rigid_region_suggestions(regions)
 
     def set_alignment_locked(self, locked: bool) -> None:
         self.ctrl.set_alignment_locked(locked)
@@ -168,6 +186,14 @@ class CanvasView(QGraphicsView):
 
     def set_deformed_transform(self, x, y, scale, rotation_deg):
         self.ctrl.set_deformed_transform(x, y, scale, rotation_deg)
+
+    def apply_deformed_correction(
+        self, dx: float, dy: float, scale: float, rotation_deg: float
+    ) -> dict[str, float]:
+        return self.ctrl.apply_deformed_correction(dx, dy, scale, rotation_deg)
+
+    def has_both_images(self) -> bool:
+        return self.ctrl.has_both_images()
 
     def get_reference_transform(self):
         return self.ctrl.get_reference_transform()

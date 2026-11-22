@@ -16,6 +16,7 @@ class ToolFlags:
     set_w_mode: bool = False
     set_guide_mode: bool = False
     measure_ci_mode: bool = False
+    rigid_region_mode: bool = False
 
 
 class ToolController:
@@ -62,6 +63,14 @@ class ToolController:
             self.set_active(tool)
         else:
             self.flags.alignment_mode = False
+            self.set_active(None)
+
+    def set_mode_rigid_region(self, enabled: bool, tool: ToolBase) -> None:
+        if enabled:
+            self.flags = ToolFlags(rigid_region_mode=True)
+            self.set_active(tool)
+        else:
+            self.flags.rigid_region_mode = False
             self.set_active(None)
 
     def set_mode_calibration(self, enabled: bool, tool: ToolBase) -> None:

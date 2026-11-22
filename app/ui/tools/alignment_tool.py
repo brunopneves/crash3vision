@@ -19,9 +19,11 @@ class AlignmentTool(ToolBase):
         self,
         get_target_item: Callable[[], QGraphicsPixmapItem | None],
         is_locked: Callable[[], bool],
+        on_transform_changed: Callable[[], None],
     ) -> None:
         self._get_target_item = get_target_item
         self._is_locked = is_locked
+        self._on_transform_changed = on_transform_changed
 
         self._dragging = False
         self._last_scene_pos: QPointF | None = None
@@ -61,6 +63,7 @@ class AlignmentTool(ToolBase):
 
         delta = scene_pos - self._last_scene_pos
         item.moveBy(delta.x(), delta.y())
+        self._on_transform_changed()
         self._last_scene_pos = scene_pos
         return True
 

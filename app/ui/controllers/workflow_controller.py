@@ -74,6 +74,7 @@ class WorkflowController:
 
         if self.host.stage == Stage.LOAD:
             self.host.align_group.setEnabled(False)
+            self.host.fine_adjust_group.setEnabled(False)
             self.host.cal_group.setEnabled(False)
             self.host.mark_group.setEnabled(False)
             self.host.calc_panel.setEnabled(False)
@@ -82,6 +83,7 @@ class WorkflowController:
 
         if self.host.stage == Stage.ALIGNMENT:
             self.host.align_group.setEnabled(True)
+            self.host.fine_adjust_group.setEnabled(True)
             self.host.cal_group.setEnabled(False)
             self.host.mark_group.setEnabled(False)
             self.host.calc_panel.setEnabled(False)
@@ -90,6 +92,7 @@ class WorkflowController:
 
         if self.host.stage == Stage.CALIBRATION:
             self.host.align_group.setEnabled(False)
+            self.host.fine_adjust_group.setEnabled(False)
             self.host.cal_group.setEnabled(True)
             self.host.mark_group.setEnabled(False)
             self.host.calc_panel.setEnabled(False)
@@ -98,6 +101,7 @@ class WorkflowController:
 
         if self.host.stage == Stage.MARKING:
             self.host.align_group.setEnabled(False)
+            self.host.fine_adjust_group.setEnabled(False)
             self.host.cal_group.setEnabled(False)
             self.host.mark_group.setEnabled(True)
             self.host.calc_panel.setEnabled(False)
@@ -106,6 +110,7 @@ class WorkflowController:
 
         if self.host.stage == Stage.DONE:
             self.host.align_group.setEnabled(False)
+            self.host.fine_adjust_group.setEnabled(False)
             self.host.cal_group.setEnabled(False)
             self.host.mark_group.setEnabled(False)
             self.host.calc_panel.setEnabled(True)

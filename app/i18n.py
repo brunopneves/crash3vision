@@ -74,8 +74,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Opacidade do overlay",
     },
     "group.alignment": {
-        "en": "Alignment",
-        "pt": "Alinhamento",
+        "en": "Image alignment",
+        "pt": "Alinhamento das imagens",
+    },
+    "group.fine_adjustment": {
+        "en": "Fine adjustment",
+        "pt": "Ajuste fino",
     },
     "check.alignment_mode": {
         "en": "Alignment mode (drag selected image)",
@@ -101,9 +105,121 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Reset image transforms",
         "pt": "Resetar transformações das imagens",
     },
+    "label.alignment_method": {
+        "en": "Alignment method",
+        "pt": "Método de alinhamento",
+    },
+    "alignment.method.auto": {
+        "en": "Automatic",
+        "pt": "Automático",
+    },
+    "alignment.method.rigid": {
+        "en": "By rigid region",
+        "pt": "Por região rígida",
+    },
+    "button.start_alignment": {
+        "en": "Start alignment",
+        "pt": "Iniciar alinhamento",
+    },
+    "button.rigid_apply": {
+        "en": "Use this alignment",
+        "pt": "Usar este alinhamento",
+    },
+    "button.rigid_try_again": {
+        "en": "Try another region",
+        "pt": "Tentar outra região",
+    },
+    "button.rigid_cancel": {
+        "en": "Cancel",
+        "pt": "Cancelar",
+    },
+    "alignment.rigid.instruction.reference": {
+        "en": "Mark 3 points on a preserved rigid region.",
+        "pt": "Marque 3 pontos sobre uma região rígida preservada.",
+    },
+    "alignment.rigid.instruction.suggestions": {
+        "en": (
+            "Suggested points are shown. Click to accept, drag to move, or "
+            "click elsewhere to replace each one."
+        ),
+        "pt": (
+            "Pontos sugeridos exibidos. Clique para aceitar, arraste para "
+            "mover ou clique em outro local para substituir cada um."
+        ),
+    },
+    "alignment.rigid.instruction.reference_progress": {
+        "en": "Mark 3 points on a preserved rigid region. ({count}/3)",
+        "pt": "Marque 3 pontos sobre uma região rígida preservada. ({count}/3)",
+    },
+    "alignment.rigid.instruction.deformed": {
+        "en": "Indicate approximately the same region in the deformed image.",
+        "pt": "Indique aproximadamente a mesma região na imagem deformada.",
+    },
+    "alignment.rigid.instruction.preview": {
+        "en": "Preview ready. Use it or try again.",
+        "pt": "Prévia pronta. Use-a ou tente novamente.",
+    },
+    "alignment.rigid.title": {
+        "en": "Rigid-region alignment",
+        "pt": "Alinhamento por região rígida",
+    },
+    "alignment.rigid.second_region": {
+        "en": (
+            "The first search was weak or ambiguous. Indicate approximately "
+            "the same region in the deformed image."
+        ),
+        "pt": (
+            "A primeira busca foi fraca ou ambígua. Indique aproximadamente "
+            "a mesma região na imagem deformada."
+        ),
+    },
+    "alignment.rigid.failure": {
+        "en": (
+            "The selected regions did not produce a reliable alignment. "
+            "Try other points."
+        ),
+        "pt": (
+            "As regiões selecionadas não produziram um alinhamento confiável. "
+            "Tente outros pontos."
+        ),
+    },
+    "alignment.status.auto_medium": {
+        "en": "Preview ready. Use this alignment or cancel.",
+        "pt": "Prévia pronta. Use este alinhamento ou cancele.",
+    },
+    "alignment.status.choose_method": {
+        "en": "Choose the alignment method.",
+        "pt": "Escolha o método de alinhamento.",
+    },
+    "alignment.status.auto_low": {
+        "en": "No reliable automatic alignment suggestion was found.",
+        "pt": "Nenhuma sugestão automática confiável foi encontrada.",
+    },
+    "button.apply_alignment_suggestion": {
+        "en": "Use this alignment",
+        "pt": "Usar este alinhamento",
+    },
+    "alignment.auto.title": {
+        "en": "Automatic alignment",
+        "pt": "Alinhamento automático",
+    },
+    "alignment.auto.locked": {
+        "en": "Unlock alignment before applying an automatic suggestion.",
+        "pt": "Destrave o alinhamento antes de aplicar uma sugestão automática.",
+    },
+    "alignment.auto.failure": {
+        "en": (
+            "A reliable automatic alignment could not be obtained. "
+            "Try alignment by rigid region."
+        ),
+        "pt": (
+            "Não foi possível obter um alinhamento automático confiável. "
+            "Tente o alinhamento por região rígida."
+        ),
+    },
     "group.nudge": {
-        "en": "Nudge (px)",
-        "pt": "Ajuste fino (px)",
+        "en": "Translation (px)",
+        "pt": "Translação (px)",
     },
     "group.rotate": {
         "en": "Rotate",

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
 from typing import Any, Mapping, Callable, Literal
 
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import QPointF, Qt, QRectF
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
 
@@ -15,6 +16,7 @@ from app.ui.tools import (
     AlignmentTool,
     CalibrationTool,
     MarkingTool,
+    RigidRegionTool,
     ToolBase,
     ToolController,
 )
@@ -43,6 +45,9 @@ class CanvasController:
         emit_ci: Callable[[int, float, float], None],
         emit_ci_selected: Callable[[int], None],
         emit_w_cleared: Callable[[], None],
+        emit_alignment_state_changed: Callable[[], None],
+        emit_images_changed: Callable[[], None],
+        emit_rigid_region_selected: Callable[[str, object], None],
     ) -> None:
         self.host = host_view
         self.scene = scene
@@ -50,6 +55,8 @@ class CanvasController:
         self._emit_calibration_px = emit_calibration_px
         self._emit_w_px = emit_w_px
         self._emit_ci = emit_ci
+        self._emit_alignment_state_changed = emit_alignment_state_changed
+        self._emit_images_changed = emit_images_changed
 
         self.ref_item: QGraphicsPixmapItem | None = None
         self.dam_item: QGraphicsPixmapItem | None = None
@@ -68,6 +75,11 @@ class CanvasController:
         self._alignment_tool = AlignmentTool(
             get_target_item=self._get_alignment_target_item,
             is_locked=lambda: self.alignment_locked,
+            on_transform_changed=self._emit_alignment_state_changed,
+        )
+        self._rigid_region_tool = RigidRegionTool(
+            get_item=self._get_region_target_item,
+            on_region_selected=emit_rigid_region_selected,
         )
 
         self._calibration_tool = CalibrationTool(
@@ -129,6 +141,11 @@ class CanvasController:
             return self.ref_item
         return self.dam_item
 
+    def _get_region_target_item(
+        self, target: Literal["ref", "dam"]
+    ) -> QGraphicsPixmapItem | None:
+        return self.ref_item if target == "ref" else self.dam_item
+
     # ---------------------- compatibility attrs ----------------------
 
     @property
@@ -174,6 +191,7 @@ class CanvasController:
         """Clear transient tool state without changing restored geometry."""
         self.controller.disable_all()
         self._alignment_tool.deactivate(self.host)
+        self._rigid_region_tool.deactivate(self.host)
         self._marking_tool.set_w_mode(False)
         self._marking_tool.set_guide_mode(False)
         self._marking_tool.set_ci_mode(False)
@@ -183,6 +201,22 @@ class CanvasController:
 
     def set_alignment_mode(self, enabled: bool) -> None:
         self.controller.set_mode_alignment(enabled, self._alignment_tool)
+
+    def set_rigid_region_mode(
+        self, enabled: bool, target: Literal["ref", "dam"] = "ref"
+    ) -> None:
+        self._rigid_region_tool.set_target(target)
+        self.controller.set_mode_rigid_region(enabled, self._rigid_region_tool)
+
+    def clear_rigid_region_visuals(self) -> None:
+        self._rigid_region_tool.clear_visuals()
+
+    def show_rigid_region_anchor(self, target: Literal["ref", "dam"], region) -> None:
+        self._rigid_region_tool.set_target(target)
+        self._rigid_region_tool.show_anchor(target, region)
+
+    def show_rigid_region_suggestions(self, regions) -> None:
+        self._rigid_region_tool.show_suggestions(tuple(regions))
 
     def set_alignment_locked(self, locked: bool) -> None:
         self.alignment_locked = locked
@@ -313,12 +347,14 @@ class CanvasController:
         if item is not None and not self.alignment_locked:
             item.moveBy(dx, dy)
             self._update_scene_rect_from_items()
+            self._emit_alignment_state_changed()
 
     def rotate_selected(self, delta_deg: float) -> None:
         item = self._get_alignment_target_item()
         if item is not None and not self.alignment_locked:
             item.setRotation(float(item.rotation()) + float(delta_deg))
             self._update_scene_rect_from_items()
+            self._emit_alignment_state_changed()
 
     def scale_selected(self, factor: float) -> None:
         item = self._get_alignment_target_item()
@@ -326,6 +362,7 @@ class CanvasController:
             new_scale = float(item.scale()) * float(factor)
             item.setScale(new_scale)
             self._update_scene_rect_from_items()
+            self._emit_alignment_state_changed()
 
     def reset_selected_transform(self) -> None:
         item = self._get_alignment_target_item()
@@ -334,6 +371,7 @@ class CanvasController:
             item.setScale(1.0)
             item.setPos(0.0, 0.0)
             self._update_scene_rect_from_items()
+            self._emit_alignment_state_changed()
 
     def reset_all_transforms(self) -> None:
         if self.ref_item is not None:
@@ -347,6 +385,7 @@ class CanvasController:
             self.dam_item.setPos(0.0, 0.0)
 
         self._update_scene_rect_from_items()
+        self._emit_alignment_state_changed()
 
     # ---------------------- legacy helpers (compatibility) ----------------------
 
@@ -354,6 +393,7 @@ class CanvasController:
         if self.dam_item is not None and not self.alignment_locked:
             self.dam_item.moveBy(dx, dy)
             self._update_scene_rect_from_items()
+            self._emit_alignment_state_changed()
 
     def reset_deformed_transform(self) -> None:
         if self.dam_item is not None and not self.alignment_locked:
@@ -361,6 +401,7 @@ class CanvasController:
             self.dam_item.setScale(1.0)
             self.dam_item.setPos(0.0, 0.0)
             self._update_scene_rect_from_items()
+            self._emit_alignment_state_changed()
 
     def reset_reference_transform(self) -> None:
         if self.ref_item is not None:
@@ -368,6 +409,7 @@ class CanvasController:
             self.ref_item.setScale(1.0)
             self.ref_item.setPos(0.0, 0.0)
             self._update_scene_rect_from_items()
+            self._emit_alignment_state_changed()
 
     def get_deformed_transform(self):
         if self.dam_item is None:
@@ -388,6 +430,54 @@ class CanvasController:
         self.dam_item.setRotation(float(rotation_deg))
         self.dam_item.setPos(float(x), float(y))
         self._update_scene_rect_from_items()
+        self._emit_alignment_state_changed()
+
+    def apply_deformed_correction(
+        self, dx: float, dy: float, scale: float, rotation_deg: float
+    ) -> dict[str, float]:
+        """Compose a scene-space similarity with the current deformed item."""
+        if self.dam_item is None:
+            raise ValueError("The deformed image must be loaded before alignment")
+
+        theta = math.radians(float(rotation_deg))
+        cosine = math.cos(theta)
+        sine = math.sin(theta)
+
+        def corrected(point: QPointF) -> QPointF:
+            return QPointF(
+                float(dx)
+                + float(scale) * (cosine * point.x() - sine * point.y()),
+                float(dy)
+                + float(scale) * (sine * point.x() + cosine * point.y()),
+            )
+
+        origin_scene = corrected(self.dam_item.mapToScene(QPointF(0.0, 0.0)))
+        axis_scene = corrected(self.dam_item.mapToScene(QPointF(1.0, 0.0)))
+        vx = axis_scene.x() - origin_scene.x()
+        vy = axis_scene.y() - origin_scene.y()
+        scene_scale = math.hypot(vx, vy)
+        scene_rotation_deg = math.degrees(math.atan2(vy, vx))
+
+        center = self.dam_item.transformOriginPoint()
+        scene_theta = math.radians(scene_rotation_deg)
+        mapped_center_x = scene_scale * (
+            math.cos(scene_theta) * center.x()
+            - math.sin(scene_theta) * center.y()
+        )
+        mapped_center_y = scene_scale * (
+            math.sin(scene_theta) * center.x()
+            + math.cos(scene_theta) * center.y()
+        )
+        self.set_deformed_transform(
+            origin_scene.x() - center.x() + mapped_center_x,
+            origin_scene.y() - center.y() + mapped_center_y,
+            scene_scale,
+            scene_rotation_deg,
+        )
+        return self.get_deformed_transform()
+
+    def has_both_images(self) -> bool:
+        return self.ref_item is not None and self.dam_item is not None
 
     def get_reference_transform(self):
         if self.ref_item is None:
@@ -408,6 +498,7 @@ class CanvasController:
         self.ref_item.setRotation(float(rotation_deg))
         self.ref_item.setPos(float(x), float(y))
         self._update_scene_rect_from_items()
+        self._emit_alignment_state_changed()
 
     def _resource_path(self, relative: str) -> Path:
         base = getattr(sys, "_MEIPASS", None)
@@ -438,6 +529,7 @@ class CanvasController:
     # ---------------------- image loading ----------------------
 
     def load_reference(self, image_path: str | QPixmap) -> None:
+        self._cancel_rigid_region_selection()
         self._hide_welcome()
         pix = QPixmap(image_path)
         if pix.isNull():
@@ -456,8 +548,11 @@ class CanvasController:
 
         self._set_item_transform_origin_to_center(self.ref_item)
         self._fit_if_possible()
+        self._emit_images_changed()
+        self._emit_alignment_state_changed()
 
     def load_deformed(self, image_path: str | QPixmap) -> None:
+        self._cancel_rigid_region_selection()
         self._hide_welcome()
         pix = QPixmap(image_path)
         if pix.isNull():
@@ -477,6 +572,8 @@ class CanvasController:
 
         self._set_item_transform_origin_to_center(self.dam_item)
         self._fit_if_possible()
+        self._emit_images_changed()
+        self._emit_alignment_state_changed()
 
     def set_deformed_opacity(self, opacity: float) -> None:
         if self.dam_item is not None:
@@ -485,7 +582,11 @@ class CanvasController:
     # ---------------------- export ----------------------
 
     def export_scene_png(self, path: str) -> None:
-        self.exporter.export_scene_png(path)
+        self._rigid_region_tool.set_visuals_visible(False)
+        try:
+            self.exporter.export_scene_png(path)
+        finally:
+            self._rigid_region_tool.set_visuals_visible(True)
 
     def get_overlay_state(self) -> dict[str, Any]:
         return self.exporter.get_overlay_state()
@@ -591,6 +692,7 @@ class CanvasController:
         item.setTransformOriginPoint(rect.center())
 
     def clear_images(self) -> None:
+        self._cancel_rigid_region_selection()
         if self.ref_item is not None:
             self.scene.removeItem(self.ref_item)
             self.ref_item = None
@@ -605,3 +707,10 @@ class CanvasController:
         self.scene.setSceneRect(QRectF())
         self._zoom_factor = 1.0
         self._show_welcome()
+        self._emit_images_changed()
+        self._emit_alignment_state_changed()
+
+    def _cancel_rigid_region_selection(self) -> None:
+        self._rigid_region_tool.clear_visuals()
+        if self.controller.flags.rigid_region_mode:
+            self.set_rigid_region_mode(False)

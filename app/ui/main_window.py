@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from enum import Enum
+import logging
 from pathlib import Path
 
+import cv2
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
@@ -23,9 +25,24 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QRadioButton,
+    QButtonGroup,
 )
 
 from app.ui.canvas_view import CanvasView
+from app.core.auto_alignment import (
+    AlignmentDiagnostics,
+    AlignmentHypothesis,
+    AutoAlignmentError,
+    estimate_auto_alignment,
+)
+from app.core.rigid_region_alignment import (
+    RigidAlignmentResult,
+    RigidRegion,
+    expand_point_anchor_regions,
+    estimate_multiscale_rigid_alignment,
+    estimate_rigid_region_alignment,
+    suggest_rigid_region_anchors,
+)
 from app.core.project import Project, Point
 from app.ui.controllers.project_io_controller import ProjectIOController
 from app.ui.controllers.measurement_controller import MeasurementController
@@ -34,6 +51,9 @@ from app.ui.controllers.calc_controller import CalcController
 from app.ui.widgets.calc_panel import CalcPanel
 from app.report import generate_report
 from app.i18n import tr, set_language, get_language
+
+
+logger = logging.getLogger(__name__)
 
 
 class Stage(str, Enum):
@@ -76,6 +96,20 @@ class MainWindow(QMainWindow):
         self._ci_m: dict[int, float] = {}
         self._current_ci_index: int = 1
 
+        self._pending_auto_alignment: AlignmentHypothesis | None = None
+        self._auto_preview_baseline_dam_transform: dict[str, float] | None = None
+        self._auto_preview_active = False
+        self._rigid_reference_regions: list[RigidRegion] = []
+        self._last_applied_rigid_reference_regions: tuple[RigidRegion, ...] = ()
+        self._rigid_deformed_region: RigidRegion | None = None
+        self._rigid_alignment_result: RigidAlignmentResult | None = None
+        self._rigid_baseline_ref_transform: dict[str, float] | None = None
+        self._rigid_baseline_dam_transform: dict[str, float] | None = None
+        self._rigid_expansion_attempted = False
+        self._rigid_internal_transform_change = False
+        self._rigid_preview_active = False
+        self._rigid_instruction_key: str | None = None
+
         self._total_energy: float | None = None
         self._vehicle_mass_kg: float | None = None
         self._damage_speed_mps: float | None = None
@@ -102,6 +136,9 @@ class MainWindow(QMainWindow):
         self.canvas.w_cleared.connect(self.meas.on_w_cleared)
         self.canvas.ci_measured.connect(self.meas.on_ci_measured)
         self.canvas.ci_selected.connect(self._on_canvas_ci_selected)
+        self.canvas.alignment_state_changed.connect(self._on_alignment_state_changed)
+        self.canvas.images_changed.connect(self._on_images_changed)
+        self.canvas.rigid_region_selected.connect(self._on_rigid_region_selected)
 
         self._update_ci_label()
         self._sync_ci_radio_buttons()
@@ -202,11 +239,14 @@ class MainWindow(QMainWindow):
         dock_layout.addWidget(self.load_group)
 
         self.lbl_overlay_opacity = QLabel(tr("label.overlay_opacity"))
-        dock_layout.addWidget(self.lbl_overlay_opacity)
         self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self.opacity_slider.setRange(0, 100)
         self.opacity_slider.setValue(50)
-        dock_layout.addWidget(self.opacity_slider)
+
+        self.fine_adjust_group = QGroupBox(tr("group.fine_adjustment"))
+        fine_layout = QVBoxLayout(self.fine_adjust_group)
+        fine_layout.addWidget(self.lbl_overlay_opacity)
+        fine_layout.addWidget(self.opacity_slider)
 
         # --- Alignment group ---
         self.align_group = QGroupBox(tr("group.alignment"))
@@ -214,8 +254,8 @@ class MainWindow(QMainWindow):
 
         self.chk_alignment_mode = QCheckBox(tr("check.alignment_mode"))
         self.chk_lock_alignment = QCheckBox(tr("check.lock_alignment"))
-        align_layout.addWidget(self.chk_alignment_mode)
-        align_layout.addWidget(self.chk_lock_alignment)
+        fine_layout.addWidget(self.chk_alignment_mode)
+        fine_layout.addWidget(self.chk_lock_alignment)
 
         row_target = QHBoxLayout()
         self.lbl_editable_image = QLabel(tr("label.editable_image"))
@@ -227,10 +267,64 @@ class MainWindow(QMainWindow):
         self.canvas.set_alignment_target("dam")
         row_target.addWidget(self.cmb_alignment_target)
 
-        align_layout.addLayout(row_target)
+        fine_layout.addLayout(row_target)
 
         self.btn_reset_alignment = QPushButton(tr("button.reset_selected_transform"))
-        align_layout.addWidget(self.btn_reset_alignment)
+        fine_layout.addWidget(self.btn_reset_alignment)
+
+        self.lbl_alignment_method = QLabel(tr("label.alignment_method"))
+        align_layout.addWidget(self.lbl_alignment_method)
+        method_row = QHBoxLayout()
+        self.rad_alignment_auto = QRadioButton(tr("alignment.method.auto"))
+        self.rad_alignment_rigid = QRadioButton(tr("alignment.method.rigid"))
+        self.alignment_method_buttons = QButtonGroup(self)
+        self.alignment_method_buttons.setExclusive(True)
+        self.alignment_method_buttons.addButton(self.rad_alignment_auto)
+        self.alignment_method_buttons.addButton(self.rad_alignment_rigid)
+        self.rad_alignment_auto.setChecked(True)
+        method_row.addWidget(self.rad_alignment_auto)
+        method_row.addWidget(self.rad_alignment_rigid)
+        align_layout.addLayout(method_row)
+
+        self.btn_start_alignment = QPushButton(tr("button.start_alignment"))
+        self.btn_start_alignment.setEnabled(False)
+        align_layout.addWidget(self.btn_start_alignment)
+
+        self.lbl_rigid_region_instruction = QLabel()
+        self.lbl_rigid_region_instruction.setWordWrap(True)
+        self.lbl_rigid_region_instruction.setText(
+            tr("alignment.status.choose_method")
+        )
+        align_layout.addWidget(self.lbl_rigid_region_instruction)
+
+        self.alignment_actions_widget = QWidget()
+        rigid_actions = QHBoxLayout(self.alignment_actions_widget)
+        rigid_actions.setContentsMargins(0, 0, 0, 0)
+        self.btn_rigid_apply = QPushButton(tr("button.rigid_apply"))
+        self.btn_rigid_try_again = QPushButton(tr("button.rigid_try_again"))
+        self.btn_rigid_cancel = QPushButton(tr("button.rigid_cancel"))
+
+        self.btn_apply_alignment_suggestion = QPushButton(
+            tr("button.apply_alignment_suggestion")
+        )
+        self.btn_apply_alignment_suggestion.setEnabled(False)
+        self.btn_apply_alignment_suggestion.setVisible(False)
+        rigid_actions.addWidget(self.btn_apply_alignment_suggestion)
+
+        for button in (
+            self.btn_rigid_apply,
+            self.btn_rigid_try_again,
+            self.btn_rigid_cancel,
+        ):
+            button.setVisible(False)
+            rigid_actions.addWidget(button)
+        self.alignment_actions_widget.setVisible(False)
+        align_layout.addWidget(self.alignment_actions_widget)
+
+        self.btn_finish_alignment = QPushButton(tr("button.finish_alignment"))
+        self.btn_finish_alignment.setVisible(False)
+        self.btn_finish_alignment.setEnabled(False)
+        align_layout.addWidget(self.btn_finish_alignment)
 
         self.nudge_box = QGroupBox(tr("group.nudge"))
         nudge_layout = QVBoxLayout(self.nudge_box)
@@ -267,7 +361,7 @@ class MainWindow(QMainWindow):
         nudge_layout.addLayout(grid_mid)
         nudge_layout.addLayout(grid_bot)
 
-        align_layout.addWidget(self.nudge_box)
+        fine_layout.addWidget(self.nudge_box)
 
         self.rotate_box = QGroupBox(tr("group.rotate"))
         rotate_layout = QHBoxLayout(self.rotate_box)
@@ -287,7 +381,7 @@ class MainWindow(QMainWindow):
         self.spn_rotate_step.setValue(1.0)
         rotate_layout.addWidget(self.spn_rotate_step)
 
-        align_layout.addWidget(self.rotate_box)
+        fine_layout.addWidget(self.rotate_box)
 
         self.scale_box = QGroupBox(tr("group.scale"))
         scale_layout = QHBoxLayout(self.scale_box)
@@ -323,16 +417,14 @@ class MainWindow(QMainWindow):
         self.spn_scale_step.setValue(1.0)
         scale_layout.addWidget(self.spn_scale_step)
 
-        align_layout.addWidget(self.scale_box)
+        fine_layout.addWidget(self.scale_box)
 
         self.lbl_alignment_shortcuts = QLabel(tr("label.alignment_shortcuts"))
         self.lbl_alignment_shortcuts.setWordWrap(True)
-        align_layout.addWidget(self.lbl_alignment_shortcuts)
-
-        self.btn_finish_alignment = QPushButton(tr("button.finish_alignment"))
-        align_layout.addWidget(self.btn_finish_alignment)
+        fine_layout.addWidget(self.lbl_alignment_shortcuts)
 
         dock_layout.addWidget(self.align_group)
+        dock_layout.addWidget(self.fine_adjust_group)
 
         # --- Calibration group ---
         self.cal_group = QGroupBox(tr("group.calibration"))
@@ -479,6 +571,15 @@ class MainWindow(QMainWindow):
         self.chk_alignment_mode.toggled.connect(self._on_alignment_mode_toggled)
         self.chk_lock_alignment.toggled.connect(self._on_lock_alignment_toggled)
         self.btn_reset_alignment.clicked.connect(self._on_reset_alignment)
+        self.btn_start_alignment.clicked.connect(self._on_start_alignment)
+        self.btn_rigid_apply.clicked.connect(self._on_apply_rigid_region_preview)
+        self.btn_rigid_try_again.clicked.connect(
+            self._on_try_another_rigid_region
+        )
+        self.btn_rigid_cancel.clicked.connect(self._on_cancel_alignment_preview)
+        self.btn_apply_alignment_suggestion.clicked.connect(
+            self._on_apply_auto_alignment_suggestion
+        )
 
         self.cmb_alignment_target.currentIndexChanged.connect(
             self._on_alignment_target_changed
@@ -548,6 +649,7 @@ class MainWindow(QMainWindow):
         self.lbl_overlay_opacity.setText(tr("label.overlay_opacity"))
 
         self.align_group.setTitle(tr("group.alignment"))
+        self.fine_adjust_group.setTitle(tr("group.fine_adjustment"))
         self.nudge_box.setTitle(tr("group.nudge"))
         self.rotate_box.setTitle(tr("group.rotate"))
         self.scale_box.setTitle(tr("group.scale"))
@@ -557,6 +659,24 @@ class MainWindow(QMainWindow):
         self.cmb_alignment_target.setItemText(0, tr("combo.deformed"))
         self.cmb_alignment_target.setItemText(1, tr("combo.reference"))
         self.btn_reset_alignment.setText(tr("button.reset_selected_transform"))
+        self.lbl_alignment_method.setText(tr("label.alignment_method"))
+        self.rad_alignment_auto.setText(tr("alignment.method.auto"))
+        self.rad_alignment_rigid.setText(tr("alignment.method.rigid"))
+        self.btn_start_alignment.setText(tr("button.start_alignment"))
+        self.btn_rigid_apply.setText(tr("button.rigid_apply"))
+        self.btn_rigid_try_again.setText(tr("button.rigid_try_again"))
+        self.btn_rigid_cancel.setText(tr("button.rigid_cancel"))
+        if self._rigid_instruction_key is not None:
+            self.lbl_rigid_region_instruction.setText(
+                tr(self._rigid_instruction_key)
+            )
+        else:
+            self.lbl_rigid_region_instruction.setText(
+                tr("alignment.status.choose_method")
+            )
+        self.btn_apply_alignment_suggestion.setText(
+            tr("button.apply_alignment_suggestion")
+        )
         self.btn_rotate_minus.setText(tr("button.rotate_minus"))
         self.btn_rotate_plus.setText(tr("button.rotate_plus"))
         self.lbl_step_deg.setText(tr("label.step_deg"))
@@ -684,6 +804,620 @@ class MainWindow(QMainWindow):
     def _on_reset_alignment(self) -> None:
         self.canvas.reset_all_transforms()
 
+    def _update_auto_align_availability(self) -> None:
+        available = self.canvas.has_both_images()
+        self.btn_start_alignment.setEnabled(available)
+
+    def _on_start_alignment(self) -> None:
+        if self.rad_alignment_rigid.isChecked():
+            self._on_start_rigid_region_alignment()
+        else:
+            self._on_auto_align()
+
+    def _set_rigid_instruction(self, key: str | None) -> None:
+        self._rigid_instruction_key = key
+        self.lbl_rigid_region_instruction.setText(
+            tr(key) if key else tr("alignment.status.choose_method")
+        )
+        self.lbl_rigid_region_instruction.setVisible(True)
+
+    def _show_finish_alignment(self) -> None:
+        self._set_rigid_action_visibility(
+            apply=False, try_again=False, cancel=False
+        )
+        self.btn_apply_alignment_suggestion.setVisible(False)
+        self.btn_apply_alignment_suggestion.setEnabled(False)
+        self._update_alignment_actions_visibility()
+        self.lbl_rigid_region_instruction.setVisible(False)
+        self.btn_finish_alignment.setVisible(True)
+        self.btn_finish_alignment.setEnabled(True)
+
+    def _hide_finish_alignment(self) -> None:
+        self.btn_finish_alignment.setVisible(False)
+        self.btn_finish_alignment.setEnabled(False)
+
+    def _set_rigid_action_visibility(
+        self, *, apply: bool, try_again: bool, cancel: bool
+    ) -> None:
+        self.btn_rigid_apply.setVisible(apply)
+        self.btn_rigid_apply.setEnabled(apply)
+        self.btn_rigid_try_again.setVisible(try_again)
+        self.btn_rigid_try_again.setEnabled(try_again)
+        self.btn_rigid_cancel.setVisible(cancel)
+        self.btn_rigid_cancel.setEnabled(cancel)
+        self._update_alignment_actions_visibility()
+
+    def _update_alignment_actions_visibility(self) -> None:
+        buttons = (
+            self.btn_apply_alignment_suggestion,
+            self.btn_rigid_apply,
+            self.btn_rigid_try_again,
+            self.btn_rigid_cancel,
+        )
+        self.alignment_actions_widget.setVisible(
+            any(not button.isHidden() for button in buttons)
+        )
+
+    def _on_alignment_state_changed(self) -> None:
+        if self._rigid_internal_transform_change:
+            return
+        had_auto_preview = self._auto_preview_active
+        self._invalidate_auto_alignment_suggestion()
+        if had_auto_preview:
+            self._set_rigid_action_visibility(
+                apply=False, try_again=False, cancel=False
+            )
+            self._set_rigid_instruction(None)
+        if self._rigid_baseline_ref_transform is not None:
+            self._discard_rigid_region_state(restore=False, clear_visuals=True)
+
+    def _on_images_changed(self) -> None:
+        self._last_applied_rigid_reference_regions = ()
+        self._hide_finish_alignment()
+        self._set_rigid_instruction(None)
+
+    def _set_canvas_alignment_transforms(
+        self,
+        ref_transform: dict[str, float] | None,
+        dam_transform: dict[str, float] | None,
+    ) -> None:
+        self._rigid_internal_transform_change = True
+        try:
+            if ref_transform is not None:
+                self.canvas.set_reference_transform(
+                    ref_transform["x"],
+                    ref_transform["y"],
+                    ref_transform["scale"],
+                    ref_transform["rotation_deg"],
+                )
+            if dam_transform is not None:
+                self.canvas.set_deformed_transform(
+                    dam_transform["x"],
+                    dam_transform["y"],
+                    dam_transform["scale"],
+                    dam_transform["rotation_deg"],
+                )
+        finally:
+            self._rigid_internal_transform_change = False
+
+    def _discard_rigid_region_state(
+        self, *, restore: bool, clear_visuals: bool
+    ) -> None:
+        if restore:
+            self._set_canvas_alignment_transforms(
+                self._rigid_baseline_ref_transform,
+                self._rigid_baseline_dam_transform,
+            )
+        self.canvas.set_rigid_region_mode(False)
+        if clear_visuals:
+            self.canvas.clear_rigid_region_visuals()
+        self._rigid_reference_regions = []
+        self._rigid_deformed_region = None
+        self._rigid_alignment_result = None
+        self._rigid_baseline_ref_transform = None
+        self._rigid_baseline_dam_transform = None
+        self._rigid_expansion_attempted = False
+        self._rigid_preview_active = False
+        self._set_rigid_instruction(None)
+        self._set_rigid_action_visibility(
+            apply=False, try_again=False, cancel=False
+        )
+
+    def _on_start_rigid_region_alignment(self) -> None:
+        if not self.canvas.has_both_images():
+            return
+        if self.chk_lock_alignment.isChecked():
+            QMessageBox.warning(
+                self,
+                tr("alignment.rigid.title"),
+                tr("alignment.auto.locked"),
+            )
+            return
+        self._discard_auto_alignment_preview(restore=True)
+        self._hide_finish_alignment()
+        if self._rigid_baseline_ref_transform is not None:
+            self._discard_rigid_region_state(restore=True, clear_visuals=True)
+        self.canvas.clear_rigid_region_visuals()
+        self._last_applied_rigid_reference_regions = ()
+        if self.chk_alignment_mode.isChecked():
+            self.chk_alignment_mode.setChecked(False)
+        self._rigid_baseline_ref_transform = dict(
+            self.canvas.get_reference_transform()
+        )
+        self._rigid_baseline_dam_transform = dict(
+            self.canvas.get_deformed_transform()
+        )
+        self._rigid_reference_regions = []
+        self._rigid_deformed_region = None
+        self._rigid_alignment_result = None
+        self._rigid_preview_active = False
+        self._rigid_expansion_attempted = False
+        suggestion_regions: tuple[RigidRegion, ...] = ()
+        try:
+            suggestions = suggest_rigid_region_anchors(
+                self.project.ref_path,
+                self.project.dam_path,
+            )
+            suggestion_regions = tuple(
+                item.region for item in suggestions.suggestions
+            )
+            logger.info(
+                "Rigid anchor suggestions: ref_keypoints=%d dam_keypoints=%d "
+                "suggestions=%s",
+                suggestions.reference_keypoints,
+                suggestions.deformed_keypoints,
+                suggestions.suggestions,
+            )
+        except (ValueError, cv2.error):
+            logger.exception("Could not generate rigid anchor suggestions")
+        if suggestion_regions:
+            self.canvas.show_rigid_region_suggestions(suggestion_regions)
+            self._set_rigid_instruction(
+                "alignment.rigid.instruction.suggestions"
+            )
+        else:
+            self._set_rigid_instruction("alignment.rigid.instruction.reference")
+        self._set_rigid_action_visibility(
+            apply=False, try_again=False, cancel=True
+        )
+        self.canvas.set_rigid_region_mode(True, "ref")
+
+    def _on_rigid_region_selected(self, target: str, region: object) -> None:
+        if not isinstance(region, RigidRegion):
+            return
+        if target == "ref":
+            if len(self._rigid_reference_regions) >= 3:
+                return
+            self._rigid_reference_regions.append(region)
+            count = len(self._rigid_reference_regions)
+            if count < 3:
+                self._rigid_instruction_key = None
+                self.lbl_rigid_region_instruction.setText(
+                    tr(
+                        "alignment.rigid.instruction.reference_progress",
+                        count=count,
+                    )
+                )
+                return
+            self._estimate_rigid_region_preview()
+        elif target == "dam":
+            self._rigid_deformed_region = region
+            self._estimate_rigid_region_preview()
+
+    def _estimate_rigid_region_preview(self) -> None:
+        reference_regions = tuple(self._rigid_reference_regions)
+        if len(reference_regions) != 3:
+            return
+        ref_path = self.project.ref_path
+        dam_path = self.project.dam_path
+        if not ref_path or not dam_path:
+            return
+        result = estimate_rigid_region_alignment(
+            ref_path,
+            dam_path,
+            reference_regions,
+            deformed_region=self._rigid_deformed_region,
+            reference_transform=self.canvas.get_reference_transform(),
+            deformed_transform=self.canvas.get_deformed_transform(),
+            expansion_attempted=self._rigid_expansion_attempted,
+        )
+        structural_regions = reference_regions
+        if (
+            result.status == "needs_second_region"
+            and self._rigid_deformed_region is None
+        ):
+            self._rigid_expansion_attempted = True
+            logger.info(
+                "Rigid-region alignment retrying with expanded point ROIs: "
+                "initial_reason=%s anchor_matches=%s",
+                result.reason,
+                result.diagnostics.anchor_matches,
+            )
+            expanded_regions = expand_point_anchor_regions(reference_regions)
+            structural_regions = expanded_regions
+            result = estimate_rigid_region_alignment(
+                ref_path,
+                dam_path,
+                expanded_regions,
+                reference_transform=self.canvas.get_reference_transform(),
+                deformed_transform=self.canvas.get_deformed_transform(),
+            )
+        if (
+            result.status == "needs_second_region"
+            and self._rigid_deformed_region is None
+        ):
+            logger.info(
+                "Rigid-region alignment retrying with normalized multiscale "
+                "ROIs: expanded_reason=%s anchor_matches=%s",
+                result.reason,
+                result.diagnostics.anchor_matches,
+            )
+            result = estimate_multiscale_rigid_alignment(
+                ref_path,
+                dam_path,
+                structural_regions,
+                reference_transform=self.canvas.get_reference_transform(),
+                deformed_transform=self.canvas.get_deformed_transform(),
+            )
+        if (
+            result.status == "needs_second_region"
+            and self._rigid_deformed_region is None
+        ):
+            logger.info(
+                "Rigid-region alignment retrying with structural gradients: "
+                "multiscale_reason=%s anchor_matches=%s",
+                result.reason,
+                result.diagnostics.anchor_matches,
+            )
+            result = estimate_rigid_region_alignment(
+                ref_path,
+                dam_path,
+                structural_regions,
+                reference_transform=self.canvas.get_reference_transform(),
+                deformed_transform=self.canvas.get_deformed_transform(),
+                expansion_attempted=True,
+                structural_fallback=True,
+            )
+        self._rigid_alignment_result = result
+        logger.info(
+            "Rigid-region alignment: status=%s reason=%s region=%s "
+            "keypoints=%d "
+            "matches=%d anchor_keypoints=%s anchor_matches=%s roi_scale=%.2f "
+            "expansion_attempted=%s normalized_multiscale=%s scales=%s "
+            "structural_fallback=%s candidates=%s",
+            result.status,
+            result.reason,
+            reference_regions,
+            result.diagnostics.region_keypoints,
+            result.diagnostics.accepted_matches,
+            result.diagnostics.anchor_keypoints,
+            result.diagnostics.anchor_matches,
+            result.diagnostics.roi_scale,
+            result.diagnostics.expansion_attempted,
+            result.diagnostics.normalized_multiscale,
+            result.diagnostics.detection_scales,
+            result.diagnostics.structural_fallback,
+            result.candidates,
+        )
+        if result.status == "needs_second_region":
+            self._set_rigid_instruction("alignment.rigid.instruction.deformed")
+            self._set_rigid_action_visibility(
+                apply=False, try_again=True, cancel=True
+            )
+            self.canvas.set_rigid_region_mode(True, "dam")
+            QMessageBox.information(
+                self,
+                tr("alignment.rigid.title"),
+                tr("alignment.rigid.second_region"),
+            )
+            return
+        if result.status != "success" or result.best is None:
+            self.canvas.set_rigid_region_mode(False)
+            self._set_rigid_action_visibility(
+                apply=False, try_again=True, cancel=True
+            )
+            QMessageBox.warning(
+                self,
+                tr("alignment.rigid.title"),
+                tr("alignment.rigid.failure"),
+            )
+            return
+
+        candidate = result.best
+        self._rigid_internal_transform_change = True
+        try:
+            self.canvas.apply_deformed_correction(
+                candidate.dx,
+                candidate.dy,
+                candidate.scale,
+                candidate.rotation_deg,
+            )
+        finally:
+            self._rigid_internal_transform_change = False
+        self._rigid_preview_active = True
+        self.canvas.set_rigid_region_mode(False)
+        self._set_rigid_instruction("alignment.rigid.instruction.preview")
+        self._set_rigid_action_visibility(
+            apply=True, try_again=True, cancel=True
+        )
+
+    def _on_apply_rigid_region_preview(self) -> None:
+        if not self._rigid_preview_active:
+            return
+        ref_transform = self.canvas.get_reference_transform()
+        dam_transform = self.canvas.get_deformed_transform()
+        self.project.ref_transform.x = ref_transform["x"]
+        self.project.ref_transform.y = ref_transform["y"]
+        self.project.ref_transform.scale = ref_transform["scale"]
+        self.project.ref_transform.rotation_deg = ref_transform["rotation_deg"]
+        self.project.dam_transform.x = dam_transform["x"]
+        self.project.dam_transform.y = dam_transform["y"]
+        self.project.dam_transform.scale = dam_transform["scale"]
+        self.project.dam_transform.rotation_deg = dam_transform["rotation_deg"]
+        self._last_applied_rigid_reference_regions = tuple(
+            self._rigid_reference_regions
+        )
+        self._discard_rigid_region_state(restore=False, clear_visuals=True)
+        self._refresh_summary()
+        self._show_finish_alignment()
+
+    def _on_try_another_rigid_region(self) -> None:
+        if self._rigid_baseline_ref_transform is None:
+            return
+        baseline_ref = dict(self._rigid_baseline_ref_transform)
+        baseline_dam = dict(self._rigid_baseline_dam_transform or {})
+        self._set_canvas_alignment_transforms(baseline_ref, baseline_dam)
+        self.canvas.clear_rigid_region_visuals()
+        self._rigid_reference_regions = []
+        self._rigid_deformed_region = None
+        self._rigid_alignment_result = None
+        self._rigid_expansion_attempted = False
+        self._rigid_preview_active = False
+        self._set_rigid_instruction("alignment.rigid.instruction.reference")
+        self._set_rigid_action_visibility(
+            apply=False, try_again=False, cancel=True
+        )
+        self.canvas.set_rigid_region_mode(True, "ref")
+
+    def _on_cancel_rigid_region_alignment(self) -> None:
+        self._discard_rigid_region_state(restore=True, clear_visuals=True)
+
+    def _on_cancel_alignment_preview(self) -> None:
+        if self._auto_preview_active:
+            self._discard_auto_alignment_preview(restore=True)
+            self._set_rigid_action_visibility(
+                apply=False, try_again=False, cancel=False
+            )
+            self._set_rigid_instruction(None)
+            return
+        self._on_cancel_rigid_region_alignment()
+
+    def _invalidate_auto_alignment_suggestion(self) -> None:
+        self._pending_auto_alignment = None
+        self._auto_preview_baseline_dam_transform = None
+        self._auto_preview_active = False
+        if hasattr(self, "btn_apply_alignment_suggestion"):
+            self.btn_apply_alignment_suggestion.setEnabled(False)
+            self.btn_apply_alignment_suggestion.setVisible(False)
+            self._update_alignment_actions_visibility()
+
+    def _discard_auto_alignment_preview(self, *, restore: bool) -> None:
+        baseline = self._auto_preview_baseline_dam_transform
+        if restore and baseline is not None:
+            self._set_canvas_alignment_transforms(None, baseline)
+        self._invalidate_auto_alignment_suggestion()
+
+    def _preview_auto_alignment(
+        self, hypothesis: AlignmentHypothesis
+    ) -> None:
+        self._discard_auto_alignment_preview(restore=True)
+        self._auto_preview_baseline_dam_transform = dict(
+            self.canvas.get_deformed_transform()
+        )
+        self._rigid_internal_transform_change = True
+        try:
+            self.canvas.apply_deformed_correction(
+                hypothesis.dx,
+                hypothesis.dy,
+                hypothesis.scale,
+                hypothesis.rotation_deg,
+            )
+        finally:
+            self._rigid_internal_transform_change = False
+        self._pending_auto_alignment = hypothesis
+        self._auto_preview_active = True
+        self.btn_apply_alignment_suggestion.setVisible(True)
+        self.btn_apply_alignment_suggestion.setEnabled(True)
+        self._set_rigid_action_visibility(
+            apply=False, try_again=False, cancel=True
+        )
+        self._set_rigid_instruction("alignment.status.auto_medium")
+
+    def _on_apply_auto_alignment_suggestion(self) -> None:
+        hypothesis = self._pending_auto_alignment
+        if hypothesis is None or not self._auto_preview_active:
+            return
+        if self.chk_lock_alignment.isChecked():
+            QMessageBox.warning(
+                self,
+                tr("alignment.auto.title"),
+                tr("alignment.auto.locked"),
+            )
+            return
+        applied = self.canvas.get_deformed_transform()
+        self._invalidate_auto_alignment_suggestion()
+        self.cmb_alignment_target.setCurrentIndex(0)
+        self.canvas.set_alignment_target("dam")
+        self.project.dam_transform.x = applied["x"]
+        self.project.dam_transform.y = applied["y"]
+        self.project.dam_transform.scale = applied["scale"]
+        self.project.dam_transform.rotation_deg = applied["rotation_deg"]
+        self._refresh_summary()
+        self._show_finish_alignment()
+        logger.info(
+            "Automatic alignment preview accepted: "
+            "dx=%.3f dy=%.3f rotation=%.4f scale=%.6f",
+            hypothesis.dx,
+            hypothesis.dy,
+            hypothesis.rotation_deg,
+            hypothesis.scale,
+        )
+
+    @staticmethod
+    def _format_alignment_diagnostics_for_log(
+        diagnostics: AlignmentDiagnostics | None,
+    ) -> str:
+        if diagnostics is None:
+            return "diagnostics unavailable"
+        return (
+            f"keypoints_ref={diagnostics.reference_keypoints} "
+            f"keypoints_deformed={diagnostics.deformed_keypoints} "
+            f"candidate_matches={diagnostics.candidate_matches} "
+            f"accepted_matches={diagnostics.accepted_matches}"
+        )
+
+    def _on_auto_align(self) -> None:
+        if not self.canvas.has_both_images():
+            return
+        if self.chk_lock_alignment.isChecked():
+            QMessageBox.warning(
+                self,
+                tr("alignment.auto.title"),
+                tr("alignment.auto.locked"),
+            )
+            return
+
+        if self._rigid_baseline_ref_transform is not None:
+            self._discard_rigid_region_state(restore=True, clear_visuals=True)
+        self._discard_auto_alignment_preview(restore=True)
+        self._hide_finish_alignment()
+
+        ref_path = self.project.ref_path
+        dam_path = self.project.dam_path
+        if not ref_path or not dam_path:
+            return
+
+        self.btn_start_alignment.setEnabled(False)
+        try:
+            result = estimate_auto_alignment(
+                ref_path,
+                dam_path,
+                reference_transform=self.canvas.get_reference_transform(),
+                deformed_transform=self.canvas.get_deformed_transform(),
+            )
+            metrics = self._format_alignment_diagnostics_for_log(
+                result.diagnostics
+            )
+            for rank, hypothesis in enumerate(result.hypotheses, start=1):
+                logger.info(
+                    "Auto-alignment hypothesis %d (model %d): score=%.2f "
+                    "inliers=%d ratio=%.3f rmse=%.3f dx=%.3f dy=%.3f "
+                    "rotation=%.4f scale=%.6f centroid=(%.3f, %.3f) "
+                    "bbox=(%.3f, %.3f, %.3f, %.3f) "
+                    "dispersion=(%.3f, %.3f) support_area=%.4f "
+                    "edge_fraction=%.3f body_fraction=%.3f",
+                    rank,
+                    hypothesis.model_index,
+                    hypothesis.score,
+                    hypothesis.inliers,
+                    hypothesis.inlier_ratio,
+                    hypothesis.inlier_rmse_px,
+                    hypothesis.dx,
+                    hypothesis.dy,
+                    hypothesis.rotation_deg,
+                    hypothesis.scale,
+                    hypothesis.centroid_x,
+                    hypothesis.centroid_y,
+                    hypothesis.bbox_x_min,
+                    hypothesis.bbox_y_min,
+                    hypothesis.bbox_x_max,
+                    hypothesis.bbox_y_max,
+                    hypothesis.dispersion_x,
+                    hypothesis.dispersion_y,
+                    hypothesis.support_area_ratio,
+                    hypothesis.edge_fraction,
+                    hypothesis.body_fraction,
+                )
+                refinement = hypothesis.refinement
+                if refinement is not None:
+                    logger.info(
+                        "Auto-alignment rigid refinement for model %d: "
+                        "matches=%d rmse_before=%s rmse_after=%s used=%s "
+                        "original=(%.3f, %.3f, %.4f, %.6f) "
+                        "refined=(%s, %s, %s, %s)",
+                        hypothesis.model_index,
+                        refinement.rigid_matches,
+                        refinement.rmse_before_px,
+                        refinement.rmse_after_px,
+                        refinement.used_refined,
+                        refinement.original_dx,
+                        refinement.original_dy,
+                        refinement.original_rotation_deg,
+                        refinement.original_scale,
+                        refinement.refined_dx,
+                        refinement.refined_dy,
+                        refinement.refined_rotation_deg,
+                        refinement.refined_scale,
+                    )
+
+            if result.confidence == "medium" and result.best is not None:
+                self._preview_auto_alignment(result.best)
+                logger.warning(
+                    "Auto-alignment preview created: confidence=%s reasons=%s; %s",
+                    result.confidence,
+                    ",".join(result.confidence_reasons),
+                    metrics.replace("\n", "; "),
+                )
+                return
+
+            selected = result.selected
+            if result.confidence != "high" or selected is None:
+                self._set_rigid_instruction("alignment.status.auto_low")
+                logger.warning(
+                    "Auto-alignment not applied: confidence=%s reasons=%s; %s",
+                    result.confidence,
+                    ",".join(result.confidence_reasons),
+                    metrics.replace("\n", "; "),
+                )
+                return
+
+            self._preview_auto_alignment(selected)
+
+            logger.info(
+                "Auto-alignment preview created: dx=%.3f dy=%.3f rotation=%.4f "
+                "scale=%.6f; %s",
+                selected.dx,
+                selected.dy,
+                selected.rotation_deg,
+                selected.scale,
+                metrics.replace("\n", "; "),
+            )
+        except AutoAlignmentError as error:
+            self._set_rigid_instruction("alignment.status.auto_low")
+            metrics = self._format_alignment_diagnostics_for_log(
+                error.diagnostics
+            )
+            logger.warning(
+                "Auto-alignment rejected (%s): %s",
+                error.code,
+                metrics.replace("\n", "; "),
+            )
+            QMessageBox.warning(
+                self,
+                tr("alignment.auto.title"),
+                tr("alignment.auto.failure"),
+            )
+        except Exception:
+            self._set_rigid_instruction("alignment.status.auto_low")
+            logger.exception("Auto-alignment failed")
+            QMessageBox.warning(
+                self,
+                tr("alignment.auto.title"),
+                tr("alignment.auto.failure"),
+            )
+        finally:
+            self._update_auto_align_availability()
+
     def _on_rotate_minus(self) -> None:
         step_deg = float(self.spn_rotate_step.value())
         self.canvas.rotate_selected(-step_deg)
@@ -703,10 +1437,22 @@ class MainWindow(QMainWindow):
         self.canvas.scale_selected(factor)
 
     def _on_finish_alignment(self) -> None:
+        self.canvas.set_rigid_region_mode(False)
+        self.canvas.clear_rigid_region_visuals()
+        self._discard_auto_alignment_preview(restore=False)
+        self._discard_rigid_region_state(restore=False, clear_visuals=True)
+        self._set_rigid_action_visibility(
+            apply=False, try_again=False, cancel=False
+        )
+        self.lbl_rigid_region_instruction.setVisible(False)
+        self._hide_finish_alignment()
         self.workflow.finish_alignment()
 
     def _on_restart_alignment(self) -> None:
         self.workflow.restart_from_alignment()
+        if self.stage == self.Stage.ALIGNMENT:
+            self._set_rigid_instruction(None)
+            self._hide_finish_alignment()
 
     def _on_restart_calibration(self) -> None:
         self.workflow.restart_from_calibration()
