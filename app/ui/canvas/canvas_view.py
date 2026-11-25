@@ -195,6 +195,9 @@ class CanvasView(QGraphicsView):
     def has_both_images(self) -> bool:
         return self.ctrl.has_both_images()
 
+    def has_images(self) -> bool:
+        return self.ctrl.ref_item is not None or self.ctrl.dam_item is not None
+
     def get_reference_transform(self):
         return self.ctrl.get_reference_transform()
 

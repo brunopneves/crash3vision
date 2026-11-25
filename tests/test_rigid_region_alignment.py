@@ -539,7 +539,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertFalse(window.lbl_rigid_region_instruction.isHidden())
         self.assertEqual(
             window.lbl_rigid_region_instruction.text(),
-            "Escolha o método de alinhamento.",
+            "Escolha um método de alinhamento ou avance direto para a calibração.",
         )
         self.assertTrue(window.alignment_actions_widget.isHidden())
         self.assertTrue(window.btn_rigid_apply.isHidden())
@@ -585,6 +585,34 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             window.rad_alignment_rigid.setChecked(True)
             window.btn_start_alignment.click()
             rigid_align.assert_called_once_with()
+
+    def test_deformed_image_alone_can_continue_directly_to_calibration(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        self.assertTrue(window.btn_finish_alignment.isHidden())
+        dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
+        with patch.object(window.io, "pick_image_file", return_value=dam_path):
+            window.io.load_dam()
+
+        self.assertFalse(window.btn_finish_alignment.isHidden())
+        self.assertFalse(window.btn_start_alignment.isEnabled())
+        window.btn_finish_alignment.click()
+        self.assertEqual(window.stage, window.Stage.CALIBRATION)
+
+    def test_two_images_can_continue_with_or_without_manual_adjustment(self) -> None:
+        for manual in (False, True):
+            with self.subTest(manual=manual):
+                window = self._window()
+                baseline = window.canvas.get_deformed_transform()
+                if manual:
+                    window.canvas.nudge_selected(4.0, -2.0)
+                expected = window.canvas.get_deformed_transform()
+                self.assertEqual(expected["x"], baseline["x"] + (4 if manual else 0))
+
+                self.assertFalse(window.btn_finish_alignment.isHidden())
+                window.btn_finish_alignment.click()
+                self.assertEqual(window.stage, window.Stage.CALIBRATION)
+                self.assertEqual(window.canvas.get_deformed_transform(), expected)
 
     def test_weak_first_search_requests_second_region(self) -> None:
         blank = np.zeros((400, 600), dtype=np.uint8)
@@ -652,6 +680,10 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             estimator.call_args_list[3].kwargs["deformed_region"],
             deformed_region,
         )
+        self.assertTrue(window._rigid_preview_active)
+        self.assertTrue(window.btn_finish_alignment.isHidden())
+        window._on_finish_alignment()
+        self.assertEqual(window.stage, window.Stage.ALIGNMENT)
         self.assertTrue(window._rigid_preview_active)
         self.assertTrue(window.btn_rigid_apply.isEnabled())
 

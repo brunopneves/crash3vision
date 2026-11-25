@@ -188,8 +188,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Prévia pronta. Use este alinhamento ou cancele.",
     },
     "alignment.status.choose_method": {
-        "en": "Choose the alignment method.",
-        "pt": "Escolha o método de alinhamento.",
+        "en": "Choose an alignment method or continue directly to calibration.",
+        "pt": "Escolha um método de alinhamento ou avance direto para a calibração.",
     },
     "alignment.status.auto_low": {
         "en": "No reliable automatic alignment suggestion was found.",
@@ -258,8 +258,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Atalhos: setas = ajuste fino | Q/E = rotacionar | Z/X = escala",
     },
     "button.finish_alignment": {
-        "en": "Finish alignment →",
-        "pt": "Concluir alinhamento →",
+        "en": "Continue to calibration →",
+        "pt": "Continuar para a calibração →",
     },
     "group.calibration": {
         "en": "Calibration (px → m)",

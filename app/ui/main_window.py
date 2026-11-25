@@ -829,8 +829,20 @@ class MainWindow(QMainWindow):
         self.btn_apply_alignment_suggestion.setEnabled(False)
         self._update_alignment_actions_visibility()
         self.lbl_rigid_region_instruction.setVisible(False)
-        self.btn_finish_alignment.setVisible(True)
-        self.btn_finish_alignment.setEnabled(True)
+        self._update_finish_alignment_availability()
+
+    def _can_finish_alignment(self) -> bool:
+        return (
+            self.stage == Stage.ALIGNMENT
+            and self.canvas.has_images()
+            and not self._auto_preview_active
+            and self._rigid_baseline_ref_transform is None
+        )
+
+    def _update_finish_alignment_availability(self) -> None:
+        available = self._can_finish_alignment()
+        self.btn_finish_alignment.setVisible(available)
+        self.btn_finish_alignment.setEnabled(available)
 
     def _hide_finish_alignment(self) -> None:
         self.btn_finish_alignment.setVisible(False)
@@ -857,6 +869,7 @@ class MainWindow(QMainWindow):
         self.alignment_actions_widget.setVisible(
             any(not button.isHidden() for button in buttons)
         )
+        self._update_finish_alignment_availability()
 
     def _on_alignment_state_changed(self) -> None:
         if self._rigid_internal_transform_change:
@@ -1418,6 +1431,7 @@ class MainWindow(QMainWindow):
             )
         finally:
             self._update_auto_align_availability()
+            self._update_finish_alignment_availability()
 
     def _on_rotate_minus(self) -> None:
         step_deg = float(self.spn_rotate_step.value())
@@ -1438,6 +1452,11 @@ class MainWindow(QMainWindow):
         self.canvas.scale_selected(factor)
 
     def _on_finish_alignment(self) -> None:
+        if not self._can_finish_alignment():
+            return
+        self.workflow.finish_alignment()
+        if self.stage != Stage.CALIBRATION:
+            return
         self.canvas.set_rigid_region_mode(False)
         self.canvas.clear_rigid_region_visuals()
         self._discard_auto_alignment_preview(restore=False)
@@ -1447,13 +1466,12 @@ class MainWindow(QMainWindow):
         )
         self.lbl_rigid_region_instruction.setVisible(False)
         self._hide_finish_alignment()
-        self.workflow.finish_alignment()
 
     def _on_restart_alignment(self) -> None:
         self.workflow.restart_from_alignment()
         if self.stage == self.Stage.ALIGNMENT:
             self._set_rigid_instruction(None)
-            self._hide_finish_alignment()
+            self._update_finish_alignment_availability()
 
     def _on_restart_calibration(self) -> None:
         self.workflow.restart_from_calibration()

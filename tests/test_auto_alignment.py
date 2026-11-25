@@ -400,6 +400,11 @@ class AutoAlignmentTests(unittest.TestCase):
         self.assertNotEqual(window.canvas.get_deformed_transform(), baseline)
         self.assertEqual(window.project.dam_transform.to_dict(), baseline)
         self.assertFalse(window.btn_apply_alignment_suggestion.isHidden())
+        self.assertTrue(window.btn_finish_alignment.isHidden())
+        window._on_finish_alignment()
+        window.workflow.finish_alignment()
+        self.assertEqual(window.stage, window.Stage.ALIGNMENT)
+        self.assertIs(window._pending_auto_alignment, hypothesis)
 
     def test_medium_result_waits_for_explicit_application(self) -> None:
         window = self._alignment_window()
@@ -444,6 +449,7 @@ class AutoAlignmentTests(unittest.TestCase):
         self.assertEqual(window.project.dam_transform.to_dict(), baseline)
         self.assertIsNone(window._pending_auto_alignment)
         self.assertTrue(window.alignment_actions_widget.isHidden())
+        self.assertFalse(window.btn_finish_alignment.isHidden())
 
     def test_apply_suggestion_uses_exact_hypothesis_and_remains_editable(
         self,

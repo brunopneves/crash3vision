@@ -92,6 +92,7 @@ class WorkflowController:
 
     def apply_stage_gating(self) -> None:
         Stage = self.host.Stage  # type: ignore[attr-defined]
+        self.host._update_finish_alignment_availability()
 
         if self.host.stage == Stage.LOAD:
             self.host.align_group.setEnabled(False)
@@ -338,13 +339,13 @@ class WorkflowController:
 
     def finish_alignment(self) -> None:
         Stage = self.host.Stage
-        if self.host.stage != Stage.ALIGNMENT:
+        if not self.host._can_finish_alignment():
             return
 
         has_ref = self.host.project.ref_path is not None
         has_dam = self.host.project.dam_path is not None
 
-        if not (has_ref and has_dam):
+        if has_ref and not has_dam:
             answer = QMessageBox.question(
                 self.host,
                 tr("alignment.single_image.title"),
