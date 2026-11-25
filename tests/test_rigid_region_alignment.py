@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QImage, QMouseEvent
-from PySide6.QtWidgets import QApplication, QGraphicsView, QMessageBox
+from PySide6.QtWidgets import QApplication, QFileDialog, QGraphicsView, QMessageBox
 
 from app.core.project import Project
 from app.core.rigid_region_alignment import (
@@ -52,6 +52,72 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    def test_workflow_progress_tracks_images_and_alignment(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        steps = window.workflow_step_labels
+        self.assertEqual(steps["images"].property("progressStatus"), "current")
+        self.assertEqual(steps["alignment"].property("progressStatus"), "future")
+
+        dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
+        with patch.object(window.io, "pick_image_file", return_value=dam_path):
+            window.io.load_dam()
+        self.assertEqual(steps["images"].property("progressStatus"), "complete")
+        self.assertEqual(steps["alignment"].property("progressStatus"), "current")
+        self.assertIn("opcional", steps["alignment"].text())
+        window.btn_finish_alignment.click()
+        self.assertIn("pulado", steps["alignment"].text())
+        self.assertEqual(steps["calibration"].property("progressStatus"), "current")
+
+        ref_path = str(COMPASS / "reference_vehicle_frame_000.png")
+        with patch.object(window.io, "pick_image_file", return_value=ref_path):
+            window.io.load_ref()
+        self.assertEqual(steps["alignment"].property("progressStatus"), "current")
+        window.btn_finish_alignment.click()
+        self.assertEqual(steps["alignment"].property("progressStatus"), "passed")
+        self.assertNotIn("pulado", steps["alignment"].text())
+
+    def test_workflow_progress_loads_results_and_tracks_invalidation(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        path = str(COMPASS / "crash3vision_reference_project.json")
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(path, "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        steps = window.workflow_step_labels
+        self.assertEqual(
+            {step: label.property("progressStatus") for step, label in steps.items()},
+            dict.fromkeys(steps, "complete") | {"alignment": "passed"},
+        )
+        self.assertNotIn("✓", steps["alignment"].text())
+        self.assertIn("Etapa superada", steps["alignment"].toolTip())
+
+        window.workflow.restart_from_marking()
+        self.assertEqual(steps["measurement"].property("progressStatus"), "current")
+        window.workflow.finish_marking()
+        self.assertEqual(steps["calculation"].property("progressStatus"), "current")
+        self.assertEqual(steps["result"].property("progressStatus"), "future")
+        window.calc_panel.btn_compute.click()
+        self.assertEqual(steps["calculation"].property("progressStatus"), "current")
+        self.assertEqual(steps["result"].property("progressStatus"), "future")
+        window.calc_panel.btn_compute_speed.click()
+        self.assertEqual(steps["calculation"].property("progressStatus"), "complete")
+        self.assertEqual(steps["result"].property("progressStatus"), "complete")
+        self.assertIn("#245b96", steps["result"].styleSheet())
+        window.workflow.invalidate_speed()
+        self.assertEqual(steps["calculation"].property("progressStatus"), "current")
+        self.assertEqual(steps["result"].property("progressStatus"), "future")
+
+        window.workflow.restart_from_calibration()
+        self.assertEqual(steps["calibration"].property("progressStatus"), "current")
+        self.assertEqual(steps["measurement"].property("progressStatus"), "future")
+        window._m_per_px = 0.005
+        window.workflow.confirm_calibration()
+        self.assertEqual(steps["calibration"].property("progressStatus"), "complete")
+        self.assertEqual(steps["measurement"].property("progressStatus"), "current")
+
     def test_structural_image_uses_continuous_sobel_magnitude(self) -> None:
         image = np.zeros((120, 160), dtype=np.uint8)
         cv2.rectangle(image, (20, 20), (140, 100), 180, 3)

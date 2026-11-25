@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QRadioButton,
     QButtonGroup,
+    QSizePolicy,
+    QToolBar,
 )
 
 from app.ui.canvas_view import CanvasView
@@ -125,6 +127,7 @@ class MainWindow(QMainWindow):
         self.calc = CalcController(self)
 
         self._build_menu()
+        self._build_workflow_progress()
         self._build_dock()
         self._apply_styles()
         self._build_shortcuts()
@@ -216,6 +219,67 @@ class MainWindow(QMainWindow):
             self.lbl_ci_values,
         ):
             lbl.setFont(bold)
+
+    def _build_workflow_progress(self) -> None:
+        toolbar = QToolBar(self)
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+        toolbar.toggleViewAction().setVisible(False)
+        strip = QWidget()
+        strip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        layout = QHBoxLayout(strip)
+        layout.setContentsMargins(6, 3, 6, 3)
+        layout.setSpacing(4)
+        self.workflow_step_labels = {}
+        for step in ("images", "alignment", "calibration", "measurement", "calculation", "result"):
+            label = QLabel()
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            self.workflow_step_labels[step] = label
+            layout.addWidget(label, 1)
+        toolbar.addWidget(strip)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+
+    def _refresh_workflow_progress(self) -> None:
+        steps = tuple(self.workflow_step_labels)
+        current = {
+            Stage.LOAD: 0,
+            Stage.ALIGNMENT: 1,
+            Stage.CALIBRATION: 2,
+            Stage.MARKING: 3,
+            Stage.DONE: 4,
+        }[self.stage]
+        result_ready = (
+            self.stage == Stage.DONE
+            and self._total_energy is not None
+            and self._damage_speed_kmh is not None
+        )
+        if result_ready:
+            current = steps.index("result")
+
+        highlight = "background-color: #245b96; color: white; font-weight: bold;"
+        for index, (step, label) in enumerate(self.workflow_step_labels.items()):
+            title = tr(f"progress.{step}")
+            if step == "alignment":
+                if current <= index:
+                    title += f" · {tr('progress.optional')}"
+                elif not self.canvas.has_both_images():
+                    title += f" · {tr('progress.skipped')}"
+            if step == "alignment" and index < current:
+                status, text, style = "passed", f"→ {title}", "color: #808080;"
+            elif step == "result" and result_ready:
+                status, text, style = "complete", f"✓ {title}", highlight
+            elif index < current:
+                status, text, style = "complete", f"✓ {title}", "font-weight: bold;"
+            elif index == current:
+                status, text, style = "current", title, highlight
+            else:
+                status, text, style = "future", title, "color: #808080;"
+            label.setProperty("progressStatus", status)
+            label.setText(text)
+            label.setToolTip(f"{text} — {tr(f'progress.status.{status}')}")
+            label.setAccessibleName(label.toolTip())
+            label.setStyleSheet(f"QLabel {{ {style} padding: 3px; border-radius: 3px; }}")
 
     def _build_canvas_area(self) -> None:
         central = QWidget()
@@ -1669,6 +1733,7 @@ class MainWindow(QMainWindow):
             self.project.c_points = None
 
     def _refresh_summary(self) -> None:
+        self._refresh_workflow_progress()
         stage_key = f"stage.{self.stage.value}"
 
         parts = []
