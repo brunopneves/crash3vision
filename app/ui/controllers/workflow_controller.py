@@ -70,29 +70,12 @@ class WorkflowController:
         self.host.btn_restart_marking.setEnabled(marking)
 
     def _set_fine_adjustment_enabled(self, manual_enabled: bool) -> None:
-        has_both_images = self.host.canvas.has_both_images()
-        self.host.fine_adjust_group.setEnabled(
-            manual_enabled or has_both_images
-        )
-        self.host.opacity_slider.setEnabled(has_both_images)
-        self.host.lbl_overlay_opacity.setEnabled(has_both_images)
-
-        for control in (
-            self.host.chk_alignment_mode,
-            self.host.chk_lock_alignment,
-            self.host.lbl_editable_image,
-            self.host.cmb_alignment_target,
-            self.host.btn_reset_alignment,
-            self.host.nudge_box,
-            self.host.rotate_box,
-            self.host.scale_box,
-            self.host.lbl_alignment_shortcuts,
-        ):
-            control.setEnabled(manual_enabled)
+        self.host.fine_adjust_group.setEnabled(manual_enabled)
 
     def apply_stage_gating(self) -> None:
         Stage = self.host.Stage  # type: ignore[attr-defined]
         self.host._update_finish_alignment_availability()
+        self.host.canvas_view_bar.setEnabled(self.host.canvas.has_both_images())
 
         if self.host.stage == Stage.LOAD:
             self.host.align_group.setEnabled(False)

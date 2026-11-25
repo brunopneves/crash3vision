@@ -229,6 +229,7 @@ class ProjectIOController:
         self.host.opacity_slider.blockSignals(True)
         self.host.opacity_slider.setValue(int(self.host.project.opacity * 100))
         self.host.opacity_slider.blockSignals(False)
+        self.host._refresh_opacity_percentage()
 
         self.host._m_per_px = self.host.project.m_per_px
         if self.host._m_per_px is not None:

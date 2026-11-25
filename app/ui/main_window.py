@@ -76,7 +76,7 @@ class MainWindow(QMainWindow):
         self.resize(1280, 900)
 
         self.canvas = CanvasView()
-        self.setCentralWidget(self.canvas)
+        self._build_canvas_area()
 
         self.project = Project(name="")
         self._current_project_path: str | None = None
@@ -217,10 +217,34 @@ class MainWindow(QMainWindow):
         ):
             lbl.setFont(bold)
 
+    def _build_canvas_area(self) -> None:
+        central = QWidget()
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.canvas, 1)
+
+        self.canvas_view_bar = QWidget()
+        bar_layout = QHBoxLayout(self.canvas_view_bar)
+        bar_layout.setContentsMargins(8, 3, 8, 3)
+        self.lbl_overlay_opacity = QLabel(tr("label.overlay_opacity"))
+        self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.opacity_slider.setRange(0, 100)
+        self.opacity_slider.setValue(50)
+        self.opacity_slider.setMaximumWidth(180)
+        self.lbl_opacity_percent = QLabel()
+        self._refresh_opacity_percentage()
+        bar_layout.addWidget(self.lbl_overlay_opacity)
+        bar_layout.addWidget(self.opacity_slider)
+        bar_layout.addWidget(self.lbl_opacity_percent)
+        bar_layout.addStretch()
+        layout.addWidget(self.canvas_view_bar)
+        self.setCentralWidget(central)
+
     def _build_dock(self) -> None:
         dock = QDockWidget(tr("dock.controls"), self)
         self._controls_dock = dock
-        dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea)
+        dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -238,15 +262,8 @@ class MainWindow(QMainWindow):
         load_layout.addWidget(self.btn_load_dam)
         dock_layout.addWidget(self.load_group)
 
-        self.lbl_overlay_opacity = QLabel(tr("label.overlay_opacity"))
-        self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
-        self.opacity_slider.setRange(0, 100)
-        self.opacity_slider.setValue(50)
-
         self.fine_adjust_group = QGroupBox(tr("group.fine_adjustment"))
         fine_layout = QVBoxLayout(self.fine_adjust_group)
-        fine_layout.addWidget(self.lbl_overlay_opacity)
-        fine_layout.addWidget(self.opacity_slider)
 
         # --- Alignment group ---
         self.align_group = QGroupBox(tr("group.alignment"))
@@ -562,7 +579,7 @@ class MainWindow(QMainWindow):
 
         scroll.setWidget(dock_widget)
         dock.setWidget(scroll)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
 
         self.btn_load_ref.clicked.connect(self._on_load_ref)
         self.btn_load_dam.clicked.connect(self._on_load_dam)
@@ -784,7 +801,11 @@ class MainWindow(QMainWindow):
         self.io.load_dam()
 
     # ---------------- Opacity ----------------
+    def _refresh_opacity_percentage(self) -> None:
+        self.lbl_opacity_percent.setText(f"{self.opacity_slider.value()}%")
+
     def _on_opacity_changed(self, value: int) -> None:
+        self._refresh_opacity_percentage()
         self.canvas.set_deformed_opacity(value / 100.0)
         self.project.opacity = value / 100.0
         self._refresh_summary()

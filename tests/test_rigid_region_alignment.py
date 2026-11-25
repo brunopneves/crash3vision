@@ -12,8 +12,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import cv2
 import numpy as np
 from PySide6.QtCore import QEvent, QPointF, Qt
-from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtGui import QImage, QMouseEvent
+from PySide6.QtWidgets import QApplication, QGraphicsView, QMessageBox
 
 from app.core.project import Project
 from app.core.rigid_region_alignment import (
@@ -553,6 +553,12 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         ref_path = COMPASS / "reference_vehicle_frame_000.png"
         dam_path = COMPASS / "deformed_vehicle_frame_300.png"
 
+        self.assertEqual(
+            window.dockWidgetArea(window._controls_dock),
+            Qt.DockWidgetArea.LeftDockWidgetArea,
+        )
+        self.assertIs(window.opacity_slider.parentWidget(), window.canvas_view_bar)
+        self.assertTrue(window.opacity_slider.isEnabled())
         window.workflow.finish_alignment()
 
         self.assertEqual(window.stage, window.Stage.CALIBRATION)
@@ -560,6 +566,13 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertFalse(window.nudge_box.isEnabled())
         window.opacity_slider.setValue(35)
         self.assertAlmostEqual(window.project.opacity, 0.35)
+        self.assertEqual(window.lbl_opacity_percent.text(), "35%")
+        self.assertAlmostEqual(window.canvas.ctrl.dam_item.opacity(), 0.35)
+
+        for stage in (window.Stage.MARKING, window.Stage.DONE):
+            window.workflow.set_stage(stage)
+            self.assertTrue(window.opacity_slider.isEnabled())
+            self.assertFalse(window.fine_adjust_group.isEnabled())
 
         window.canvas.load_reference(str(ref_path))
         self.assertTrue(window.opacity_slider.isEnabled())
@@ -571,6 +584,56 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertFalse(window.opacity_slider.isEnabled())
         window.canvas.load_deformed(str(dam_path))
         self.assertTrue(window.opacity_slider.isEnabled())
+
+    def test_resizing_left_dock_preserves_overlay_and_png_exports(self) -> None:
+        window = self._window()
+        window.show()
+        QApplication.processEvents()
+        canvas = window.canvas
+        state = canvas.get_overlay_state()
+        state.update(
+            cal_p1={"x": 300, "y": 500},
+            cal_p2={"x": 600, "y": 500},
+            w_p1={"x": 400, "y": 700},
+            w_p2={"x": 1000, "y": 700},
+            slice_x=[400, 520, 640, 760, 880, 1000],
+            c_points={"C1": {"ref": {"x": 400, "y": 700},
+                             "def": {"x": 400, "y": 740}}},
+            m_per_px=0.005,
+        )
+        canvas.restore_overlay_state(state)
+        before = canvas.get_overlay_state()
+        original_width = canvas.viewport().width()
+        self.assertEqual(canvas.dragMode(), QGraphicsView.DragMode.ScrollHandDrag)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            first = str(Path(tmp) / "before.png")
+            second = str(Path(tmp) / "after.png")
+            view = str(Path(tmp) / "view.png")
+            canvas.export_scene_png(first)
+            window.resizeDocks(
+                [window._controls_dock],
+                [window._controls_dock.width() + 150],
+                Qt.Orientation.Horizontal,
+            )
+            QApplication.processEvents()
+            self.assertLess(canvas.viewport().width(), original_width)
+            zoom_before = canvas.transform().m11()
+            canvas.ctrl.wheel_zoom(2.0)
+            self.assertAlmostEqual(canvas.transform().m11(), zoom_before * 2.0)
+            scrollbar = canvas.horizontalScrollBar()
+            position = scrollbar.value()
+            scrollbar.setValue(
+                scrollbar.maximum() if position != scrollbar.maximum()
+                else scrollbar.minimum()
+            )
+            self.assertNotEqual(scrollbar.value(), position)
+            canvas.export_scene_png(second)
+            canvas.export_current_view_png(view)
+            self.assertGreater(QImage(first).width(), 0)
+            self.assertEqual(QImage(first), QImage(second))
+            self.assertEqual(QImage(view).size(), canvas.viewport().grab().size())
+        self.assertEqual(canvas.get_overlay_state(), before)
 
     def test_single_start_button_routes_selected_method(self) -> None:
         window = self._window()
