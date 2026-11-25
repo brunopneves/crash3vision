@@ -89,6 +89,7 @@ class ProjectIOController:
         self.host.meas.update_ci_values_label()
         self.host._update_ci_label()
 
+        self.host.workflow.reset_canvas_tools()
         self.host.canvas.clear_images()
         self.host.canvas.set_alignment_target("dam")
         self.host._update_auto_align_availability()

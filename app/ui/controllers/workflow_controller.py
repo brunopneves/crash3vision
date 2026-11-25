@@ -16,6 +16,8 @@ class WorkflowController:
         self.host = host
 
     def set_stage(self, stage: "Stage") -> None:
+        if self.host.stage != stage:
+            self.reset_canvas_tools()
         self.host.stage = stage
         self.apply_stage_gating()
         self.host._refresh_summary()
@@ -41,9 +43,9 @@ class WorkflowController:
             return Stage.MARKING
         return Stage.DONE
 
-    def sync_stage_after_load(self) -> None:
-        stage = self.determine_stage_from_project()
+    def reset_canvas_tools(self) -> None:
         self.host.canvas.reset_interaction()
+        self.host.canvas.set_ci_index(self.host._current_ci_index)
         for checkbox in (
             self.host.chk_alignment_mode,
             self.host.chk_calibration_mode,
@@ -53,7 +55,11 @@ class WorkflowController:
         ):
             with QSignalBlocker(checkbox):
                 checkbox.setChecked(False)
+
+    def sync_stage_after_load(self) -> None:
+        stage = self.determine_stage_from_project()
         self.host._current_ci_index = 1
+        self.reset_canvas_tools()
         self.host._sync_ci_radio_buttons()
         self.host._update_ci_label()
         locked = stage != self.host.Stage.ALIGNMENT
@@ -62,65 +68,34 @@ class WorkflowController:
             self.host.chk_lock_alignment.setChecked(locked)
         self.set_stage(stage)
 
-    def _enable_restart_buttons(
-        self, alignment: bool, calibration: bool, marking: bool
-    ) -> None:
-        self.host.btn_restart_alignment.setEnabled(alignment)
-        self.host.btn_restart_calibration.setEnabled(calibration)
-        self.host.btn_restart_marking.setEnabled(marking)
-
-    def _set_fine_adjustment_enabled(self, manual_enabled: bool) -> None:
-        self.host.fine_adjust_group.setEnabled(manual_enabled)
-
     def apply_stage_gating(self) -> None:
-        Stage = self.host.Stage  # type: ignore[attr-defined]
-        self.host._update_finish_alignment_availability()
-        self.host.canvas_view_bar.setEnabled(self.host.canvas.has_both_images())
+        host = self.host
+        Stage = host.Stage
+        stage = host.stage
+        host._update_finish_alignment_availability()
+        host.canvas_view_bar.setEnabled(host.canvas.has_both_images())
 
-        if self.host.stage == Stage.LOAD:
-            self.host.align_group.setEnabled(False)
-            self._set_fine_adjustment_enabled(False)
-            self.host.cal_group.setEnabled(False)
-            self.host.mark_group.setEnabled(False)
-            self.host.calc_panel.setEnabled(False)
-            self._enable_restart_buttons(False, False, False)
-            return
+        for group, group_stage in (
+            (host.align_group, Stage.ALIGNMENT),
+            (host.fine_adjust_group, Stage.ALIGNMENT),
+            (host.cal_group, Stage.CALIBRATION),
+            (host.mark_group, Stage.MARKING),
+            (host.calc_panel, Stage.DONE),
+            (host._summary_group, Stage.DONE),
+        ):
+            active = stage == group_stage
+            group.setEnabled(active)
+            group.setVisible(active)
 
-        if self.host.stage == Stage.ALIGNMENT:
-            self.host.align_group.setEnabled(True)
-            self._set_fine_adjustment_enabled(True)
-            self.host.cal_group.setEnabled(False)
-            self.host.mark_group.setEnabled(False)
-            self.host.calc_panel.setEnabled(False)
-            self._enable_restart_buttons(False, False, False)
-            return
-
-        if self.host.stage == Stage.CALIBRATION:
-            self.host.align_group.setEnabled(False)
-            self._set_fine_adjustment_enabled(False)
-            self.host.cal_group.setEnabled(True)
-            self.host.mark_group.setEnabled(False)
-            self.host.calc_panel.setEnabled(False)
-            self._enable_restart_buttons(True, False, False)
-            return
-
-        if self.host.stage == Stage.MARKING:
-            self.host.align_group.setEnabled(False)
-            self._set_fine_adjustment_enabled(False)
-            self.host.cal_group.setEnabled(False)
-            self.host.mark_group.setEnabled(True)
-            self.host.calc_panel.setEnabled(False)
-            self._enable_restart_buttons(True, True, False)
-            return
-
-        if self.host.stage == Stage.DONE:
-            self.host.align_group.setEnabled(False)
-            self._set_fine_adjustment_enabled(False)
-            self.host.cal_group.setEnabled(False)
-            self.host.mark_group.setEnabled(False)
-            self.host.calc_panel.setEnabled(True)
-            self._enable_restart_buttons(True, True, True)
-            return
+        restart_actions = (
+            (host.btn_restart_alignment, stage in (Stage.CALIBRATION, Stage.MARKING, Stage.DONE)),
+            (host.btn_restart_calibration, stage in (Stage.MARKING, Stage.DONE)),
+            (host.btn_restart_marking, stage == Stage.DONE),
+        )
+        for button, available in restart_actions:
+            button.setEnabled(available)
+            button.setVisible(available)
+        host.workflow_group.setVisible(any(available for _, available in restart_actions))
 
     def invalidate_energy(self) -> None:
         self.host._total_energy = None

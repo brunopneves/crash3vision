@@ -58,6 +58,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         steps = window.workflow_step_labels
         self.assertEqual(steps["images"].property("progressStatus"), "current")
         self.assertEqual(steps["alignment"].property("progressStatus"), "future")
+        self.assertFalse(window.load_group.isHidden())
+        self.assertTrue(window.align_group.isHidden())
+        self.assertTrue(window.workflow_group.isHidden())
 
         dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
         with patch.object(window.io, "pick_image_file", return_value=dam_path):
@@ -65,13 +68,42 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(steps["images"].property("progressStatus"), "complete")
         self.assertEqual(steps["alignment"].property("progressStatus"), "current")
         self.assertIn("opcional", steps["alignment"].text())
+        self.assertFalse(window.align_group.isHidden())
+        self.assertFalse(window.fine_adjust_group.isHidden())
+        self.assertTrue(window.cal_group.isHidden())
         window.btn_finish_alignment.click()
         self.assertIn("pulado", steps["alignment"].text())
         self.assertEqual(steps["calibration"].property("progressStatus"), "current")
+        self.assertTrue(window.align_group.isHidden())
+        self.assertFalse(window.cal_group.isHidden())
+        self.assertFalse(window.btn_restart_alignment.isHidden())
+        self.assertTrue(window.btn_restart_calibration.isHidden())
+
+        window._m_per_px = 0.005
+        window.workflow.confirm_calibration()
+        self.assertTrue(window.cal_group.isHidden())
+        self.assertFalse(window.mark_group.isHidden())
+        window.meas.on_w_px_measured(600.0)
+        for index in range(1, 7):
+            window.meas.on_ci_measured(index, 20.0, 0.1)
+        window.chk_set_w_mode.setChecked(True)
+        window.workflow.apply_stage_gating()
+        self.assertTrue(window.canvas.set_w_mode)
+        window.btn_finish_marking.click()
+        self.assertTrue(window.mark_group.isHidden())
+        self.assertFalse(window.calc_panel.isHidden())
+        self.assertFalse(window._summary_group.isHidden())
+        self.assertIsNone(window.canvas.ctrl.active_tool())
+        self.assertEqual(len(window._ci_m), 6)
 
         ref_path = str(COMPASS / "reference_vehicle_frame_000.png")
-        with patch.object(window.io, "pick_image_file", return_value=ref_path):
+        with (
+            patch.object(window.io, "pick_image_file", return_value=ref_path),
+            patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes),
+        ):
             window.io.load_ref()
+        self.assertTrue(window.calc_panel.isHidden())
+        self.assertFalse(window.load_group.isHidden())
         self.assertEqual(steps["alignment"].property("progressStatus"), "current")
         window.btn_finish_alignment.click()
         self.assertEqual(steps["alignment"].property("progressStatus"), "passed")
@@ -87,6 +119,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         ):
             window.io.load_project()
         steps = window.workflow_step_labels
+        self.assertFalse(window.calc_panel.isHidden())
+        self.assertFalse(window._summary_group.isHidden())
+        self.assertTrue(window.mark_group.isHidden())
         self.assertEqual(
             {step: label.property("progressStatus") for step, label in steps.items()},
             dict.fromkeys(steps, "complete") | {"alignment": "passed"},
@@ -95,6 +130,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertIn("Etapa superada", steps["alignment"].toolTip())
 
         window.workflow.restart_from_marking()
+        self.assertFalse(window.mark_group.isHidden())
+        self.assertTrue(window._summary_group.isHidden())
+        self.assertTrue(window.btn_restart_marking.isHidden())
         self.assertEqual(steps["measurement"].property("progressStatus"), "current")
         window.workflow.finish_marking()
         self.assertEqual(steps["calculation"].property("progressStatus"), "current")
