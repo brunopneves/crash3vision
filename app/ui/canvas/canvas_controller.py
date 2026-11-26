@@ -59,6 +59,7 @@ class CanvasController:
 
         self.ref_item: QGraphicsPixmapItem | None = None
         self.dam_item: QGraphicsPixmapItem | None = None
+        self._overlay_opacity = 0.5
 
         self._zoom_factor: float = 1.0
         self._alignment_target: AlignmentTarget = "dam"
@@ -545,6 +546,7 @@ class CanvasController:
             self.ref_item.setPixmap(pix)
 
         self._set_item_transform_origin_to_center(self.ref_item)
+        self._apply_image_opacity()
         self._fit_if_possible()
         self._emit_images_changed()
         self._emit_alignment_state_changed()
@@ -563,19 +565,23 @@ class CanvasController:
                     f"Failed to create graphics item for image: {image_path}"
                 )
             item.setZValue(1)
-            item.setOpacity(0.5)
             self.dam_item = item
         else:
             self.dam_item.setPixmap(pix)
 
         self._set_item_transform_origin_to_center(self.dam_item)
+        self._apply_image_opacity()
         self._fit_if_possible()
         self._emit_images_changed()
         self._emit_alignment_state_changed()
 
     def set_deformed_opacity(self, opacity: float) -> None:
+        self._overlay_opacity = max(0.0, min(1.0, float(opacity)))
+        self._apply_image_opacity()
+
+    def _apply_image_opacity(self) -> None:
         if self.dam_item is not None:
-            self.dam_item.setOpacity(max(0.0, min(1.0, float(opacity))))
+            self.dam_item.setOpacity(self._overlay_opacity if self.has_both_images() else 1.0)
 
     # ---------------------- export ----------------------
 

@@ -58,12 +58,17 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Controles",
     },
     "group.images": {"en": "Images", "pt": "Imagens"},
-    "images.instructions": {
-        "en": "Load the deformed image to start. Add a reference image if you want to compare the two.",
-        "pt": "Carregue a imagem deformada para começar. Adicione uma imagem de referência se quiser comparar as duas.",
-    },
     "images.reference": {"en": "Reference image", "pt": "Imagem de referência"},
-    "images.deformed": {"en": "Deformed image", "pt": "Imagem deformada"},
+    "images.reference_optional": {
+        "en": "Reference image (optional)",
+        "pt": "Imagem de referência (opcional)",
+    },
+    "images.deformed": {"en": "Damaged vehicle image", "pt": "Imagem do veículo danificado"},
+    "images.deformed_help": {"en": "Required for measurements.", "pt": "Obrigatória para as medições."},
+    "images.reference_help": {
+        "en": "Used for comparison and alignment.",
+        "pt": "Usada para comparação e alinhamento.",
+    },
     "images.status_loaded": {"en": "✓ Loaded", "pt": "✓ Carregada"},
     "images.status_missing": {"en": "Missing", "pt": "Ausente"},
     "images.choose": {"en": "Load image", "pt": "Carregar imagem"},
@@ -107,8 +112,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Imagem editável:",
     },
     "combo.deformed": {
-        "en": "Deformed",
-        "pt": "Deformada",
+        "en": "Damaged vehicle",
+        "pt": "Veículo danificado",
     },
     "combo.reference": {
         "en": "Reference",
@@ -174,8 +179,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Marque 3 pontos sobre uma região rígida preservada. ({count}/3)",
     },
     "alignment.rigid.instruction.deformed": {
-        "en": "Indicate approximately the same region in the deformed image.",
-        "pt": "Indique aproximadamente a mesma região na imagem deformada.",
+        "en": "Mark approximately the same region in the damaged vehicle image.",
+        "pt": "Indique aproximadamente a mesma região na imagem do veículo danificado.",
     },
     "alignment.rigid.instruction.preview": {
         "en": "Preview ready. Use it or try again.",
@@ -188,11 +193,11 @@ STRINGS: dict[str, dict[str, str]] = {
     "alignment.rigid.second_region": {
         "en": (
             "The first search was weak or ambiguous. Indicate approximately "
-            "the same region in the deformed image."
+            "the same region in the damaged vehicle image."
         ),
         "pt": (
             "A primeira busca foi fraca ou ambígua. Indique aproximadamente "
-            "a mesma região na imagem deformada."
+            "a mesma região na imagem do veículo danificado."
         ),
     },
     "alignment.rigid.failure": {
@@ -327,6 +332,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Shortcuts: arrows = nudge | Q/E = rotate | Z/X = scale",
         "pt": "Atalhos: setas = ajuste fino | Q/E = rotacionar | Z/X = escala",
     },
+    "button.finish_images": {"en": "Continue to alignment", "pt": "Continuar para alinhamento"},
     "button.finish_alignment": {
         "en": "Continue to calibration",
         "pt": "Continuar para calibração",
@@ -349,7 +355,25 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "calibration.mark_points": {"en": "Mark two points", "pt": "Marcar dois pontos"},
     "calibration.remark_points": {"en": "Mark points again", "pt": "Remarcar pontos"},
-    "calibration.cancel_points": {"en": "Cancel point selection", "pt": "Cancelar marcação"},
+    "calibration.cancel_points": {"en": "Cancel marking", "pt": "Cancelar marcação"},
+    "calibration.points_title": {"en": "Calibration points", "pt": "Marcação dos pontos"},
+    "calibration.points_instruction": {
+        "en": "Select two points on the image with a known distance between them.",
+        "pt": "Selecione dois pontos na imagem cuja distância real seja conhecida.",
+    },
+    "calibration.points_complete": {"en": "✓ Two points marked", "pt": "✓ Dois pontos marcados"},
+    "calibration.distance_title": {"en": "Reference distance", "pt": "Distância de referência"},
+    "calibration.distance_measured": {
+        "en": "Measured distance: {value}",
+        "pt": "Distância medida: {value}",
+    },
+    "calibration.distance_example": {"en": "e.g., 1.0", "pt": "Ex.: 1,0"},
+    "calibration.scale_title": {"en": "Calculated scale", "pt": "Escala calculada"},
+    "calibration.applied_scale_title": {"en": "Applied scale", "pt": "Escala aplicada"},
+    "calibration.preview_hint": {
+        "en": "The scale will be applied when you continue.",
+        "pt": "A escala será aplicada ao continuar.",
+    },
     "calibration.calculated_scale": {
         "en": "Calculated scale (m/px): {value}",
         "pt": "Escala calculada (m/px): {value}",
@@ -951,8 +975,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Erro ao carregar referência",
     },
     "project.load_dam.error_title": {
-        "en": "Error loading deformed",
-        "pt": "Erro ao carregar deformada",
+        "en": "Error loading the damaged vehicle image",
+        "pt": "Erro ao carregar a imagem do veículo danificado",
     },
     "summary.project": {
         "en": "Project: {name}",
@@ -1047,8 +1071,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Aviso de calibração",
     },
     "alignment.warning.scale_mismatch": {
-        "en": "The reference and deformed images currently have different visual scales.\n\nCalibration may become inconsistent unless both vehicles are visually matched in size before calibration.\n\nContinue anyway?",
-        "pt": "As imagens de referência e deformada estão atualmente com escalas visuais diferentes.\n\nA calibração pode ficar inconsistente se ambos os veículos não estiverem visualmente compatíveis em tamanho antes da calibração.\n\nDeseja continuar mesmo assim?",
+        "en": "The reference image and the damaged vehicle image currently have different visual scales.\n\nCalibration may become inconsistent unless both vehicles are visually matched in size before calibration.\n\nContinue anyway?",
+        "pt": "A imagem de referência e a imagem do veículo danificado estão atualmente com escalas visuais diferentes.\n\nA calibração pode ficar inconsistente se ambos os veículos não estiverem visualmente compatíveis em tamanho antes da calibração.\n\nDeseja continuar mesmo assim?",
     },
     "report.units": {
         "en": "Units",

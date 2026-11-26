@@ -241,8 +241,6 @@ class MainWindow(QMainWindow):
         bold = QFont()
         bold.setBold(True)
         for lbl in (
-            self.lbl_px_distance,
-            self.lbl_m_per_px,
             self.lbl_w,
             self.lbl_delta_w,
             self.lbl_ci_values,
@@ -439,18 +437,9 @@ class MainWindow(QMainWindow):
         load_layout = QVBoxLayout(self.load_group)
         load_layout.setContentsMargins(0, 0, 0, 0)
         load_layout.setSpacing(10)
-        self._images_intro = QWidget()
-        intro_layout = QVBoxLayout(self._images_intro)
-        intro_layout.setContentsMargins(8, 4, 8, 4)
-        intro_layout.setSpacing(5)
         self._images_title = QLabel()
         self._images_title.setObjectName("imagesTitle")
-        self._images_instructions = QLabel()
-        self._images_instructions.setObjectName("imagesInstructions")
-        self._images_instructions.setWordWrap(True)
-        intro_layout.addWidget(self._images_title)
-        intro_layout.addWidget(self._images_instructions)
-        load_layout.addWidget(self._images_intro)
+        load_layout.addWidget(self._images_title)
 
         self.btn_toggle_image_controls = QToolButton()
         self.btn_toggle_image_controls.setObjectName("imagesDisclosure")
@@ -458,10 +447,10 @@ class MainWindow(QMainWindow):
         self.btn_toggle_image_controls.toggled.connect(self._refresh_image_controls)
         load_layout.addWidget(self.btn_toggle_image_controls)
 
-        self.btn_load_ref = QPushButton()
         self.btn_load_dam = QPushButton()
+        self.btn_load_ref = QPushButton()
         self._image_cards = {}
-        for key, button in (("reference", self.btn_load_ref), ("deformed", self.btn_load_dam)):
+        for key, button in (("deformed", self.btn_load_dam), ("reference", self.btn_load_ref)):
             card = QFrame()
             card.setObjectName("imageLoadCard")
             card_layout = QVBoxLayout(card)
@@ -472,16 +461,21 @@ class MainWindow(QMainWindow):
             title = QLabel()
             title.setObjectName("imageCardTitle")
             title.setWordWrap(True)
+            title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             status = QLabel()
             status.setObjectName("imageCardStatus")
             heading.addWidget(title, 1)
             heading.addWidget(status, 0, Qt.AlignmentFlag.AlignVCenter)
             card_layout.addLayout(heading)
+            description = QLabel()
+            description.setObjectName("imageCardDescription")
+            description.setWordWrap(True)
+            card_layout.addWidget(description)
             button.setProperty("uiRole", "secondary")
             button.setProperty("imageAction", True)
             card_layout.addWidget(button)
             load_layout.addWidget(card)
-            self._image_cards[key] = (card, title, status, button)
+            self._image_cards[key] = (card, title, description, status, button)
         dock_layout.addWidget(self.load_group)
 
         self.fine_adjust_group = QGroupBox()
@@ -734,29 +728,7 @@ class MainWindow(QMainWindow):
         self._refresh_alignment_sections()
 
         # --- Calibration group ---
-        self.cal_group = QGroupBox(tr("group.calibration"))
-        cal_layout = QVBoxLayout(self.cal_group)
-
-        self.chk_calibration_mode = QPushButton(tr("calibration.mark_points"))
-        self.chk_calibration_mode.setProperty("uiRole", "secondary")
-        self.chk_calibration_mode.setCheckable(True)
-        cal_layout.addWidget(self.chk_calibration_mode)
-
-        self.lbl_px_distance = QLabel(tr("label.measured_distance"))
-        cal_layout.addWidget(self.lbl_px_distance)
-
-        self.lbl_real_distance_m = QLabel(tr("label.real_distance_m"))
-        cal_layout.addWidget(self.lbl_real_distance_m)
-        self.txt_real_m = QLineEdit()
-        self.txt_real_m.setPlaceholderText("e.g., 1.0")
-        cal_layout.addWidget(self.txt_real_m)
-
-        self.lbl_m_per_px = QLabel(tr("label.scale_m_per_px"))
-        self.lbl_m_per_px.setWordWrap(True)
-        cal_layout.addWidget(self.lbl_m_per_px)
-
-        self.btn_confirm_calibration = QPushButton(tr("button.confirm_calibration"))
-
+        self._build_calibration_panel()
         dock_layout.addWidget(self.cal_group)
 
         # --- Marking group ---
@@ -905,7 +877,12 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
         )
         footer_layout.addWidget(self.lbl_navigation_hint)
-        for button in (self.btn_finish_alignment, self.btn_confirm_calibration, self.btn_finish_marking):
+        self.btn_finish_images = QPushButton(tr("button.finish_images"))
+        self.btn_finish_images.clicked.connect(self.workflow.finish_images)
+        for button in (
+            self.btn_finish_images, self.btn_finish_alignment,
+            self.btn_confirm_calibration, self.btn_finish_marking,
+        ):
             button.setProperty("uiRole", "primary")
             footer_layout.addWidget(button)
         dock_content_layout.addWidget(self.navigation_footer)
@@ -993,6 +970,7 @@ class MainWindow(QMainWindow):
         self._refresh_alignment_consultation()
 
         self._refresh_image_controls()
+        self.btn_finish_images.setText(tr("button.finish_images"))
         self.lbl_overlay_opacity.setText(tr("label.overlay_opacity"))
 
         self.align_group.setAccessibleName(tr("group.alignment"))
@@ -1043,8 +1021,7 @@ class MainWindow(QMainWindow):
         self.lbl_alignment_shortcuts.setText(tr("label.alignment_shortcuts"))
         self.btn_finish_alignment.setText(tr("button.finish_alignment"))
 
-        self.cal_group.setTitle(tr("group.calibration"))
-        self.lbl_real_distance_m.setText(tr("label.real_distance_m"))
+        self._translate_calibration_panel()
         self.btn_confirm_calibration.setText(tr("button.confirm_calibration"))
 
         self.mark_group.setTitle(tr("group.marking"))
@@ -1062,12 +1039,6 @@ class MainWindow(QMainWindow):
 
 
         self._summary_group.setTitle(tr("group.summary"))
-
-        if self._calibration_px is None:
-            self.lbl_px_distance.setText(tr("label.measured_distance"))
-
-        if self._m_per_px is None:
-            self.lbl_m_per_px.setText(tr("label.scale_m_per_px"))
 
         if self._w_px is None:
             self.lbl_w.setText(tr("label.w_default"))
@@ -1135,20 +1106,19 @@ class MainWindow(QMainWindow):
             toggle.setChecked(False)
         toggle.setVisible(not loading)
         expanded = toggle.isChecked()
-        self._images_intro.setVisible(loading or self._viewed_step == "images")
-        self._images_instructions.setVisible(loading)
+        self._images_title.setVisible(loading or self._viewed_step == "images")
         self._images_title.setText(tr("group.images"))
-        self._images_instructions.setText(tr("images.instructions"))
         roles = []
         for key, item in (
-            ("reference", self.canvas.ctrl.ref_item), ("deformed", self.canvas.ctrl.dam_item)
+            ("deformed", self.canvas.ctrl.dam_item), ("reference", self.canvas.ctrl.ref_item)
         ):
-            card, title, badge, button = self._image_cards[key]
+            card, title, description, badge, button = self._image_cards[key]
             loaded = item is not None
             if loaded:
                 roles.append(tr(f"combo.{key}"))
             image_name = tr(f"images.{key}")
-            title.setText(image_name)
+            title.setText(tr("images.reference_optional") if key == "reference" else image_name)
+            description.setText(tr(f"images.{key}_help"))
             badge.setText(tr("images.status_loaded" if loaded else "images.status_missing"))
             button.setText(tr("images.replace" if loaded else "images.choose"))
             button.setAccessibleName(tr(
@@ -1339,8 +1309,9 @@ class MainWindow(QMainWindow):
         )
 
     def _refresh_navigation_footer(self) -> None:
-        consulting = self._viewed_step is not None
-        active = None if consulting else self.stage
+        active = None if self._viewed_step is not None else self.stage
+        if active == Stage.LOAD and not self.workflow.can_finish_images():
+            active = None
         hint = None
         if active == Stage.ALIGNMENT and not self._can_finish_alignment():
             hint = (
@@ -1353,6 +1324,7 @@ class MainWindow(QMainWindow):
             hint = self.workflow.marking_block_reason()
 
         actions = (
+            (Stage.LOAD, self.btn_finish_images),
             (Stage.ALIGNMENT, self.btn_finish_alignment),
             (Stage.CALIBRATION, self.btn_confirm_calibration),
             (Stage.MARKING, self.btn_finish_marking),
@@ -2067,6 +2039,80 @@ class MainWindow(QMainWindow):
         self.canvas.set_measure_ci_mode(True)
 
     # ---------------- Calibration ----------------
+    def _build_calibration_panel(self) -> None:
+        self.cal_group = QGroupBox()
+        self.cal_group.setObjectName("calibrationPanel")
+        layout = QVBoxLayout(self.cal_group)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+        self.lbl_calibration_title = QLabel()
+        self.lbl_calibration_title.setObjectName("calibrationTitle")
+        layout.addWidget(self.lbl_calibration_title)
+
+        points_card = QFrame()
+        distance_card = QFrame()
+        self.calibration_scale_card = QFrame()
+        for card in (points_card, distance_card, self.calibration_scale_card):
+            card.setProperty("calibrationCard", True)
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 11, 12, 11)
+            card_layout.setSpacing(7)
+            layout.addWidget(card)
+
+        self.lbl_calibration_points_title = QLabel()
+        self.lbl_calibration_distance_title = QLabel()
+        self.lbl_calibration_scale_title = QLabel()
+        for card, title in (
+            (points_card, self.lbl_calibration_points_title),
+            (distance_card, self.lbl_calibration_distance_title),
+            (self.calibration_scale_card, self.lbl_calibration_scale_title),
+        ):
+            title.setProperty("calibrationHeading", True)
+            title.setWordWrap(True)
+            card.layout().addWidget(title)
+
+        self.lbl_calibration_points_status = QLabel()
+        self.lbl_calibration_points_status.setObjectName("calibrationPointsStatus")
+        self.lbl_calibration_points_status.setWordWrap(True)
+        points_card.layout().addWidget(self.lbl_calibration_points_status)
+        self.chk_calibration_mode = QPushButton()
+        self.chk_calibration_mode.setProperty("uiRole", "primary")
+        self.chk_calibration_mode.setProperty("panelAction", True)
+        self.chk_calibration_mode.setCheckable(True)
+        points_card.layout().addWidget(self.chk_calibration_mode)
+
+        self.lbl_px_distance = QLabel()
+        self.lbl_px_distance.setWordWrap(True)
+        distance_card.layout().addWidget(self.lbl_px_distance)
+        self.lbl_real_distance_m = QLabel()
+        self.lbl_real_distance_m.setWordWrap(True)
+        distance_card.layout().addWidget(self.lbl_real_distance_m)
+        self.txt_real_m = QLineEdit()
+        self.txt_real_m.setObjectName("calibrationDistanceInput")
+        self.lbl_real_distance_m.setBuddy(self.txt_real_m)
+        distance_card.layout().addWidget(self.txt_real_m)
+
+        self.lbl_m_per_px = QLabel()
+        self.lbl_m_per_px.setObjectName("calibrationScaleValue")
+        self.lbl_m_per_px.setWordWrap(True)
+        self.calibration_scale_card.layout().addWidget(self.lbl_m_per_px)
+        self.lbl_calibration_scale_hint = QLabel()
+        self.lbl_calibration_scale_hint.setWordWrap(True)
+        self.calibration_scale_card.layout().addWidget(self.lbl_calibration_scale_hint)
+        self.btn_confirm_calibration = QPushButton(tr("button.confirm_calibration"))
+        self._translate_calibration_panel()
+
+    def _translate_calibration_panel(self) -> None:
+        title = tr("progress.calibration")
+        self.lbl_calibration_title.setText(title)
+        self.cal_group.setAccessibleName(title)
+        self.lbl_calibration_points_title.setText(tr("calibration.points_title"))
+        self.lbl_calibration_distance_title.setText(tr("calibration.distance_title"))
+        self.lbl_real_distance_m.setText(tr("label.real_distance_m"))
+        self.txt_real_m.setAccessibleName(self.lbl_real_distance_m.text())
+        self.txt_real_m.setPlaceholderText(tr("calibration.distance_example"))
+        self.lbl_calibration_scale_hint.setText(tr("calibration.preview_hint"))
+
     def _on_calibration_mode_toggled(self, checked: bool) -> None:
         if checked:
             self.canvas.clear_calibration()
@@ -2076,23 +2122,44 @@ class MainWindow(QMainWindow):
 
     def _refresh_calibration_panel(self) -> None:
         has_points = self.canvas.cal_p1 is not None and self.canvas.cal_p2 is not None
-        if self.chk_calibration_mode.isChecked():
+        capturing = self.chk_calibration_mode.isChecked()
+        if capturing:
             action = "calibration.cancel_points"
         else:
             action = "calibration.remark_points" if has_points else "calibration.mark_points"
         self.chk_calibration_mode.setText(tr(action))
-        self.lbl_px_distance.setText(
-            tr("measurement.measured_distance_value", value=f"{self._calibration_px:.2f}")
-            if has_points and self._calibration_px is not None else tr("label.measured_distance")
+        set_style_property(
+            self.chk_calibration_mode, "uiRole", "secondary" if has_points or capturing else "primary"
         )
-        if self.stage == Stage.CALIBRATION and self._viewed_step is None:
+        self.lbl_calibration_points_status.setText(tr(
+            "calibration.points_complete" if has_points else "calibration.points_instruction"
+        ))
+        set_style_property(self.lbl_calibration_points_status, "complete", has_points)
+        px_value = (
+            f"{self._calibration_px:.2f} px"
+            if has_points and self._calibration_px is not None else "—"
+        )
+        self.lbl_px_distance.setText(tr("calibration.distance_measured", value=px_value))
+
+        editing = self.stage == Stage.CALIBRATION and self._viewed_step is None
+        if editing:
             candidate, _ = self.meas.calibration_candidate()
-            value = f"{candidate:.6g}" if candidate is not None else "—"
-            self.lbl_m_per_px.setText(tr("calibration.calculated_scale", value=value))
+            scale = f"{candidate:.6g}" if candidate is not None else None
         elif self._m_per_px is not None:
-            self.lbl_m_per_px.setText(tr("measurement.scale_value", value=f"{self._m_per_px:.6f}"))
+            scale = f"{self._m_per_px:.6f}"
         else:
-            self.lbl_m_per_px.setText(tr("label.scale_m_per_px"))
+            scale = None
+        applied = not editing and scale is not None
+        self.lbl_calibration_scale_title.setText(tr(
+            "calibration.applied_scale_title" if applied else "calibration.scale_title"
+        ))
+        self.lbl_m_per_px.setText(f"{scale} m/px" if scale is not None else "—")
+        self.lbl_calibration_scale_hint.setVisible(editing and scale is not None)
+        set_style_property(self.calibration_scale_card, "hasScale", scale is not None)
+        set_style_property(
+            self.txt_real_m, "invalidDistance",
+            editing and has_points and bool(self.txt_real_m.text().strip()) and scale is None,
+        )
         self._refresh_navigation_footer()
 
     def _on_confirm_calibration(self) -> None:

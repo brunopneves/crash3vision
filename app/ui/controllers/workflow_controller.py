@@ -203,7 +203,7 @@ class WorkflowController:
         self.invalidate_energy()
         self.set_stage(self.host.Stage.CALIBRATION)  # type: ignore[attr-defined]
 
-    def invalidate_from_alignment(self) -> None:
+    def invalidate_from_alignment(self, *, target_stage: Stage | None = None) -> None:
         self.host.canvas.reset_alignment_visual()
 
         self.host._calibration_px = None
@@ -281,7 +281,9 @@ class WorkflowController:
 
         self.invalidate_energy()
         stage = self.host.Stage
-        self.set_stage(stage.ALIGNMENT if self.host.project.dam_path else stage.LOAD)
+        if target_stage is None:
+            target_stage = stage.ALIGNMENT if self.host.project.dam_path else stage.LOAD
+        self.set_stage(target_stage)
 
     def restart_from_alignment(self) -> None:
         Stage = self.host.Stage  # type: ignore[attr-defined]
@@ -297,6 +299,18 @@ class WorkflowController:
         Stage = self.host.Stage  # type: ignore[attr-defined]
         if self.host.stage == Stage.DONE:
             self.invalidate_from_marking()
+
+    def can_finish_images(self) -> bool:
+        host = self.host
+        return (
+            host.stage == host.Stage.LOAD
+            and host._viewed_step is None
+            and host.canvas.ctrl.dam_item is not None
+        )
+
+    def finish_images(self) -> None:
+        if self.can_finish_images():
+            self.set_stage(self.host.Stage.ALIGNMENT)
 
     def finish_alignment(self) -> None:
         Stage = self.host.Stage

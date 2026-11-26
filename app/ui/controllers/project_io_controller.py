@@ -549,15 +549,10 @@ class ProjectIOController:
             return
 
         try:
-            self.host.workflow.invalidate_from_alignment()
+            self.host.workflow.invalidate_from_alignment(target_stage=self.host.Stage.LOAD)
             self.host.canvas.load_reference(path)
             self.host.project.ref_path = path
-
-            stage = self.host.Stage
-            self.host.workflow.set_stage(
-                stage.ALIGNMENT if self.host.project.dam_path else stage.LOAD
-            )
-            self.host._update_auto_align_availability()
+            self.host._refresh_summary()
 
         except Exception as e:
             QMessageBox.critical(
@@ -575,15 +570,14 @@ class ProjectIOController:
             return
 
         try:
-            self.host.workflow.invalidate_from_alignment()
+            self.host.workflow.invalidate_from_alignment(target_stage=self.host.Stage.LOAD)
             self.host.canvas.load_deformed(path)
             self.host.canvas.set_deformed_opacity(
                 self.host.opacity_slider.value() / 100.0
             )
             self.host.project.dam_path = path
 
-            self.host.workflow.set_stage(self.host.Stage.ALIGNMENT)
-            self.host._update_auto_align_availability()
+            self.host._refresh_summary()
 
         except Exception as e:
             QMessageBox.critical(

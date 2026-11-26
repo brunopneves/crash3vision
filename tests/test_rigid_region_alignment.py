@@ -564,6 +564,56 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(window.stage, window.Stage.MARKING)
         self.assertAlmostEqual(window.project.m_per_px, 0.6 / window._calibration_px)
 
+    def test_calibration_cards_show_capture_preview_and_applied_scale(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
+        with patch.object(window.io, "pick_image_file", return_value=dam_path):
+            window.btn_load_dam.click()
+        window.btn_finish_images.click()
+        window.btn_finish_alignment.click()
+        window.show()
+        QApplication.processEvents()
+        self.assertEqual(window.lbl_calibration_title.text(), "Calibração")
+        self.assertEqual(window.chk_calibration_mode.property("uiRole"), "primary")
+        self.assertEqual(window.lbl_m_per_px.text(), "—")
+        self.assertFalse(window.btn_confirm_calibration.isEnabled())
+        window.chk_calibration_mode.click()
+        viewport = window.canvas.viewport()
+        point = viewport.rect().center()
+        QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=point)
+        self.assertIsNotNone(window.canvas.cal_p1)
+        self.assertIsNone(window.canvas.cal_p2)
+        self.assertEqual(window.chk_calibration_mode.text(), "Cancelar marcação")
+        self.assertFalse(window.lbl_calibration_points_status.property("complete"))
+        QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=point + QPoint(50, 0))
+        self.assertTrue(window.lbl_calibration_points_status.property("complete"))
+        self.assertTrue(window.lbl_px_distance.text().endswith(" px"))
+        self.assertEqual(window.chk_calibration_mode.property("uiRole"), "secondary")
+        self.assertEqual(window.chk_calibration_mode.text(), "Remarcar pontos")
+        self.assertFalse(window.btn_confirm_calibration.isEnabled())
+        window.txt_real_m.setText("abc")
+        self.assertTrue(window.txt_real_m.property("invalidDistance"))
+        self.assertTrue(window.lbl_navigation_hint.isVisible())
+        self.assertFalse(window.btn_confirm_calibration.isEnabled())
+        window.txt_real_m.setText("0,5")
+        self.assertFalse(window.txt_real_m.property("invalidDistance"))
+        self.assertTrue(window.calibration_scale_card.property("hasScale"))
+        self.assertTrue(window.lbl_calibration_scale_hint.isVisible())
+        self.assertTrue(window.lbl_m_per_px.text().endswith(" m/px"))
+        self.assertIsNone(window.project.m_per_px)
+        window.btn_confirm_calibration.click()
+        self.assertEqual(window.stage, window.Stage.MARKING)
+        before = window.project.to_dict()
+        window.workflow_step_labels["calibration"].click()
+        self.assertEqual(window.lbl_calibration_scale_title.text(), "Escala aplicada")
+        self.assertFalse(window.chk_calibration_mode.isEnabled())
+        self.assertFalse(window.txt_real_m.isEnabled())
+        self.assertTrue(window.lbl_calibration_scale_hint.isHidden())
+        window._set_language_and_refresh("en")
+        self.assertEqual(window.lbl_calibration_scale_title.text(), "Applied scale")
+        self.assertEqual(window.project.to_dict(), before)
+
     def test_legacy_project_displays_ees_in_mps_without_changing_stored_results(self) -> None:
         window = self._window()
         source = COMPASS / "crash3vision_reference_project.json"
@@ -707,46 +757,78 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         window = MainWindow()
         self.addCleanup(window.close)
         window.show()
-        ref_card, _, ref_status, ref_button = window._image_cards["reference"]
-        dam_card, _, dam_status, dam_button = window._image_cards["deformed"]
+        ref_card, ref_title, ref_help, ref_status, ref_button = window._image_cards["reference"]
+        dam_card, dam_title, dam_help, dam_status, dam_button = window._image_cards["deformed"]
         self.assertEqual(window._images_title.text(), "Imagens")
-        self.assertTrue(window._images_instructions.isVisible())
+        self.assertLess(
+            window.load_group.layout().indexOf(dam_card),
+            window.load_group.layout().indexOf(ref_card),
+        )
+        self.assertEqual(dam_title.text(), "Imagem do veículo danificado")
+        self.assertEqual(ref_title.text(), "Imagem de referência (opcional)")
+        self.assertEqual(dam_help.text(), "Obrigatória para as medições.")
+        self.assertEqual(ref_help.text(), "Usada para comparação e alinhamento.")
         self.assertEqual(ref_status.text(), "Ausente")
         self.assertEqual(dam_status.text(), "Ausente")
         self.assertEqual(dam_button.property("uiRole"), "primary")
         self.assertEqual(ref_button.property("uiRole"), "secondary")
+        self.assertTrue(window.btn_finish_images.isHidden())
+        self.assertFalse(window.btn_finish_images.isEnabled())
 
         dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
         with patch.object(window.io, "pick_image_file", return_value=dam_path):
             dam_button.click()
-        self.assertEqual(window.stage, window.Stage.ALIGNMENT)
-        self.assertTrue(ref_card.isHidden())
-        self.assertTrue(dam_card.isHidden())
-        self.assertEqual(window.btn_toggle_image_controls.text(), "▸ ✓ Deformada")
-        window.btn_toggle_image_controls.click()
+        self.assertEqual(window.stage, window.Stage.LOAD)
+        self.assertEqual(window.canvas.ctrl.dam_item.opacity(), 1.0)
+        self.assertFalse(window.opacity_slider.isEnabled())
+        self.assertTrue(window.btn_toggle_image_controls.isHidden())
+        self.assertTrue(window.btn_finish_images.isEnabled())
+        self.assertIs(window.btn_finish_images.parentWidget(), window.navigation_footer)
         self.assertTrue(ref_card.isVisible())
         self.assertTrue(dam_card.isVisible())
         self.assertFalse(ref_status.property("imageLoaded"))
         self.assertTrue(dam_status.property("imageLoaded"))
         self.assertEqual(dam_button.property("uiRole"), "secondary")
         self.assertEqual(dam_button.text(), "Substituir imagem")
-        self.assertEqual(dam_button.accessibleName(), "Substituir imagem deformada")
+        self.assertEqual(dam_button.accessibleName(), "Substituir imagem do veículo danificado")
 
         ref_path = str(COMPASS / "reference_vehicle_frame_000.png")
         with patch.object(window.io, "pick_image_file", return_value=ref_path):
             ref_button.click()
-        window.btn_toggle_image_controls.click()
+        self.assertEqual(window.stage, window.Stage.LOAD)
+        self.assertTrue(ref_status.property("imageLoaded"))
+        with patch.object(window.io, "pick_image_file", return_value=dam_path):
+            ref_button.click()
+        self.assertEqual(window.project.ref_path, dam_path)
+        self.assertEqual(window.stage, window.Stage.LOAD)
+        with patch.object(window.io, "pick_image_file", return_value=ref_path):
+            dam_button.click()
+        self.assertEqual(window.project.dam_path, ref_path)
+        self.assertEqual(window.stage, window.Stage.LOAD)
+        self.assertFalse(ref_card.isHidden())
+        self.assertFalse(dam_card.isHidden())
+        window._set_language_and_refresh("en")
+        self.assertEqual(window.btn_finish_images.text(), "Continue to alignment")
+        window._set_language_and_refresh("pt")
+        self.assertEqual(window.btn_finish_images.text(), "Continuar para alinhamento")
+        window.btn_finish_images.click()
+        self.assertEqual(window.stage, window.Stage.ALIGNMENT)
+        self.assertTrue(ref_card.isHidden())
+        self.assertTrue(dam_card.isHidden())
         self.assertEqual(window.btn_toggle_image_controls.text(), "▸ ✓ Ambas as imagens")
         before = window.project.to_dict()
         window.workflow_step_labels["images"].click()
         window.btn_toggle_image_controls.click()
         self.assertTrue(window._images_title.isVisible())
-        self.assertTrue(window._images_instructions.isHidden())
         self.assertTrue(ref_card.isVisible())
         self.assertTrue(ref_status.property("imageLoaded"))
         self.assertTrue(dam_status.property("imageLoaded"))
         self.assertFalse(ref_button.isEnabled())
         self.assertFalse(dam_button.isEnabled())
+        self.assertTrue(window.btn_finish_images.isHidden())
+        self.assertFalse(window.btn_finish_images.isEnabled())
+        window.workflow.finish_images()
+        self.assertEqual(window._viewed_step, "images")
         window.resize(900, 550)
         window.resizeDocks([window._controls_dock], [350], Qt.Orientation.Horizontal)
         for language, title in (("pt", "Imagens"), ("en", "Images")):
@@ -754,6 +836,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             QApplication.processEvents()
             self.assertEqual(window._images_title.text(), title)
             self.assertEqual(window._controls_scroll.horizontalScrollBar().maximum(), 0)
+        self.assertEqual(dam_title.text(), "Damaged vehicle image")
+        self.assertEqual(ref_title.text(), "Reference image (optional)")
+        self.assertEqual(dam_button.accessibleName(), "Replace damaged vehicle image")
         self.assertEqual(window.project.to_dict(), before)
 
     def test_reference_only_stays_in_images_until_deformed_is_loaded(self) -> None:
@@ -765,6 +850,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(window.stage, window.Stage.LOAD)
         self.assertEqual(window.workflow.determine_stage_from_project(), window.Stage.LOAD)
         self.assertFalse(window.btn_load_dam.isHidden())
+        self.assertFalse(window.btn_finish_images.isEnabled())
+        window.workflow.finish_images()
+        self.assertEqual(window.stage, window.Stage.LOAD)
         self.assertTrue(window.btn_toggle_image_controls.isHidden())
         self.assertEqual(
             window.workflow_step_labels["images"].property("progressStatus"), "current"
@@ -772,6 +860,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
         with patch.object(window.io, "pick_image_file", return_value=dam_path):
             window.btn_load_dam.click()
+        self.assertEqual(window.stage, window.Stage.LOAD)
+        self.assertTrue(window.btn_finish_images.isEnabled())
+        window.btn_finish_images.click()
         self.assertEqual(window.stage, window.Stage.ALIGNMENT)
         self.assertTrue(window.btn_start_alignment.isEnabled())
         self.assertTrue(window.btn_load_dam.isHidden())
@@ -832,10 +923,13 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
         with patch.object(window.io, "pick_image_file", return_value=dam_path):
             window.io.load_dam()
+        self.assertEqual(steps["images"].property("progressStatus"), "current")
+        self.assertFalse(steps["alignment"].isEnabled())
+        window.btn_finish_images.click()
         self.assertEqual(steps["images"].property("progressStatus"), "complete")
         self.assertEqual(steps["alignment"].property("progressStatus"), "current")
         self.assertIn("opcional", steps["alignment"].text())
-        self.assertEqual(window.btn_toggle_image_controls.text(), "▸ ✓ Deformada")
+        self.assertEqual(window.btn_toggle_image_controls.text(), "▸ ✓ Veículo danificado")
         self.assertTrue(window.btn_load_ref.isHidden())
         self.assertTrue(window.btn_load_dam.isHidden())
         self.assertFalse(window.align_group.isHidden())
@@ -906,8 +1000,11 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             window.btn_load_ref.click()
         self.assertTrue(window.calc_panel.isHidden())
         self.assertFalse(window.load_group.isHidden())
-        self.assertEqual(window.btn_toggle_image_controls.text(), "▾ ✓ Ambas as imagens")
-        window.btn_toggle_image_controls.click()
+        self.assertTrue(window.btn_toggle_image_controls.isHidden())
+        self.assertFalse(window.btn_load_ref.isHidden())
+        self.assertEqual(window.stage, window.Stage.LOAD)
+        self.assertFalse(window._ci_m)
+        window.btn_finish_images.click()
         self.assertTrue(window.btn_load_ref.isHidden())
         self.assertEqual(steps["alignment"].property("progressStatus"), "current")
         window.btn_finish_alignment.click()
@@ -1608,14 +1705,63 @@ class RigidRegionAlignmentTests(unittest.TestCase):
 
         window.canvas.load_reference(str(ref_path))
         self.assertTrue(window.opacity_slider.isEnabled())
+        self.assertAlmostEqual(window.canvas.ctrl.dam_item.opacity(), 0.35)
 
         window.canvas.clear_images()
         self.assertFalse(window.opacity_slider.isEnabled())
 
-        window.canvas.load_reference(str(ref_path))
-        self.assertFalse(window.opacity_slider.isEnabled())
         window.canvas.load_deformed(str(dam_path))
+        self.assertFalse(window.opacity_slider.isEnabled())
+        self.assertEqual(window.canvas.ctrl.dam_item.opacity(), 1.0)
+        window.canvas.load_reference(str(ref_path))
         self.assertTrue(window.opacity_slider.isEnabled())
+        self.assertAlmostEqual(window.canvas.ctrl.dam_item.opacity(), 0.35)
+        window.canvas.load_deformed(str(dam_path))
+        self.assertAlmostEqual(window.canvas.ctrl.dam_item.opacity(), 0.35)
+
+    def test_saved_overlay_opacity_is_used_only_with_both_images(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            dam_path, ref_path = folder / "dam.png", folder / "ref.png"
+            for path, color in ((dam_path, Qt.GlobalColor.red), (ref_path, Qt.GlobalColor.blue)):
+                image = QImage(640, 360, QImage.Format.Format_RGB32)
+                image.fill(color)
+                self.assertTrue(image.save(str(path)))
+            project_path = folder / "legacy.json"
+            export_path = folder / "export.png"
+            data = {"name": "Legacy", "dam_path": str(dam_path), "opacity": 0.27}
+            for paired in (False, True, False):
+                if paired:
+                    data["ref_path"] = str(ref_path)
+                else:
+                    data.pop("ref_path", None)
+                original = json.dumps(data)
+                project_path.write_text(original, encoding="utf-8")
+                with (
+                    patch.object(QFileDialog, "getOpenFileName", return_value=(str(project_path), "")),
+                    patch.object(QMessageBox, "information"),
+                ):
+                    window.io.load_project()
+                self.assertEqual(window.stage, window.Stage.ALIGNMENT)
+                self.assertTrue(window.btn_finish_images.isHidden())
+                self.assertEqual(window.opacity_slider.isEnabled(), paired)
+                self.assertEqual(window.opacity_slider.value(), 27)
+                self.assertAlmostEqual(window.project.opacity, 0.27)
+                self.assertAlmostEqual(window.canvas.ctrl.dam_item.opacity(), 0.27 if paired else 1.0)
+                window.canvas.export_scene_png(str(export_path))
+                exported = QImage(str(export_path))
+                self.assertFalse(exported.isNull())
+                pixel = exported.pixelColor(exported.rect().center())
+                self.assertEqual(pixel.alpha(), 255)
+                if paired:
+                    self.assertGreater(pixel.blue(), pixel.red())
+                else:
+                    self.assertEqual(pixel.getRgb(), (255, 0, 0, 255))
+                self.assertEqual(project_path.read_text(encoding="utf-8"), original)
+            window.btn_finish_alignment.click()
+            self.assertEqual(window.stage, window.Stage.CALIBRATION)
 
     def test_resizing_left_dock_preserves_overlay_and_png_exports(self) -> None:
         window = self._window()
@@ -1688,6 +1834,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
         with patch.object(window.io, "pick_image_file", return_value=dam_path):
             window.io.load_dam()
+        self.assertEqual(window.stage, window.Stage.LOAD)
+        window.btn_finish_images.click()
 
         self.assertFalse(window.btn_finish_alignment.isHidden())
         self.assertFalse(window.btn_start_alignment.isEnabled())
