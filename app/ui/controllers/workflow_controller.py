@@ -71,42 +71,33 @@ class WorkflowController:
 
     def apply_stage_gating(self) -> None:
         host = self.host
-        Stage = host.Stage
-        stage = host.stage
         viewed = host._viewed_step
         consulting = viewed is not None
         panel = viewed or host._current_workflow_step()
+        entering_result = panel == "result" and host._summary_group.isHidden()
         host._refresh_image_controls()
-        host._update_finish_alignment_availability()
+        host._refresh_navigation_footer()
         host.canvas_view_bar.setEnabled(host.canvas.has_both_images() and not consulting)
         host.btn_return_to_current_step.setVisible(consulting)
+        host.btn_redo_step.setVisible(viewed in ("alignment", "calibration", "measurement"))
         host.btn_load_ref.setEnabled(not consulting)
         host.btn_load_dam.setEnabled(not consulting)
-        for shortcut in host._alignment_shortcuts:
-            shortcut.setEnabled(not consulting)
+        host._update_alignment_edit_availability()
 
-        for group, panels in (
-            (host.align_group, ("alignment",)),
-            (host.fine_adjust_group, ("alignment",)),
-            (host.cal_group, ("calibration",)),
-            (host.mark_group, ("measurement",)),
-            (host.calc_panel, ("calculation", "result")),
-            (host._summary_group, ("calculation", "result")),
+        for group, step in (
+            (host.align_group, "alignment"),
+            (host.cal_group, "calibration"),
+            (host.mark_group, "measurement"),
+            (host.calc_panel, "calculation"),
+            (host._summary_group, "result"),
         ):
-            visible = panel in panels
-            group.setEnabled(visible and not consulting)
+            visible = panel == step
+            group.setEnabled(visible and (not consulting or step == "calculation"))
             group.setVisible(visible)
         host._refresh_alignment_consultation()
-
-        restart_actions = (
-            (host.btn_restart_alignment, stage in (Stage.CALIBRATION, Stage.MARKING, Stage.DONE)),
-            (host.btn_restart_calibration, stage in (Stage.MARKING, Stage.DONE)),
-            (host.btn_restart_marking, stage == Stage.DONE),
-        )
-        for button, available in restart_actions:
-            button.setEnabled(available)
-            button.setVisible(available)
-        host.workflow_group.setVisible(any(available for _, available in restart_actions))
+        if entering_result:
+            host._controls_scroll.verticalScrollBar().setValue(0)
+            host._controls_scroll.horizontalScrollBar().setValue(0)
 
     def invalidate_energy(self) -> None:
         self.host._total_energy = None
@@ -335,7 +326,7 @@ class WorkflowController:
 
     def confirm_calibration(self) -> None:
         Stage = self.host.Stage  # type: ignore[attr-defined]
-        if self.host.stage != Stage.CALIBRATION:
+        if self.host.stage != Stage.CALIBRATION or self.host._viewed_step is not None:
             return
 
         if self.host._m_per_px is None:
@@ -351,14 +342,21 @@ class WorkflowController:
 
         self.set_stage(Stage.MARKING)
 
+    def marking_block_reason(self) -> str | None:
+        if self.host._m_per_px is None:
+            return "workflow.error.apply_calibration_first"
+        if self.host._w_px is None:
+            return "navigation.measure_width"
+        if any(i not in self.host._ci_m for i in range(1, 7)):
+            return "navigation.measure_crush"
+        return None
+
     def finish_marking(self) -> None:
         Stage = self.host.Stage  # type: ignore[attr-defined]
-        if self.host.stage != Stage.MARKING:
+        if self.host.stage != Stage.MARKING or self.host._viewed_step is not None:
             return
 
-        c_done = sum(1 for i in range(1, 7) if i in self.host._ci_m)
-
-        if self.host._w_px is None or self.host._m_per_px is None or c_done != 6:
+        if self.marking_block_reason() is not None:
             QMessageBox.warning(
                 self.host,
                 tr("group.marking"),

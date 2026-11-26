@@ -63,6 +63,8 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "group.images": {"en": "Images", "pt": "Imagens"},
     "images.none_loaded": {"en": "No images loaded", "pt": "Nenhuma imagem carregada"},
+    "images.both_loaded": {"en": "Both images", "pt": "Ambas as imagens"},
+    "images.loaded": {"en": "Loaded images", "pt": "Imagens carregadas"},
     "images.toggle_controls": {
         "en": "Show or hide image loading and replacement controls",
         "pt": "Mostrar ou ocultar os controles de carregamento e substituição",
@@ -84,12 +86,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Alinhamento das imagens",
     },
     "group.fine_adjustment": {
-        "en": "Fine adjustment",
-        "pt": "Ajuste fino",
+        "en": "Manual adjustment",
+        "pt": "Ajuste manual",
     },
+    "alignment.advanced": {"en": "Precision adjustments", "pt": "Ajustes de precisão"},
     "check.alignment_mode": {
-        "en": "Drag selected image",
-        "pt": "Arrastar imagem selecionada",
+        "en": "Drag image",
+        "pt": "Arrastar imagem",
     },
     "check.alignment_mode_hint": {
         "en": "Alignment mode (drag selected image)",
@@ -112,8 +115,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Referência",
     },
     "button.reset_selected_transform": {
-        "en": "Reset image transforms",
-        "pt": "Resetar transformações das imagens",
+        "en": "Reset alignment",
+        "pt": "Redefinir alinhamento",
+    },
+    "alignment.reset.tooltip": {
+        "en": "Restores the original position, rotation and scale of both images.",
+        "pt": "Restaura a posição, a rotação e a escala originais das duas imagens.",
+    },
+    "alignment.reset.confirm": {
+        "en": "Restore both images to their original positions, rotations and scales?",
+        "pt": "Restaurar as posições, rotações e escalas originais das duas imagens?",
     },
     "label.alignment_method": {
         "en": "Alignment method",
@@ -132,8 +143,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Iniciar alinhamento",
     },
     "button.rigid_apply": {
-        "en": "Use this alignment",
-        "pt": "Usar este alinhamento",
+        "en": "Apply\nalignment",
+        "pt": "Aplicar\nalinhamento",
     },
     "button.rigid_try_again": {
         "en": "Try another region",
@@ -143,6 +154,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Cancel",
         "pt": "Cancelar",
     },
+    "alignment.discard_preview": {"en": "Discard\npreview", "pt": "Descartar\nprévia"},
     "alignment.rigid.instruction.reference": {
         "en": "Mark 3 points on a preserved rigid region.",
         "pt": "Marque 3 pontos sobre uma região rígida preservada.",
@@ -208,6 +220,20 @@ STRINGS: dict[str, dict[str, str]] = {
     "progress.status.complete": {"en": "Complete", "pt": "Concluída"},
     "progress.status.passed": {"en": "Stage passed", "pt": "Etapa superada"},
     "progress.viewing": {"en": "Viewing · read-only", "pt": "Em consulta · somente leitura"},
+    "progress.viewing_calculation": {"en": "Calculation panel open", "pt": "Painel de cálculo aberto"},
+    "progress.redo": {"en": "Redo this step", "pt": "Refazer esta etapa"},
+    "progress.redo.alignment": {
+        "en": "Redo alignment? This resets image transforms and clears calibration, measurements, energy and EES.",
+        "pt": "Refazer o alinhamento? Isso redefine as transformações das imagens e apaga a calibração, as medições, a energia e a EES.",
+    },
+    "progress.redo.calibration": {
+        "en": "Redo calibration? This clears the scale, dependent measurements, energy and EES.",
+        "pt": "Refazer a calibração? Isso apaga a escala, as medições dependentes, a energia e a EES.",
+    },
+    "progress.redo.measurement": {
+        "en": "Redo measurement? The existing points are kept. Energy and EES are cleared.",
+        "pt": "Refazer a medição? Os pontos existentes serão preservados. A energia e a EES serão apagadas.",
+    },
     "progress.return_current": {"en": "Return to current step", "pt": "Voltar à etapa atual"},
     "progress.transform": {
         "en": "{image}: X {x:.2f}, Y {y:.2f}, rotation {rotation:.2f}°, scale {scale:.4f}",
@@ -224,8 +250,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Nenhuma sugestão automática confiável foi encontrada.",
     },
     "button.apply_alignment_suggestion": {
-        "en": "Use this alignment",
-        "pt": "Usar este alinhamento",
+        "en": "Apply\nalignment",
+        "pt": "Aplicar\nalinhamento",
     },
     "alignment.auto.title": {
         "en": "Automatic alignment",
@@ -262,8 +288,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Rotacionar +",
     },
     "label.step_deg": {
-        "en": "Step (deg):",
-        "pt": "Passo (graus):",
+        "en": "Rotation step (°):",
+        "pt": "Passo da rotação (°):",
     },
     "group.scale": {
         "en": "Scale",
@@ -278,16 +304,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Escala +",
     },
     "label.step_pct": {
-        "en": "Step (%):",
-        "pt": "Passo (%):",
+        "en": "Scale step (%):",
+        "pt": "Passo da escala (%):",
     },
     "label.alignment_shortcuts": {
         "en": "Shortcuts: arrows = nudge | Q/E = rotate | Z/X = scale",
         "pt": "Atalhos: setas = ajuste fino | Q/E = rotacionar | Z/X = escala",
     },
     "button.finish_alignment": {
-        "en": "Continue to calibration →",
-        "pt": "Continuar para a calibração →",
+        "en": "Continue to calibration",
+        "pt": "Continuar para calibração",
     },
     "group.calibration": {
         "en": "Calibration (px → m)",
@@ -314,8 +340,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Escala: (m/px) -",
     },
     "button.confirm_calibration": {
-        "en": "Confirm calibration →",
-        "pt": "Confirmar calibração →",
+        "en": "Continue to measurement",
+        "pt": "Continuar para medição",
     },
     "group.marking": {
         "en": "Marking (W + C1..C6)",
@@ -362,8 +388,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Valores de C (m): C1=-  C2=-  C3=-  C4=-  C5=-  C6=-",
     },
     "button.finish_marking": {
-        "en": "Finish marking ✓",
-        "pt": "Concluir marcação ✓",
+        "en": "Continue to calculation",
+        "pt": "Continuar para cálculo",
     },
     "group.workflow": {
         "en": "Workflow",
@@ -380,6 +406,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "button.restart_marking": {
         "en": "Restart marking",
         "pt": "Reiniciar marcação",
+    },
+    "result.ees_kmh": {"en": "EES {value} km/h", "pt": "EES {value} km/h"},
+    "result.ees_mps": {"en": "{value} m/s", "pt": "{value} m/s"},
+    "result.energy_kj": {
+        "en": "Deformation energy\n{value} kJ",
+        "pt": "Energia de deformação\n{value} kJ",
     },
     "group.summary": {
         "en": "Summary",
@@ -754,6 +786,22 @@ STRINGS: dict[str, dict[str, str]] = {
     "measurement.c_values_prefix": {
         "en": "C values (m):",
         "pt": "Valores de C (m):",
+    },
+    "navigation.resolve_alignment": {
+        "en": "Finish or cancel the alignment in progress.",
+        "pt": "Conclua ou cancele o alinhamento em andamento.",
+    },
+    "navigation.load_image": {
+        "en": "Load an image before continuing.",
+        "pt": "Carregue uma imagem antes de continuar.",
+    },
+    "navigation.measure_width": {
+        "en": "Measure width W before continuing.",
+        "pt": "Meça a largura W antes de continuar.",
+    },
+    "navigation.measure_crush": {
+        "en": "Complete measurements C1–C6.",
+        "pt": "Complete as medições C1–C6.",
     },
     "workflow.error.apply_calibration_first": {
         "en": "Apply calibration first (m/px).",

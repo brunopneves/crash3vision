@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 import logging
+import math
 from pathlib import Path
 
 import cv2
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QToolBar,
     QToolButton,
+    QFrame,
 )
 
 from app.ui.canvas_view import CanvasView
@@ -143,10 +145,6 @@ class MainWindow(QMainWindow):
         self._vehicle_mass_kg: float | None = None
         self._damage_speed_mps: float | None = None
         self._damage_speed_kmh: float | None = None
-
-        self.btn_restart_alignment: QPushButton
-        self.btn_restart_calibration: QPushButton
-        self.btn_restart_marking: QPushButton
 
         self.io = ProjectIOController(self)
         self.meas = MeasurementController(self)
@@ -300,6 +298,25 @@ class MainWindow(QMainWindow):
     def _return_to_current_step(self) -> None:
         self._view_workflow_step(self._current_workflow_step())
 
+    def _redo_viewed_step(self) -> None:
+        actions = {
+            "alignment": self._on_restart_alignment,
+            "calibration": self._on_restart_calibration,
+            "measurement": self._on_restart_marking,
+        }
+        step = self._viewed_step
+        if step not in actions or self._workflow_navigation_blocked():
+            return
+        answer = QMessageBox.question(
+            self,
+            tr("progress.redo"),
+            tr(f"progress.redo.{step}"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            actions[step]()
+
     def _refresh_workflow_progress(self) -> None:
         steps = tuple(self.workflow_step_labels)
         current = steps.index(self._current_workflow_step())
@@ -330,7 +347,9 @@ class MainWindow(QMainWindow):
                 style += "border: 1px solid #67727a; font-weight: bold;"
                 text = f"▸ {text}"
             label.setText(text)
-            description = tr("progress.viewing") if viewing else tr(f"progress.status.{status}")
+            description = tr(f"progress.status.{status}")
+            if viewing:
+                description = tr("progress.viewing_calculation" if step == "calculation" else "progress.viewing")
             label.setToolTip(f"{text} — {description}")
             label.setAccessibleName(label.toolTip())
             label.setEnabled(index <= current and not blocked)
@@ -360,41 +379,48 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.canvas_view_bar)
         self.setCentralWidget(central)
 
+    @staticmethod
+    def _style_disclosure(toggle: QToolButton) -> None:
+        toggle.setCheckable(True)
+        toggle.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        toggle.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        toggle.setStyleSheet("""
+            QToolButton {
+                background: #edf0f2; color: #23313a;
+                border: 2px solid #c8cfd4; border-radius: 4px;
+                padding: 3px 7px; font-size: 11px;
+            }
+            QToolButton:hover { background: #e0e5e8; }
+            QToolButton:focus { border-color: #245b96; }
+            QToolButton:disabled { color: #59636a; background: #f3f4f5; }
+        """)
+
     def _build_dock(self) -> None:
         dock = QDockWidget(tr("dock.controls"), self)
         self._controls_dock = dock
         dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea)
 
         scroll = QScrollArea()
+        self._controls_scroll = scroll
         scroll.setWidgetResizable(True)
 
         dock_widget = QWidget()
         dock_layout = QVBoxLayout(dock_widget)
+        dock_layout.setContentsMargins(6, 9, 6, 9)
         self.btn_return_to_current_step = QPushButton(tr("progress.return_current"))
         self.btn_return_to_current_step.clicked.connect(self._return_to_current_step)
         self.btn_return_to_current_step.hide()
         dock_layout.addWidget(self.btn_return_to_current_step)
+        self.btn_redo_step = QPushButton(tr("progress.redo"))
+        self.btn_redo_step.clicked.connect(self._redo_viewed_step)
+        self.btn_redo_step.hide()
+        dock_layout.addWidget(self.btn_redo_step)
 
         # --- Load images ---
         self.load_group = QGroupBox(tr("group.load_images"))
         load_layout = QVBoxLayout(self.load_group)
         self.btn_toggle_image_controls = QToolButton()
-        self.btn_toggle_image_controls.setCheckable(True)
-        self.btn_toggle_image_controls.setStyleSheet("""
-            QToolButton {
-                background: #eef3f5;
-                color: #23343e;
-                border: 1px solid #b9c9d0;
-                border-radius: 4px;
-                padding: 4px 8px;
-            }
-            QToolButton:hover, QToolButton:checked {
-                background: #dcebef;
-            }
-        """)
-        self.btn_toggle_image_controls.setToolButtonStyle(
-            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
-        )
+        self._style_disclosure(self.btn_toggle_image_controls)
         self.btn_toggle_image_controls.toggled.connect(self._refresh_image_controls)
         load_layout.addWidget(self.btn_toggle_image_controls)
         self.btn_load_ref = QPushButton(tr("button.load_ref"))
@@ -403,8 +429,18 @@ class MainWindow(QMainWindow):
         load_layout.addWidget(self.btn_load_dam)
         dock_layout.addWidget(self.load_group)
 
-        self.fine_adjust_group = QGroupBox(tr("group.fine_adjustment"))
+        self.fine_adjust_group = QGroupBox()
         fine_layout = QVBoxLayout(self.fine_adjust_group)
+        fine_layout.setContentsMargins(8, 10, 8, 10)
+        self.btn_toggle_manual_alignment = QToolButton()
+        self.btn_toggle_advanced_alignment = QToolButton()
+        for toggle in (self.btn_toggle_manual_alignment, self.btn_toggle_advanced_alignment):
+            self._style_disclosure(toggle)
+            toggle.toggled.connect(self._refresh_alignment_sections)
+        self.alignment_advanced = QWidget()
+        advanced_layout = QGridLayout(self.alignment_advanced)
+        advanced_layout.setContentsMargins(0, 0, 0, 0)
+        advanced_layout.setHorizontalSpacing(3)
 
         # --- Alignment group ---
         self.align_group = QGroupBox(tr("group.alignment"))
@@ -430,12 +466,16 @@ class MainWindow(QMainWindow):
         fine_layout.addWidget(self.cmb_alignment_target)
 
         self.btn_reset_alignment = QPushButton(tr("button.reset_selected_transform"))
-        fine_layout.addWidget(self.btn_reset_alignment)
+        self.btn_reset_alignment.setAccessibleName(self.btn_reset_alignment.text())
+        self.btn_reset_alignment.setToolTip(tr("alignment.reset.tooltip"))
+        self.btn_reset_alignment.setFlat(True)
 
         self.lbl_alignment_method = QLabel(tr("label.alignment_method"))
         align_layout.addWidget(self.lbl_alignment_method)
         self.rad_alignment_auto = QRadioButton(tr("alignment.method.auto"))
         self.rad_alignment_rigid = QRadioButton(tr("alignment.method.rigid"))
+        for radio in (self.rad_alignment_auto, self.rad_alignment_rigid):
+            radio.setStyleSheet("QRadioButton { font-size: 10px; }")
         self.alignment_method_buttons = QButtonGroup(self)
         self.alignment_method_buttons.setExclusive(True)
         self.alignment_method_buttons.addButton(self.rad_alignment_auto)
@@ -460,6 +500,8 @@ class MainWindow(QMainWindow):
         self.alignment_actions_widget = QWidget()
         rigid_actions = QVBoxLayout(self.alignment_actions_widget)
         rigid_actions.setContentsMargins(0, 0, 0, 0)
+        preview_row = QHBoxLayout()
+        rigid_actions.addLayout(preview_row)
         self.btn_rigid_apply = QPushButton(tr("button.rigid_apply"))
         self.btn_rigid_try_again = QPushButton(tr("button.rigid_try_again"))
         self.btn_rigid_cancel = QPushButton(tr("button.rigid_cancel"))
@@ -469,22 +511,41 @@ class MainWindow(QMainWindow):
         )
         self.btn_apply_alignment_suggestion.setEnabled(False)
         self.btn_apply_alignment_suggestion.setVisible(False)
-        rigid_actions.addWidget(self.btn_apply_alignment_suggestion)
-
         for button in (
+            self.btn_apply_alignment_suggestion,
             self.btn_rigid_apply,
-            self.btn_rigid_try_again,
             self.btn_rigid_cancel,
         ):
             button.setVisible(False)
-            rigid_actions.addWidget(button)
+            preview_row.addWidget(button, 1)
+        for button in (self.btn_apply_alignment_suggestion, self.btn_rigid_apply):
+            button.setAccessibleName(button.text().replace("\n", " "))
+            button.setStyleSheet("""
+                QPushButton {
+                    background: #245b96; color: white;
+                    border: 2px solid #245b96; border-radius: 4px;
+                    padding: 4px; font-size: 10px; font-weight: bold;
+                }
+                QPushButton:hover { background: #1b4c80; }
+                QPushButton:focus { border-color: #8fc5ff; }
+            """)
+        self.btn_rigid_cancel.setStyleSheet("""
+            QPushButton {
+                background: #edf0f2; color: #23313a;
+                border: 2px solid #c8cfd4; border-radius: 4px;
+                padding: 4px; font-size: 10px;
+            }
+            QPushButton:hover { background: #e0e5e8; }
+            QPushButton:focus { border-color: #245b96; }
+        """)
+        self.btn_rigid_try_again.hide()
+        rigid_actions.addWidget(self.btn_rigid_try_again)
         self.alignment_actions_widget.setVisible(False)
         align_layout.addWidget(self.alignment_actions_widget)
 
         self.btn_finish_alignment = QPushButton(tr("button.finish_alignment"))
         self.btn_finish_alignment.setVisible(False)
         self.btn_finish_alignment.setEnabled(False)
-        align_layout.addWidget(self.btn_finish_alignment)
 
         self.nudge_box = QGroupBox(tr("group.nudge"))
         nudge_layout = QVBoxLayout(self.nudge_box)
@@ -521,25 +582,28 @@ class MainWindow(QMainWindow):
         nudge_layout.addLayout(grid_mid)
         nudge_layout.addLayout(grid_bot)
 
-        fine_layout.addWidget(self.nudge_box)
+        advanced_layout.addWidget(self.nudge_box, 0, 0, 1, 2)
 
         self.rotate_box = QGroupBox(tr("group.rotate"))
         rotate_layout = QGridLayout(self.rotate_box)
 
-        self.btn_rotate_minus = QPushButton(tr("button.rotate_minus"))
-        self.btn_rotate_plus = QPushButton(tr("button.rotate_plus"))
+        self.btn_rotate_minus = QPushButton("−")
+        self.btn_rotate_plus = QPushButton("+")
+        self.btn_rotate_minus.setToolTip(tr("button.rotate_minus"))
+        self.btn_rotate_plus.setToolTip(tr("button.rotate_plus"))
 
         rotate_layout.addWidget(self.btn_rotate_minus, 0, 0)
         rotate_layout.addWidget(self.btn_rotate_plus, 0, 1)
 
         self.lbl_step_deg = QLabel(tr("label.step_deg"))
-        rotate_layout.addWidget(self.lbl_step_deg, 1, 0)
+        self.lbl_step_deg.setWordWrap(True)
+        advanced_layout.addWidget(self.lbl_step_deg, 1, 0)
         self.spn_rotate_step = QDoubleSpinBox()
         self.spn_rotate_step.setDecimals(2)
         self.spn_rotate_step.setRange(0.01, 360.0)
         self.spn_rotate_step.setSingleStep(0.1)
         self.spn_rotate_step.setValue(1.0)
-        rotate_layout.addWidget(self.spn_rotate_step, 1, 1)
+        advanced_layout.addWidget(self.spn_rotate_step, 1, 1)
 
         fine_layout.addWidget(self.rotate_box)
 
@@ -569,22 +633,29 @@ class MainWindow(QMainWindow):
         scale_layout.addWidget(self.btn_scale_plus, 0, 1)
 
         self.lbl_step_pct = QLabel(tr("label.step_pct"))
-        scale_layout.addWidget(self.lbl_step_pct, 1, 0)
+        self.lbl_step_pct.setWordWrap(True)
+        advanced_layout.addWidget(self.lbl_step_pct, 2, 0)
         self.spn_scale_step = QDoubleSpinBox()
         self.spn_scale_step.setDecimals(2)
         self.spn_scale_step.setRange(0.01, 50.0)
         self.spn_scale_step.setSingleStep(0.1)
         self.spn_scale_step.setValue(1.0)
-        scale_layout.addWidget(self.spn_scale_step, 1, 1)
+        advanced_layout.addWidget(self.spn_scale_step, 2, 1)
 
         fine_layout.addWidget(self.scale_box)
 
         self.lbl_alignment_shortcuts = QLabel(tr("label.alignment_shortcuts"))
         self.lbl_alignment_shortcuts.setWordWrap(True)
         fine_layout.addWidget(self.lbl_alignment_shortcuts)
+        fine_layout.addWidget(self.btn_toggle_advanced_alignment)
+        fine_layout.addWidget(self.alignment_advanced)
+        fine_layout.addSpacing(8)
+        fine_layout.addWidget(self.btn_reset_alignment)
 
+        align_layout.addWidget(self.btn_toggle_manual_alignment)
+        align_layout.addWidget(self.fine_adjust_group)
         dock_layout.addWidget(self.align_group)
-        dock_layout.addWidget(self.fine_adjust_group)
+        self._refresh_alignment_sections()
 
         # --- Calibration group ---
         self.cal_group = QGroupBox(tr("group.calibration"))
@@ -611,7 +682,6 @@ class MainWindow(QMainWindow):
         cal_layout.addWidget(self.lbl_m_per_px)
 
         self.btn_confirm_calibration = QPushButton(tr("button.confirm_calibration"))
-        cal_layout.addWidget(self.btn_confirm_calibration)
 
         dock_layout.addWidget(self.cal_group)
 
@@ -686,24 +756,9 @@ class MainWindow(QMainWindow):
         mark_layout.addWidget(self.lbl_ci_values)
 
         self.btn_finish_marking = QPushButton(tr("button.finish_marking"))
-        mark_layout.addWidget(self.btn_finish_marking)
 
         dock_layout.addWidget(self.mark_group)
 
-        # --- Workflow group ---
-        self.workflow_group = QGroupBox(tr("group.workflow"))
-        workflow_layout = QVBoxLayout(self.workflow_group)
-
-        self.btn_restart_alignment = QPushButton(tr("button.restart_alignment"))
-        workflow_layout.addWidget(self.btn_restart_alignment)
-
-        self.btn_restart_calibration = QPushButton(tr("button.restart_calibration"))
-        workflow_layout.addWidget(self.btn_restart_calibration)
-
-        self.btn_restart_marking = QPushButton(tr("button.restart_marking"))
-        workflow_layout.addWidget(self.btn_restart_marking)
-
-        dock_layout.addWidget(self.workflow_group)
 
         # --- Calc panel ---
         self.calc_panel = CalcPanel(self)
@@ -713,15 +768,58 @@ class MainWindow(QMainWindow):
         summary_group = QGroupBox(tr("group.summary"))
         self._summary_group = summary_group
         summary_layout = QVBoxLayout(summary_group)
+        self.lbl_result_ees_kmh = QLabel()
+        self.lbl_result_ees_kmh.setStyleSheet("font-size: 23px; font-weight: bold;")
+        self.lbl_result_ees_mps = QLabel()
+        self.lbl_result_energy = QLabel()
+        for label in (self.lbl_result_ees_kmh, self.lbl_result_ees_mps, self.lbl_result_energy):
+            label.setWordWrap(True)
+            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            summary_layout.addWidget(label)
         self.lbl_summary = QLabel(tr("summary.status_default"))
         self.lbl_summary.setWordWrap(True)
+        self.lbl_summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         summary_layout.addWidget(self.lbl_summary)
         dock_layout.addWidget(summary_group)
 
         dock_layout.addStretch(1)
 
         scroll.setWidget(dock_widget)
-        dock.setWidget(scroll)
+        dock_content = QWidget()
+        dock_content_layout = QVBoxLayout(dock_content)
+        dock_content_layout.setContentsMargins(0, 0, 0, 0)
+        dock_content_layout.setSpacing(0)
+        dock_content_layout.addWidget(scroll, 1)
+
+        self.navigation_footer = QWidget()
+        footer_layout = QVBoxLayout(self.navigation_footer)
+        footer_layout.setContentsMargins(6, 0, 6, 6)
+        footer_layout.setSpacing(4)
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        footer_layout.addWidget(separator)
+        self.lbl_navigation_hint = QLabel()
+        self.lbl_navigation_hint.setWordWrap(True)
+        self.lbl_navigation_hint.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        footer_layout.addWidget(self.lbl_navigation_hint)
+        self.navigation_footer.setStyleSheet("""
+            QPushButton {
+                background: #dbe8f5; color: #183c5c;
+                border: 2px solid #b8cddd; border-radius: 4px;
+                padding: 4px; font-size: 11px; font-weight: bold;
+            }
+            QPushButton:hover { background: #ccdff1; }
+            QPushButton:focus { border-color: #245b96; }
+            QPushButton:disabled {
+                background: #edf0f2; color: #53616b; border-color: #c8cfd4;
+            }
+        """)
+        for button in (self.btn_finish_alignment, self.btn_confirm_calibration, self.btn_finish_marking):
+            footer_layout.addWidget(button)
+        dock_content_layout.addWidget(self.navigation_footer)
+        dock.setWidget(dock_content)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
         self.resizeDocks([dock], [370], Qt.Orientation.Horizontal)
 
@@ -756,9 +854,6 @@ class MainWindow(QMainWindow):
         self.btn_right.clicked.connect(lambda: self.canvas.nudge_selected(1, 0))
 
         self.btn_finish_alignment.clicked.connect(self._on_finish_alignment)
-        self.btn_restart_alignment.clicked.connect(self._on_restart_alignment)
-        self.btn_restart_calibration.clicked.connect(self._on_restart_calibration)
-        self.btn_restart_marking.clicked.connect(self._on_restart_marking)
 
         self.chk_calibration_mode.toggled.connect(self._on_calibration_mode_toggled)
         self.btn_apply_calibration.clicked.connect(self._on_apply_calibration)
@@ -804,6 +899,7 @@ class MainWindow(QMainWindow):
 
         self._controls_dock.setWindowTitle(tr("dock.controls"))
         self.btn_return_to_current_step.setText(tr("progress.return_current"))
+        self.btn_redo_step.setText(tr("progress.redo"))
         self._refresh_alignment_consultation()
 
         self._refresh_image_controls()
@@ -812,8 +908,7 @@ class MainWindow(QMainWindow):
         self.lbl_overlay_opacity.setText(tr("label.overlay_opacity"))
 
         self.align_group.setTitle(tr("group.alignment"))
-        self.fine_adjust_group.setTitle(tr("group.fine_adjustment"))
-        self.nudge_box.setTitle(tr("group.nudge"))
+        self._refresh_alignment_sections()
         self.rotate_box.setTitle(tr("group.rotate"))
         self.scale_box.setTitle(tr("group.scale"))
         self.chk_alignment_mode.setText(tr("check.alignment_mode"))
@@ -823,6 +918,8 @@ class MainWindow(QMainWindow):
         self.cmb_alignment_target.setItemText(0, tr("combo.deformed"))
         self.cmb_alignment_target.setItemText(1, tr("combo.reference"))
         self.btn_reset_alignment.setText(tr("button.reset_selected_transform"))
+        self.btn_reset_alignment.setAccessibleName(self.btn_reset_alignment.text())
+        self.btn_reset_alignment.setToolTip(tr("alignment.reset.tooltip"))
         self.lbl_alignment_method.setText(tr("label.alignment_method"))
         self.rad_alignment_auto.setText(tr("alignment.method.auto"))
         self.rad_alignment_rigid.setText(tr("alignment.method.rigid"))
@@ -830,7 +927,7 @@ class MainWindow(QMainWindow):
         self.btn_start_alignment.setText(tr("button.start_alignment"))
         self.btn_rigid_apply.setText(tr("button.rigid_apply"))
         self.btn_rigid_try_again.setText(tr("button.rigid_try_again"))
-        self.btn_rigid_cancel.setText(tr("button.rigid_cancel"))
+        self._refresh_alignment_cancel_label()
         if self._rigid_instruction_key is not None:
             self.lbl_rigid_region_instruction.setText(
                 tr(self._rigid_instruction_key)
@@ -842,9 +939,12 @@ class MainWindow(QMainWindow):
         self.btn_apply_alignment_suggestion.setText(
             tr("button.apply_alignment_suggestion")
         )
-        self.btn_rotate_minus.setText(tr("button.rotate_minus"))
-        self.btn_rotate_plus.setText(tr("button.rotate_plus"))
+        for button in (self.btn_apply_alignment_suggestion, self.btn_rigid_apply):
+            button.setAccessibleName(button.text().replace("\n", " "))
+        self.btn_rotate_minus.setToolTip(tr("button.rotate_minus"))
+        self.btn_rotate_plus.setToolTip(tr("button.rotate_plus"))
         self.lbl_step_deg.setText(tr("label.step_deg"))
+        self.nudge_box.setTitle(tr("group.nudge"))
         self.btn_scale_minus.setText(tr("button.scale_minus"))
         self.btn_scale_plus.setText(tr("button.scale_plus"))
         self.lbl_step_pct.setText(tr("label.step_pct"))
@@ -870,10 +970,6 @@ class MainWindow(QMainWindow):
         if not self._ci_m:
             self.lbl_ci_values.setText(tr("label.c_values_default"))
 
-        self.workflow_group.setTitle(tr("group.workflow"))
-        self.btn_restart_alignment.setText(tr("button.restart_alignment"))
-        self.btn_restart_calibration.setText(tr("button.restart_calibration"))
-        self.btn_restart_marking.setText(tr("button.restart_marking"))
 
         self._summary_group.setTitle(tr("group.summary"))
 
@@ -949,15 +1045,19 @@ class MainWindow(QMainWindow):
             toggle.setChecked(False)
         toggle.setVisible(not loading)
         expanded = toggle.isChecked()
-        toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
-        self.load_group.setTitle(tr("group.load_images" if loading else "group.images"))
+        self.load_group.setTitle(tr("group.load_images" if loading else "images.loaded"))
         roles = []
         if self.canvas.ctrl.ref_item is not None:
             roles.append(tr("combo.reference"))
         if self.canvas.ctrl.dam_item is not None:
             roles.append(tr("combo.deformed"))
-        toggle.setText("✓ " + " + ".join(roles) if roles else tr("images.none_loaded"))
-        toggle.setToolTip(tr("images.toggle_controls"))
+        if len(roles) == 2:
+            status = f"✓ {tr('images.both_loaded')}"
+        else:
+            status = f"✓ {roles[0]}" if roles else tr("images.none_loaded")
+        toggle.setText(f"{'▾' if expanded else '▸'} {status}")
+        toggle.setAccessibleName(f"{tr('images.loaded')} — {status}")
+        toggle.setToolTip("\n".join([tr("images.toggle_controls"), *roles]))
         self.btn_load_ref.setVisible(loading or expanded)
         self.btn_load_dam.setVisible(loading or expanded)
 
@@ -1010,13 +1110,58 @@ class MainWindow(QMainWindow):
             self.canvas.set_alignment_target(target)
 
     def _on_reset_alignment(self) -> None:
+        if self.stage != Stage.ALIGNMENT or self._viewed_step is not None or self._workflow_navigation_blocked():
+            return
+        transforms = (
+            self.canvas.get_reference_transform(),
+            self.canvas.get_deformed_transform(),
+        )
+        if not any(
+            t["x"] != 0 or t["y"] != 0 or t["scale"] != 1 or t["rotation_deg"] % 360 != 0
+            for t in transforms
+        ):
+            return
+        answer = QMessageBox.question(
+            self,
+            self.btn_reset_alignment.accessibleName(),
+            tr("alignment.reset.confirm"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
         self.canvas.reset_all_transforms()
 
     def _update_auto_align_availability(self) -> None:
-        available = self.canvas.has_both_images()
+        available = self.canvas.has_both_images() and not self._workflow_navigation_blocked()
         self.btn_start_alignment.setEnabled(available)
 
+    def _refresh_alignment_sections(self) -> None:
+        manual_open = self.btn_toggle_manual_alignment.isChecked()
+        if not manual_open and self.chk_alignment_mode.isChecked():
+            self.chk_alignment_mode.setChecked(False)
+        for toggle, content, key in (
+            (self.btn_toggle_manual_alignment, self.fine_adjust_group, "group.fine_adjustment"),
+            (self.btn_toggle_advanced_alignment, self.alignment_advanced, "alignment.advanced"),
+        ):
+            expanded = toggle.isChecked()
+            title = tr(key)
+            toggle.setText(f"{'▾' if expanded else '▸'} {title}")
+            toggle.setAccessibleName(title)
+            content.setVisible(expanded)
+
+    def _update_alignment_edit_availability(self) -> None:
+        pending = self._workflow_navigation_blocked()
+        editable = self.stage == Stage.ALIGNMENT and self._viewed_step is None
+        self.fine_adjust_group.setEnabled(editable and not pending)
+        self.alignment_method_row.setEnabled(editable and not pending)
+        self._update_auto_align_availability()
+        for shortcut in self._alignment_shortcuts:
+            shortcut.setEnabled(editable and not pending)
+
     def _on_start_alignment(self) -> None:
+        if self._workflow_navigation_blocked():
+            return
         if self.rad_alignment_rigid.isChecked():
             self._on_start_rigid_region_alignment()
         else:
@@ -1037,24 +1182,42 @@ class MainWindow(QMainWindow):
         self.btn_apply_alignment_suggestion.setEnabled(False)
         self._update_alignment_actions_visibility()
         self.lbl_rigid_region_instruction.setVisible(False)
-        self._update_finish_alignment_availability()
+        self._refresh_navigation_footer()
 
     def _can_finish_alignment(self) -> bool:
         return (
             self.stage == Stage.ALIGNMENT
+            and self._viewed_step is None
             and self.canvas.has_images()
-            and not self._auto_preview_active
-            and self._rigid_baseline_ref_transform is None
+            and not self._workflow_navigation_blocked()
         )
 
-    def _update_finish_alignment_availability(self) -> None:
-        available = self._can_finish_alignment()
-        self.btn_finish_alignment.setVisible(available)
-        self.btn_finish_alignment.setEnabled(available)
+    def _refresh_navigation_footer(self) -> None:
+        consulting = self._viewed_step is not None
+        active = None if consulting else self.stage
+        hint = None
+        if active == Stage.ALIGNMENT and not self._can_finish_alignment():
+            hint = (
+                "navigation.resolve_alignment" if self._workflow_navigation_blocked()
+                else "navigation.load_image"
+            )
+        elif active == Stage.CALIBRATION and self._m_per_px is None:
+            hint = "workflow.error.apply_calibration_first"
+        elif active == Stage.MARKING:
+            hint = self.workflow.marking_block_reason()
 
-    def _hide_finish_alignment(self) -> None:
-        self.btn_finish_alignment.setVisible(False)
-        self.btn_finish_alignment.setEnabled(False)
+        actions = (
+            (Stage.ALIGNMENT, self.btn_finish_alignment),
+            (Stage.CALIBRATION, self.btn_confirm_calibration),
+            (Stage.MARKING, self.btn_finish_marking),
+        )
+        for stage, button in actions:
+            visible = stage == active
+            button.setVisible(visible)
+            button.setEnabled(visible and hint is None)
+        self.lbl_navigation_hint.setText(tr(hint) if hint else "")
+        self.lbl_navigation_hint.setVisible(hint is not None)
+        self.navigation_footer.setVisible(any(stage == active for stage, _ in actions))
 
     def _set_rigid_action_visibility(
         self, *, apply: bool, try_again: bool, cancel: bool
@@ -1067,7 +1230,15 @@ class MainWindow(QMainWindow):
         self.btn_rigid_cancel.setEnabled(cancel)
         self._update_alignment_actions_visibility()
 
+    def _refresh_alignment_cancel_label(self) -> None:
+        preview = self._auto_preview_active or self._rigid_preview_active
+        self.btn_rigid_cancel.setText(tr(
+            "alignment.discard_preview" if preview else "button.rigid_cancel"
+        ))
+        self.btn_rigid_cancel.setAccessibleName(self.btn_rigid_cancel.text().replace("\n", " "))
+
     def _update_alignment_actions_visibility(self) -> None:
+        self._refresh_alignment_cancel_label()
         buttons = (
             self.btn_apply_alignment_suggestion,
             self.btn_rigid_apply,
@@ -1077,7 +1248,8 @@ class MainWindow(QMainWindow):
         self.alignment_actions_widget.setVisible(
             any(not button.isHidden() for button in buttons)
         )
-        self._update_finish_alignment_availability()
+        self._refresh_navigation_footer()
+        self._update_alignment_edit_availability()
         self._refresh_workflow_progress()
 
     def _on_alignment_state_changed(self) -> None:
@@ -1095,7 +1267,6 @@ class MainWindow(QMainWindow):
 
     def _on_images_changed(self) -> None:
         self._last_applied_rigid_reference_regions = ()
-        self._hide_finish_alignment()
         self._set_rigid_instruction(None)
         self.workflow.apply_stage_gating()
 
@@ -1157,7 +1328,6 @@ class MainWindow(QMainWindow):
             )
             return
         self._discard_auto_alignment_preview(restore=True)
-        self._hide_finish_alignment()
         if self._rigid_baseline_ref_transform is not None:
             self._discard_rigid_region_state(restore=True, clear_visuals=True)
         self.canvas.clear_rigid_region_visuals()
@@ -1434,6 +1604,8 @@ class MainWindow(QMainWindow):
         self, hypothesis: AlignmentHypothesis
     ) -> None:
         self._discard_auto_alignment_preview(restore=True)
+        if self.chk_alignment_mode.isChecked():
+            self.chk_alignment_mode.setChecked(False)
         self._auto_preview_baseline_dam_transform = dict(
             self.canvas.get_deformed_transform()
         )
@@ -1513,7 +1685,6 @@ class MainWindow(QMainWindow):
         if self._rigid_baseline_ref_transform is not None:
             self._discard_rigid_region_state(restore=True, clear_visuals=True)
         self._discard_auto_alignment_preview(restore=True)
-        self._hide_finish_alignment()
 
         ref_path = self.project.ref_path
         dam_path = self.project.dam_path
@@ -1640,7 +1811,7 @@ class MainWindow(QMainWindow):
             )
         finally:
             self._update_auto_align_availability()
-            self._update_finish_alignment_availability()
+            self._refresh_navigation_footer()
 
     def _on_rotate_minus(self) -> None:
         step_deg = float(self.spn_rotate_step.value())
@@ -1674,13 +1845,12 @@ class MainWindow(QMainWindow):
             apply=False, try_again=False, cancel=False
         )
         self.lbl_rigid_region_instruction.setVisible(False)
-        self._hide_finish_alignment()
 
     def _on_restart_alignment(self) -> None:
         self.workflow.restart_from_alignment()
         if self.stage == self.Stage.ALIGNMENT:
             self._set_rigid_instruction(None)
-            self._update_finish_alignment_availability()
+            self._refresh_navigation_footer()
 
     def _on_restart_calibration(self) -> None:
         self.workflow.restart_from_calibration()
@@ -1861,8 +2031,27 @@ class MainWindow(QMainWindow):
             steps = tuple(self.workflow_step_labels)
             if steps.index(self._viewed_step) >= steps.index(self._current_workflow_step()):
                 self._viewed_step = None
-                self.workflow.apply_stage_gating()
+        self.workflow.apply_stage_gating()
         self._refresh_workflow_progress()
+        self.lbl_result_ees_kmh.setText(
+            tr("result.ees_kmh", value=f"{self._damage_speed_kmh:.2f}")
+            if self._damage_speed_kmh is not None else ""
+        )
+        ees_mps = self._damage_speed_mps
+        ees_kmh = self._damage_speed_kmh
+        if ees_mps is None or not math.isfinite(ees_mps) or ees_mps < 0:
+            ees_mps = (
+                ees_kmh / 3.6
+                if ees_kmh is not None and math.isfinite(ees_kmh) and ees_kmh >= 0
+                else None
+            )
+        self.lbl_result_ees_mps.setText(
+            tr("result.ees_mps", value=f"{ees_mps:.2f}") if ees_mps is not None else "—"
+        )
+        self.lbl_result_energy.setText(
+            tr("result.energy_kj", value=f"{self._total_energy / 1000:.2f}")
+            if self._total_energy is not None else ""
+        )
         stage_key = f"stage.{self.stage.value}"
 
         parts = []
@@ -1895,21 +2084,9 @@ class MainWindow(QMainWindow):
         parts.append(tr("summary.c_measures", done=c_done))
 
         parts.append(
-            tr("summary.total_energy_default")
-            if self._total_energy is None
-            else tr("summary.total_energy_value", value=f"{self._total_energy:.2f}")
-        )
-
-        parts.append(
             tr("summary.vehicle_mass_default")
             if self._vehicle_mass_kg is None
             else tr("summary.vehicle_mass_value", value=f"{self._vehicle_mass_kg:.2f}")
-        )
-
-        parts.append(
-            tr("summary.damage_speed_default")
-            if self._damage_speed_kmh is None
-            else tr("summary.damage_speed_value", value=f"{self._damage_speed_kmh:.2f}")
         )
 
         ready = (
