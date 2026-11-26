@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QImage, QMouseEvent
-from PySide6.QtWidgets import QApplication, QFileDialog, QGraphicsView, QMessageBox
+from PySide6.QtWidgets import QApplication, QBoxLayout, QFileDialog, QGraphicsView, QMessageBox
 
 from app.core.project import Project
 from app.core.rigid_region_alignment import (
@@ -52,6 +52,50 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    def test_reference_only_stays_in_images_until_deformed_is_loaded(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        ref_path = str(COMPASS / "reference_vehicle_frame_000.png")
+        with patch.object(window.io, "pick_image_file", return_value=ref_path):
+            window.btn_load_ref.click()
+        self.assertEqual(window.stage, window.Stage.LOAD)
+        self.assertEqual(window.workflow.determine_stage_from_project(), window.Stage.LOAD)
+        self.assertFalse(window.btn_load_dam.isHidden())
+        self.assertTrue(window.btn_toggle_image_controls.isHidden())
+        self.assertEqual(
+            window.workflow_step_labels["images"].property("progressStatus"), "current"
+        )
+        dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
+        with patch.object(window.io, "pick_image_file", return_value=dam_path):
+            window.btn_load_dam.click()
+        self.assertEqual(window.stage, window.Stage.ALIGNMENT)
+        self.assertTrue(window.btn_start_alignment.isEnabled())
+        self.assertTrue(window.btn_load_dam.isHidden())
+
+    def test_dock_width_is_stable_and_alignment_methods_adapt(self) -> None:
+        window = self._window()
+        window.show()
+        QApplication.processEvents()
+        dock = window._controls_dock
+        self.assertAlmostEqual(dock.width(), 370, delta=15)
+        width = dock.width()
+        row = window.alignment_method_row
+        self.assertEqual(row.layout().direction(), QBoxLayout.Direction.LeftToRight)
+        window._set_language_and_refresh("en")
+        self.assertEqual(window.rad_alignment_auto.text(), "Automatic")
+        self.assertEqual(window.btn_toggle_image_controls.text(), "✓ Reference + Deformed")
+        row.resize(max(window.rad_alignment_auto.sizeHint().width(),
+                       window.rad_alignment_rigid.sizeHint().width()), row.height())
+        self.assertEqual(row.layout().direction(), QBoxLayout.Direction.TopToBottom)
+        for stage in (window.Stage.CALIBRATION, window.Stage.MARKING, window.Stage.DONE):
+            window.workflow.set_stage(stage)
+            QApplication.processEvents()
+            self.assertEqual(dock.width(), width)
+        window.resize(900, 650)
+        window.resizeDocks([dock], [300], Qt.Orientation.Horizontal)
+        QApplication.processEvents()
+        self.assertLess(dock.width(), width)
+
     def test_workflow_progress_tracks_images_and_alignment(self) -> None:
         window = MainWindow()
         self.addCleanup(window.close)
@@ -59,6 +103,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(steps["images"].property("progressStatus"), "current")
         self.assertEqual(steps["alignment"].property("progressStatus"), "future")
         self.assertFalse(window.load_group.isHidden())
+        self.assertTrue(window.btn_toggle_image_controls.isHidden())
+        self.assertFalse(window.btn_load_ref.isHidden())
+        self.assertFalse(window.btn_load_dam.isHidden())
         self.assertTrue(window.align_group.isHidden())
         self.assertTrue(window.workflow_group.isHidden())
 
@@ -68,6 +115,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(steps["images"].property("progressStatus"), "complete")
         self.assertEqual(steps["alignment"].property("progressStatus"), "current")
         self.assertIn("opcional", steps["alignment"].text())
+        self.assertEqual(window.btn_toggle_image_controls.text(), "✓ Deformada")
+        self.assertTrue(window.btn_load_ref.isHidden())
+        self.assertTrue(window.btn_load_dam.isHidden())
         self.assertFalse(window.align_group.isHidden())
         self.assertFalse(window.fine_adjust_group.isHidden())
         self.assertTrue(window.cal_group.isHidden())
@@ -95,15 +145,32 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertFalse(window._summary_group.isHidden())
         self.assertIsNone(window.canvas.ctrl.active_tool())
         self.assertEqual(len(window._ci_m), 6)
+        window._sync_ui_to_project()
 
         ref_path = str(COMPASS / "reference_vehicle_frame_000.png")
+        window.btn_toggle_image_controls.click()
+        self.assertFalse(window.btn_load_ref.isHidden())
+        self.assertFalse(window.btn_load_dam.isHidden())
+        with (
+            patch.object(window.io, "pick_image_file", return_value=ref_path),
+            patch.object(
+                QMessageBox, "question", return_value=QMessageBox.StandardButton.No
+            ) as confirm,
+        ):
+            window.btn_load_ref.click()
+        confirm.assert_called_once()
+        self.assertEqual(window.stage, window.Stage.DONE)
+        self.assertEqual(len(window._ci_m), 6)
         with (
             patch.object(window.io, "pick_image_file", return_value=ref_path),
             patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes),
         ):
-            window.io.load_ref()
+            window.btn_load_ref.click()
         self.assertTrue(window.calc_panel.isHidden())
         self.assertFalse(window.load_group.isHidden())
+        self.assertEqual(window.btn_toggle_image_controls.text(), "✓ Referência + Deformada")
+        window.btn_toggle_image_controls.click()
+        self.assertTrue(window.btn_load_ref.isHidden())
         self.assertEqual(steps["alignment"].property("progressStatus"), "current")
         window.btn_finish_alignment.click()
         self.assertEqual(steps["alignment"].property("progressStatus"), "passed")
@@ -628,8 +695,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
 
         self.assertEqual(window.align_group.title(), "Alinhamento das imagens")
         self.assertEqual(window.fine_adjust_group.title(), "Ajuste fino")
-        self.assertIs(window.rad_alignment_auto.parentWidget(), window.align_group)
-        self.assertIs(window.rad_alignment_rigid.parentWidget(), window.align_group)
+        self.assertIs(window.rad_alignment_auto.parentWidget(), window.alignment_method_row)
+        self.assertIs(window.rad_alignment_rigid.parentWidget(), window.alignment_method_row)
         self.assertIs(window.btn_start_alignment.parentWidget(), window.align_group)
         self.assertIs(
             window.lbl_rigid_region_instruction.parentWidget(),

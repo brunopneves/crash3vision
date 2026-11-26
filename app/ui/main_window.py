@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QPushButton,
     QDockWidget,
     QLabel,
@@ -26,8 +27,10 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QRadioButton,
     QButtonGroup,
+    QBoxLayout,
     QSizePolicy,
     QToolBar,
+    QToolButton,
 )
 
 from app.ui.canvas_view import CanvasView
@@ -64,6 +67,29 @@ class Stage(str, Enum):
     CALIBRATION = "calibration"
     MARKING = "marking"
     DONE = "done"
+
+
+class AlignmentMethodRow(QWidget):
+    def __init__(self, *buttons: QRadioButton) -> None:
+        super().__init__()
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self._row = QBoxLayout(QBoxLayout.Direction.TopToBottom, self)
+        self._row.setContentsMargins(0, 0, 0, 0)
+        self._buttons = buttons
+        for button in buttons:
+            self._row.addWidget(button)
+
+    def update_direction(self) -> None:
+        required = sum(button.sizeHint().width() for button in self._buttons)
+        required += self._row.spacing() * (len(self._buttons) - 1)
+        self._row.setDirection(
+            QBoxLayout.Direction.LeftToRight if self.width() >= required
+            else QBoxLayout.Direction.TopToBottom
+        )
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.update_direction()
 
 
 class MainWindow(QMainWindow):
@@ -312,7 +338,6 @@ class MainWindow(QMainWindow):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         dock_widget = QWidget()
         dock_layout = QVBoxLayout(dock_widget)
@@ -320,6 +345,25 @@ class MainWindow(QMainWindow):
         # --- Load images ---
         self.load_group = QGroupBox(tr("group.load_images"))
         load_layout = QVBoxLayout(self.load_group)
+        self.btn_toggle_image_controls = QToolButton()
+        self.btn_toggle_image_controls.setCheckable(True)
+        self.btn_toggle_image_controls.setStyleSheet("""
+            QToolButton {
+                background: #eef3f5;
+                color: #23343e;
+                border: 1px solid #b9c9d0;
+                border-radius: 4px;
+                padding: 4px 8px;
+            }
+            QToolButton:hover, QToolButton:checked {
+                background: #dcebef;
+            }
+        """)
+        self.btn_toggle_image_controls.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self.btn_toggle_image_controls.toggled.connect(self._refresh_image_controls)
+        load_layout.addWidget(self.btn_toggle_image_controls)
         self.btn_load_ref = QPushButton(tr("button.load_ref"))
         self.btn_load_dam = QPushButton(tr("button.load_dam"))
         load_layout.addWidget(self.btn_load_ref)
@@ -334,28 +378,25 @@ class MainWindow(QMainWindow):
         align_layout = QVBoxLayout(self.align_group)
 
         self.chk_alignment_mode = QCheckBox(tr("check.alignment_mode"))
+        self.chk_alignment_mode.setToolTip(tr("check.alignment_mode_hint"))
         self.chk_lock_alignment = QCheckBox(tr("check.lock_alignment"))
         fine_layout.addWidget(self.chk_alignment_mode)
         fine_layout.addWidget(self.chk_lock_alignment)
 
-        row_target = QHBoxLayout()
         self.lbl_editable_image = QLabel(tr("label.editable_image"))
-        row_target.addWidget(self.lbl_editable_image)
+        fine_layout.addWidget(self.lbl_editable_image)
 
         self.cmb_alignment_target = QComboBox()
         self.cmb_alignment_target.addItem(tr("combo.deformed"), "dam")
         self.cmb_alignment_target.addItem(tr("combo.reference"), "ref")
         self.canvas.set_alignment_target("dam")
-        row_target.addWidget(self.cmb_alignment_target)
-
-        fine_layout.addLayout(row_target)
+        fine_layout.addWidget(self.cmb_alignment_target)
 
         self.btn_reset_alignment = QPushButton(tr("button.reset_selected_transform"))
         fine_layout.addWidget(self.btn_reset_alignment)
 
         self.lbl_alignment_method = QLabel(tr("label.alignment_method"))
         align_layout.addWidget(self.lbl_alignment_method)
-        method_row = QHBoxLayout()
         self.rad_alignment_auto = QRadioButton(tr("alignment.method.auto"))
         self.rad_alignment_rigid = QRadioButton(tr("alignment.method.rigid"))
         self.alignment_method_buttons = QButtonGroup(self)
@@ -363,9 +404,10 @@ class MainWindow(QMainWindow):
         self.alignment_method_buttons.addButton(self.rad_alignment_auto)
         self.alignment_method_buttons.addButton(self.rad_alignment_rigid)
         self.rad_alignment_auto.setChecked(True)
-        method_row.addWidget(self.rad_alignment_auto)
-        method_row.addWidget(self.rad_alignment_rigid)
-        align_layout.addLayout(method_row)
+        self.alignment_method_row = AlignmentMethodRow(
+            self.rad_alignment_auto, self.rad_alignment_rigid
+        )
+        align_layout.addWidget(self.alignment_method_row)
 
         self.btn_start_alignment = QPushButton(tr("button.start_alignment"))
         self.btn_start_alignment.setEnabled(False)
@@ -379,7 +421,7 @@ class MainWindow(QMainWindow):
         align_layout.addWidget(self.lbl_rigid_region_instruction)
 
         self.alignment_actions_widget = QWidget()
-        rigid_actions = QHBoxLayout(self.alignment_actions_widget)
+        rigid_actions = QVBoxLayout(self.alignment_actions_widget)
         rigid_actions.setContentsMargins(0, 0, 0, 0)
         self.btn_rigid_apply = QPushButton(tr("button.rigid_apply"))
         self.btn_rigid_try_again = QPushButton(tr("button.rigid_try_again"))
@@ -445,27 +487,27 @@ class MainWindow(QMainWindow):
         fine_layout.addWidget(self.nudge_box)
 
         self.rotate_box = QGroupBox(tr("group.rotate"))
-        rotate_layout = QHBoxLayout(self.rotate_box)
+        rotate_layout = QGridLayout(self.rotate_box)
 
         self.btn_rotate_minus = QPushButton(tr("button.rotate_minus"))
         self.btn_rotate_plus = QPushButton(tr("button.rotate_plus"))
 
-        rotate_layout.addWidget(self.btn_rotate_minus)
-        rotate_layout.addWidget(self.btn_rotate_plus)
+        rotate_layout.addWidget(self.btn_rotate_minus, 0, 0)
+        rotate_layout.addWidget(self.btn_rotate_plus, 0, 1)
 
         self.lbl_step_deg = QLabel(tr("label.step_deg"))
-        rotate_layout.addWidget(self.lbl_step_deg)
+        rotate_layout.addWidget(self.lbl_step_deg, 1, 0)
         self.spn_rotate_step = QDoubleSpinBox()
         self.spn_rotate_step.setDecimals(2)
         self.spn_rotate_step.setRange(0.01, 360.0)
         self.spn_rotate_step.setSingleStep(0.1)
         self.spn_rotate_step.setValue(1.0)
-        rotate_layout.addWidget(self.spn_rotate_step)
+        rotate_layout.addWidget(self.spn_rotate_step, 1, 1)
 
         fine_layout.addWidget(self.rotate_box)
 
         self.scale_box = QGroupBox(tr("group.scale"))
-        scale_layout = QHBoxLayout(self.scale_box)
+        scale_layout = QGridLayout(self.scale_box)
 
         self.btn_scale_minus = QPushButton(tr("button.scale_minus"))
         self.btn_scale_plus = QPushButton(tr("button.scale_plus"))
@@ -486,17 +528,17 @@ class MainWindow(QMainWindow):
             btn.setAutoRepeatDelay(300)
             btn.setAutoRepeatInterval(60)
 
-        scale_layout.addWidget(self.btn_scale_minus)
-        scale_layout.addWidget(self.btn_scale_plus)
+        scale_layout.addWidget(self.btn_scale_minus, 0, 0)
+        scale_layout.addWidget(self.btn_scale_plus, 0, 1)
 
         self.lbl_step_pct = QLabel(tr("label.step_pct"))
-        scale_layout.addWidget(self.lbl_step_pct)
+        scale_layout.addWidget(self.lbl_step_pct, 1, 0)
         self.spn_scale_step = QDoubleSpinBox()
         self.spn_scale_step.setDecimals(2)
         self.spn_scale_step.setRange(0.01, 50.0)
         self.spn_scale_step.setSingleStep(0.1)
         self.spn_scale_step.setValue(1.0)
-        scale_layout.addWidget(self.spn_scale_step)
+        scale_layout.addWidget(self.spn_scale_step, 1, 1)
 
         fine_layout.addWidget(self.scale_box)
 
@@ -644,6 +686,7 @@ class MainWindow(QMainWindow):
         scroll.setWidget(dock_widget)
         dock.setWidget(scroll)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+        self.resizeDocks([dock], [370], Qt.Orientation.Horizontal)
 
         self.btn_load_ref.clicked.connect(self._on_load_ref)
         self.btn_load_dam.clicked.connect(self._on_load_dam)
@@ -724,7 +767,7 @@ class MainWindow(QMainWindow):
 
         self._controls_dock.setWindowTitle(tr("dock.controls"))
 
-        self.load_group.setTitle(tr("group.load_images"))
+        self._refresh_image_controls()
         self.btn_load_ref.setText(tr("button.load_ref"))
         self.btn_load_dam.setText(tr("button.load_dam"))
         self.lbl_overlay_opacity.setText(tr("label.overlay_opacity"))
@@ -735,6 +778,7 @@ class MainWindow(QMainWindow):
         self.rotate_box.setTitle(tr("group.rotate"))
         self.scale_box.setTitle(tr("group.scale"))
         self.chk_alignment_mode.setText(tr("check.alignment_mode"))
+        self.chk_alignment_mode.setToolTip(tr("check.alignment_mode_hint"))
         self.chk_lock_alignment.setText(tr("check.lock_alignment"))
         self.lbl_editable_image.setText(tr("label.editable_image"))
         self.cmb_alignment_target.setItemText(0, tr("combo.deformed"))
@@ -743,6 +787,7 @@ class MainWindow(QMainWindow):
         self.lbl_alignment_method.setText(tr("label.alignment_method"))
         self.rad_alignment_auto.setText(tr("alignment.method.auto"))
         self.rad_alignment_rigid.setText(tr("alignment.method.rigid"))
+        self.alignment_method_row.update_direction()
         self.btn_start_alignment.setText(tr("button.start_alignment"))
         self.btn_rigid_apply.setText(tr("button.rigid_apply"))
         self.btn_rigid_try_again.setText(tr("button.rigid_try_again"))
@@ -858,6 +903,25 @@ class MainWindow(QMainWindow):
             )
 
     # ---------------- Image loading ----------------
+    def _refresh_image_controls(self) -> None:
+        loading = self.stage == Stage.LOAD
+        toggle = self.btn_toggle_image_controls
+        if loading:
+            toggle.setChecked(False)
+        toggle.setVisible(not loading)
+        expanded = toggle.isChecked()
+        toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+        self.load_group.setTitle(tr("group.load_images" if loading else "group.images"))
+        roles = []
+        if self.canvas.ctrl.ref_item is not None:
+            roles.append(tr("combo.reference"))
+        if self.canvas.ctrl.dam_item is not None:
+            roles.append(tr("combo.deformed"))
+        toggle.setText("✓ " + " + ".join(roles) if roles else tr("images.none_loaded"))
+        toggle.setToolTip(tr("images.toggle_controls"))
+        self.btn_load_ref.setVisible(loading or expanded)
+        self.btn_load_dam.setVisible(loading or expanded)
+
     def _on_load_ref(self) -> None:
         self.io.load_ref()
 

@@ -61,6 +61,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Load images",
         "pt": "Carregar imagens",
     },
+    "group.images": {"en": "Images", "pt": "Imagens"},
+    "images.none_loaded": {"en": "No images loaded", "pt": "Nenhuma imagem carregada"},
+    "images.toggle_controls": {
+        "en": "Show or hide image loading and replacement controls",
+        "pt": "Mostrar ou ocultar os controles de carregamento e substituição",
+    },
     "button.load_ref": {
         "en": "Load reference image (ref)",
         "pt": "Carregar imagem de referência (ref)",
@@ -82,6 +88,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Ajuste fino",
     },
     "check.alignment_mode": {
+        "en": "Drag selected image",
+        "pt": "Arrastar imagem selecionada",
+    },
+    "check.alignment_mode_hint": {
         "en": "Alignment mode (drag selected image)",
         "pt": "Modo de alinhamento (arrastar imagem selecionada)",
     },

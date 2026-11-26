@@ -544,7 +544,10 @@ class ProjectIOController:
             self.host.canvas.load_reference(path)
             self.host.project.ref_path = path
 
-            self.host.workflow.set_stage(self.host.Stage.ALIGNMENT)
+            stage = self.host.Stage
+            self.host.workflow.set_stage(
+                stage.ALIGNMENT if self.host.project.dam_path else stage.LOAD
+            )
             self.host._update_auto_align_availability()
 
         except Exception as e:

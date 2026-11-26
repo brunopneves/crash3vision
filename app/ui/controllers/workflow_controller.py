@@ -26,8 +26,7 @@ class WorkflowController:
         Stage = self.host.Stage  # type: ignore[attr-defined]
         p = self.host.project
 
-        has_images = bool(p.ref_path or p.dam_path)
-        if not has_images:
+        if not p.dam_path:
             return Stage.LOAD
         if p.m_per_px is None:
             return Stage.ALIGNMENT
@@ -72,6 +71,7 @@ class WorkflowController:
         host = self.host
         Stage = host.Stage
         stage = host.stage
+        host._refresh_image_controls()
         host._update_finish_alignment_availability()
         host.canvas_view_bar.setEnabled(host.canvas.has_both_images())
 
@@ -278,7 +278,8 @@ class WorkflowController:
         self.host.chk_measure_ci_mode.blockSignals(False)
 
         self.invalidate_energy()
-        self.set_stage(self.host.Stage.ALIGNMENT)  # type: ignore[attr-defined]
+        stage = self.host.Stage
+        self.set_stage(stage.ALIGNMENT if self.host.project.dam_path else stage.LOAD)
 
     def restart_from_alignment(self) -> None:
         Stage = self.host.Stage  # type: ignore[attr-defined]
