@@ -254,6 +254,10 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         before = window.project.to_dict()
         self.assertIs(panel.cmb_class.parentWidget(), panel.grp_source)
         self.assertIs(panel.txt_vehicle_mass.parentWidget(), panel.grp_params)
+        self.assertIs(panel.btn_compute.parentWidget(), panel.grp_calc)
+        self.assertIs(panel.lbl_energy.parentWidget(), panel.grp_calc)
+        self.assertIs(panel.lbl_speed.parentWidget(), panel.grp_calc)
+        self.assertEqual(panel.btn_compute.property("uiRole"), "primary")
         self.assertTrue(panel.details.isHidden())
         window.show()
         for language in ("pt", "en"):
@@ -269,6 +273,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         panel.cmb_class.setCurrentIndex(1)
         self.assertEqual(window.project.ab_source_type, "generic_class")
         self.assertTrue(panel.txt_A.isReadOnly())
+        self.assertTrue(panel.txt_B.isReadOnly())
         panel.cmb_class.setCurrentIndex(0)
         self.assertFalse(panel.txt_B.isReadOnly())
         self.assertEqual(window.project.ab_source_type, "manual")
@@ -284,6 +289,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         with patch.object(QInputDialog, "getItem", side_effect=select_compass):
             panel.act_load_ab_library.trigger()
         self.assertEqual(window.project.ab_source_type, "nhtsa_library")
+        self.assertTrue(panel.lbl_ab_details.wordWrap())
         self.assertIn("M20240300", panel.lbl_ab_details.text())
         with tempfile.TemporaryDirectory() as tmp:
             ab_path = str(Path(tmp) / "coefficients.json")

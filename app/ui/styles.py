@@ -55,25 +55,29 @@ QPushButton[uiRole]:disabled, QToolButton[uiRole="disclosure"]:disabled {
 """
 
 WORKFLOW_PANEL_STYLES = """
-QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle {
+QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle,
+QLabel#calculationTitle {
     color: #172f50;
     font-size: 23px;
     font-weight: bold;
 }
 QLabel#imageCardDescription, QFrame#alignmentCard QLabel, QLabel#alignmentShortcuts,
-QLabel#measurementOrientation, QGroupBox[measurementCard="true"] QLabel {
+QLabel#measurementOrientation, QGroupBox[measurementCard="true"] QLabel,
+QGroupBox[calculationCard="true"] QLabel, QFrame[calculationCard="true"] QLabel {
     color: #44566c;
     font-size: 13px;
 }
 QFrame#imageLoadCard, QFrame#alignmentCard, QGroupBox#alignmentManualCard,
-QFrame[calibrationCard="true"], QGroupBox[measurementCard="true"], QFrame[measurementCard="true"] {
+QFrame[calibrationCard="true"], QGroupBox[measurementCard="true"], QFrame[measurementCard="true"],
+QGroupBox[calculationCard="true"], QFrame[calculationCard="true"] {
     background: #f8faff;
     border: 1px solid #d6dfe9;
     border-radius: 9px;
 }
 QLabel#imageCardTitle, QLabel#alignmentMethodLabel, QLabel#alignmentTargetLabel,
 QLabel#alignmentStatusTitle, QFrame[calibrationCard="true"] QLabel[calibrationHeading="true"],
-QGroupBox[measurementCard="true"] QLabel[measurementHeading="true"] {
+QGroupBox[measurementCard="true"] QLabel[measurementHeading="true"],
+QGroupBox[calculationCard="true"] QLabel[calculationHeading="true"] {
     color: #192f4c;
     font-size: 14px;
     font-weight: bold;
@@ -112,8 +116,9 @@ QToolButton[panelDisclosure="true"]:disabled {
     color: #566371;
 }
 QGroupBox#alignmentPanel, QGroupBox#calibrationPanel, QGroupBox#measurementPanel,
-QGroupBox#measurementCiGrid { border: none; }
-QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle {
+QGroupBox#measurementCiGrid, QGroupBox#calculationPanel { border: none; }
+QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle,
+QLabel#calculationTitle {
     padding: 4px 8px;
 }
 QLabel#measurementOrientation { padding: 0 8px; }
@@ -157,7 +162,7 @@ QLabel#calibrationScaleValue {
     font-size: 23px;
     font-weight: bold;
 }
-QLineEdit#calibrationDistanceInput {
+QLineEdit#calibrationDistanceInput, QLineEdit[calculationInput="true"] {
     background: #ffffff;
     color: #23313f;
     border: 2px solid #c4cedb;
@@ -165,10 +170,12 @@ QLineEdit#calibrationDistanceInput {
     padding: 6px 8px;
     font-size: 14px;
 }
-QLineEdit#calibrationDistanceInput:focus { border-color: #245b96; }
+QLineEdit#calibrationDistanceInput:focus, QLineEdit[calculationInput="true"]:focus {
+    border-color: #245b96;
+}
 QLineEdit#calibrationDistanceInput[invalidDistance="true"] { border-color: #b05a59; }
 QLineEdit#calibrationDistanceInput[invalidDistance="true"]:focus { border-color: #853d3d; }
-QLineEdit#calibrationDistanceInput:disabled {
+QLineEdit#calibrationDistanceInput:disabled, QLineEdit[calculationInput="true"]:disabled {
     background: #f0f2f5;
     color: #566371;
     border-color: #d0d7df;
@@ -202,6 +209,28 @@ QGroupBox#measurementCiGrid QRadioButton:disabled { color: #566371; }
 QLabel[measurementCiValue="true"] { color: #23313f; font-weight: bold; }
 QToolButton#measurementReferencesDisclosure { font-size: 12px; }
 QFrame[measurementCard="true"] QDoubleSpinBox { min-height: 24px; }
+QGroupBox[calculationCard="true"] QComboBox { min-height: 26px; font-size: 13px; }
+QLabel[calculationFieldLabel="true"] { font-weight: bold; }
+QLineEdit[calculationInput="true"]:read-only {
+    background: #edf1f6;
+    color: #344861;
+}
+QLabel#calculationSource {
+    background: #eaf0f8;
+    color: #344861;
+    border-radius: 5px;
+    padding: 7px 8px;
+}
+QLabel[calculationOutput="true"] {
+    background: #edf1f6;
+    border-radius: 5px;
+    padding: 6px 8px;
+}
+QLabel#calculationFormula {
+    background: #edf1f6;
+    border-radius: 5px;
+    padding: 6px 8px;
+}
 """
 
 

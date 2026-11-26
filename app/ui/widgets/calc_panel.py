@@ -12,6 +12,7 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QFileDialog,
     QComboBox,
+    QFrame,
     QGroupBox,
     QGridLayout,
     QHBoxLayout,
@@ -24,7 +25,6 @@ from PySide6.QtWidgets import (
     QMenu,
     QSizePolicy,
     QToolButton,
-    QWidget,
 )
 
 from app.core.nhtsa_ab_library import (
@@ -59,25 +59,41 @@ class CalcPanel(QGroupBox):
     NHTSA_LIB_PATH = DEFAULT_LIBRARY_PATH
 
     def __init__(self, main_window):
-        super().__init__(tr("calc.group.title"))
+        super().__init__()
+        self.setObjectName("calculationPanel")
 
         self.main = main_window
         self._stiffness_classes = self._load_stiffness_classes()
         self._profile_dialog: CrushProfileDialog | None = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(7, 9, 7, 7)
-        layout.setSpacing(5)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+        self.lbl_title = QLabel()
+        self.lbl_title.setObjectName("calculationTitle")
+        self.lbl_title.setWordWrap(True)
+        layout.addWidget(self.lbl_title)
 
-        self.grp_source = QGroupBox(tr("calc.group.source"))
+        self.grp_source = QGroupBox()
         src_layout = QVBoxLayout(self.grp_source)
-        self.grp_params = QGroupBox(tr("calc.group.params"))
+        self.grp_params = QGroupBox()
         params_layout = QGridLayout(self.grp_params)
-        self.grp_calc = QGroupBox(tr("calc.group.calc"))
+        self.grp_calc = QGroupBox()
         calc_layout = QVBoxLayout(self.grp_calc)
-        for section_layout in (src_layout, params_layout, calc_layout):
-            section_layout.setContentsMargins(8, 10, 8, 8)
-            section_layout.setSpacing(4)
+        for card in (self.grp_source, self.grp_params, self.grp_calc):
+            card.setProperty("calculationCard", True)
+            card.layout().setContentsMargins(12, 11, 12, 11)
+            card.layout().setSpacing(8)
+
+        self.lbl_source_heading = QLabel()
+        self.lbl_params_heading = QLabel()
+        self.lbl_calc_heading = QLabel()
+        for heading in (self.lbl_source_heading, self.lbl_params_heading, self.lbl_calc_heading):
+            heading.setProperty("calculationHeading", True)
+            heading.setWordWrap(True)
+        src_layout.addWidget(self.lbl_source_heading)
+        params_layout.addWidget(self.lbl_params_heading, 0, 0, 1, 2)
+        calc_layout.addWidget(self.lbl_calc_heading)
 
         self.lbl_generic_class = QLabel(tr("calc.generic_class"))
         self.cmb_class = QComboBox()
@@ -91,7 +107,8 @@ class CalcPanel(QGroupBox):
 
         self.btn_ab_menu = QPushButton(tr("calc.ab_menu"))
         self.btn_ab_menu.setProperty("uiRole", "secondary")
-        self.btn_ab_menu.setProperty("uiCompact", "true")
+        self.btn_ab_menu.setProperty("panelAction", True)
+        self.btn_ab_menu.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.ab_menu = QMenu(self)
         self.act_load_ab_library = QAction(tr("calc.ab_menu.load_library"), self)
         self.act_import_ab_file = QAction(tr("calc.ab_menu.import_file"), self)
@@ -105,14 +122,14 @@ class CalcPanel(QGroupBox):
 
         self.btn_compute_ab_nhtsa = QPushButton(tr("calc.compute_ab_from_nhtsa"))
         self.btn_edit_ab_nhtsa = QPushButton(tr("calc.edit_ab_from_nhtsa"))
-        nhtsa_row = QHBoxLayout()
         for button in (self.btn_compute_ab_nhtsa, self.btn_edit_ab_nhtsa):
             button.setProperty("uiRole", "secondary")
-            button.setProperty("uiCompact", "true")
-            nhtsa_row.addWidget(button, 1)
-        src_layout.addLayout(nhtsa_row)
+            button.setProperty("panelAction", True)
+            src_layout.addWidget(button)
 
         self.lbl_ab_source = QLabel(tr("calc.ab_source_default"))
+        self.lbl_ab_source.setObjectName("calculationSource")
+        self.lbl_ab_source.setTextFormat(Qt.TextFormat.PlainText)
         src_layout.addWidget(self.lbl_ab_source)
 
         self.lbl_a = QLabel(f"{tr('calc.a_coefficient')} ({self.A_UNIT})")
@@ -128,43 +145,58 @@ class CalcPanel(QGroupBox):
         self.txt_vehicle_mass.setPlaceholderText("1700")
 
         for label, field, row, column in (
-            (self.lbl_a, self.txt_A, 0, 0),
-            (self.lbl_b, self.txt_B, 0, 1),
-            (self.lbl_alpha, self.txt_alpha_deg, 2, 0),
-            (self.lbl_vehicle_mass, self.txt_vehicle_mass, 2, 1),
+            (self.lbl_a, self.txt_A, 1, 0),
+            (self.lbl_b, self.txt_B, 1, 1),
+            (self.lbl_alpha, self.txt_alpha_deg, 3, 0),
+            (self.lbl_vehicle_mass, self.txt_vehicle_mass, 3, 1),
         ):
             label.setBuddy(field)
+            label.setProperty("calculationFieldLabel", True)
+            field.setProperty("calculationInput", True)
             params_layout.addWidget(label, row, column)
             params_layout.addWidget(field, row + 1, column)
         for column in range(2):
             params_layout.setColumnStretch(column, 1)
         self.lbl_mass_hint = QLabel(tr("calc.mass_hint"))
-        params_layout.addWidget(self.lbl_mass_hint, 4, 0, 1, 2)
+        params_layout.addWidget(self.lbl_mass_hint, 5, 0, 1, 2)
 
         self.btn_compute = QPushButton(tr("calc.compute_energy"))
         self.btn_compute.setProperty("uiRole", "primary")
+        self.btn_compute.setProperty("panelAction", True)
+        self.btn_compute.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_energy = QLabel(tr("calc.total_energy_default"))
         self.lbl_speed = QLabel(tr("calc.damage_speed_default"))
-        for widget in (self.btn_compute, self.lbl_energy, self.lbl_speed):
-            calc_layout.addWidget(widget)
+        calc_layout.addWidget(self.btn_compute)
+        outputs = QHBoxLayout()
+        outputs.setSpacing(8)
+        for label in (self.lbl_energy, self.lbl_speed):
+            label.setProperty("calculationOutput", True)
+            outputs.addWidget(label, 1, Qt.AlignmentFlag.AlignTop)
+        calc_layout.addLayout(outputs)
 
         self.btn_show_profile = QPushButton(tr("calc.show_crush_profile"))
         self.btn_show_profile.setProperty("uiRole", "secondary")
-        self.btn_show_profile.setFlat(True)
+        self.btn_show_profile.setProperty("panelAction", True)
         self.btn_toggle_details = QToolButton()
         self.main._style_disclosure(self.btn_toggle_details)
+        self.btn_toggle_details.setProperty("panelDisclosure", True)
         self.btn_toggle_details.toggled.connect(self._refresh_details_visibility)
-        self.details = QWidget()
+        self.details = QFrame()
+        self.details.setProperty("calculationCard", True)
         details_layout = QVBoxLayout(self.details)
-        details_layout.setContentsMargins(8, 2, 8, 2)
+        details_layout.setContentsMargins(12, 11, 12, 11)
+        details_layout.setSpacing(8)
         self.lbl_formula_hint = QLabel(tr("calc.formula_hint"))
+        self.lbl_formula_hint.setObjectName("calculationFormula")
         self.lbl_ab_details = QLabel()
         self.lbl_ab_details.setTextFormat(Qt.TextFormat.PlainText)
+        self.lbl_ab_details.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         details_layout.addWidget(self.lbl_formula_hint)
         details_layout.addWidget(self.lbl_ab_details)
 
         for label in (
-            self.lbl_generic_class, self.lbl_ab_source, self.lbl_vehicle_mass, self.lbl_mass_hint,
+            self.lbl_generic_class, self.lbl_ab_source, self.lbl_a, self.lbl_b, self.lbl_alpha,
+            self.lbl_vehicle_mass, self.lbl_mass_hint,
             self.lbl_energy, self.lbl_speed, self.lbl_formula_hint, self.lbl_ab_details,
         ):
             label.setWordWrap(True)
@@ -215,7 +247,8 @@ class CalcPanel(QGroupBox):
             self._refresh_ab_source_ui()
 
     def retranslate_ui(self) -> None:
-        self.setTitle(tr("calc.group.title"))
+        self.lbl_title.setText(tr("calc.group.title"))
+        self.setAccessibleName(self.lbl_title.text())
         self.lbl_generic_class.setText(tr("calc.generic_class"))
 
         current_data = self.cmb_class.currentData()
@@ -225,6 +258,7 @@ class CalcPanel(QGroupBox):
             self.cmb_class.setCurrentIndex(idx)
 
         self.btn_ab_menu.setText(tr("calc.ab_menu"))
+        self.btn_ab_menu.setToolTip(self.btn_ab_menu.text())
         self.act_load_ab_library.setText(tr("calc.ab_menu.load_library"))
         self.act_import_ab_file.setText(tr("calc.ab_menu.import_file"))
         self.act_export_ab_file.setText(tr("calc.ab_menu.export_file"))
@@ -262,9 +296,13 @@ class CalcPanel(QGroupBox):
                 )
             )
 
-        self.grp_source.setTitle(tr("calc.group.source"))
-        self.grp_params.setTitle(tr("calc.group.params"))
-        self.grp_calc.setTitle(tr("calc.group.calc"))
+        for group, heading, key in (
+            (self.grp_source, self.lbl_source_heading, "calc.group.source"),
+            (self.grp_params, self.lbl_params_heading, "calc.group.params"),
+            (self.grp_calc, self.lbl_calc_heading, "calc.group.calc"),
+        ):
+            heading.setText(tr(key))
+            group.setAccessibleName(heading.text())
 
         self._refresh_ab_source_ui()
         self.btn_show_profile.setText(tr("calc.show_crush_profile"))

@@ -739,16 +739,16 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "calc.view_result": {"en": "View result", "pt": "Ver resultado"},
     "calc.total_energy_default": {
-        "en": "<b>Total Energy:</b> -",
-        "pt": "<b>Energia Total:</b> -",
+        "en": "Total energy<br><b style='font-size: 16px'>—</b>",
+        "pt": "Energia total<br><b style='font-size: 16px'>—</b>",
     },
     "calc.total_energy_value": {
-        "en": "<b>Total Energy:</b> <b>{value} {unit}</b>",
-        "pt": "<b>Energia Total:</b> <b>{value} {unit}</b>",
+        "en": "Total energy<br><b style='font-size: 16px'>{value} {unit}</b>",
+        "pt": "Energia total<br><b style='font-size: 16px'>{value} {unit}</b>",
     },
     "calc.vehicle_mass": {
-        "en": "Mass for EES (kg)",
-        "pt": "Massa para EES (kg)",
+        "en": "Mass (kg)",
+        "pt": "Massa (kg)",
     },
     "calc.mass_hint": {
         "en": "Mass is optional for energy and required for EES.",
@@ -760,12 +760,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Calcular EES",
     },
     "calc.damage_speed_default": {
-        "en": "<b>Damage Speed:</b> -",
-        "pt": "<b>Velocidade de Dano:</b> -",
+        "en": "EES<br><b style='font-size: 16px'>—</b>",
+        "pt": "EES<br><b style='font-size: 16px'>—</b>",
     },
     "calc.damage_speed_value": {
-        "en": "<b>Damage Speed:</b> <b>{value} {unit}</b>",
-        "pt": "<b>Velocidade de Dano:</b> <b>{value} {unit}</b>",
+        "en": "EES<br><b style='font-size: 16px'>{value} {unit}</b>",
+        "pt": "EES<br><b style='font-size: 16px'>{value} {unit}</b>",
     },
     "calc.show_crush_profile": {
         "en": "Crush profile",
@@ -1485,8 +1485,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Parâmetros",
     },
     "calc.group.calc": {
-        "en": "Calculation",
-        "pt": "Cálculo",
+        "en": "Run calculation",
+        "pt": "Execução do cálculo",
     },
     "project.untitled": {
         "en": "untitled",
