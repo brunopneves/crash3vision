@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.core.project import Project
+from app.i18n import tr
 from app.core.rigid_region_alignment import (
     REGION_DEFAULT_HEIGHT_FRACTION,
     REGION_DEFAULT_LENGTH_FRACTION,
@@ -180,6 +181,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertGreater(window._total_energy, 0)
         self.assertIsNone(window._damage_speed_kmh)
         self.assertFalse(panel.isHidden())
+        self.assertTrue(window._summary_group.isHidden())
+        self.assertEqual(window.lbl_result_ees_kmh.text(), "—")
+        self.assertEqual(window.lbl_result_energy.text(), f"{window._total_energy:.2f} J")
 
     def test_contextual_calculation_rejects_invalid_inputs_and_failed_results(self) -> None:
         window = self._window()
@@ -665,6 +669,55 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         window.workflow.invalidate_speed()
         self.assertEqual(window.lbl_result_ees_mps.text(), "—")
 
+    def test_result_cards_preserve_file_menu_exports(self) -> None:
+        window = self._window()
+        source = COMPASS / "crash3vision_reference_project.json"
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(str(source), "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        window.show()
+        self.assertEqual(window._current_workflow_step(), "result")
+        before = window.project.to_dict()
+        for language, heading in (
+            ("pt", "Velocidade equivalente de energia (EES)"),
+            ("en", "Energy equivalent speed (EES)"),
+        ):
+            window._set_language_and_refresh(language)
+            QApplication.processEvents()
+            self.assertEqual(window.lbl_result_ees_heading.text(), heading)
+            self.assertEqual(window.lbl_result_energy.text(), f"{window.project.total_energy_j:.2f} J")
+            self.assertIn("6/6", window.lbl_summary.text())
+            self.assertIn(" kg", window.lbl_result_context.text())
+            self.assertEqual(window._controls_scroll.horizontalScrollBar().maximum(), 0)
+        self.assertEqual(window.project.to_dict(), before)
+
+        file_menu = window.menuBar().actions()[0].menu()
+        actions = {action.text(): action for action in file_menu.actions()}
+        with tempfile.TemporaryDirectory() as tmp:
+            annotated = Path(tmp) / "annotated.png"
+            current_view = Path(tmp) / "view.png"
+            report = Path(tmp) / "report.txt"
+            for key, path in (
+                ("menu.export_overlay", annotated),
+                ("menu.export_current_view", current_view),
+                ("menu.export_report", report),
+            ):
+                with (
+                    patch.object(QFileDialog, "getSaveFileName", return_value=(str(path), "")),
+                    patch.object(QMessageBox, "information"),
+                    patch.object(QMessageBox, "critical") as error,
+                ):
+                    actions[tr(key)].trigger()
+                error.assert_not_called()
+                self.assertTrue(path.is_file())
+            self.assertFalse(QImage(str(annotated)).isNull())
+            self.assertEqual(QImage(str(current_view)).size(), window.canvas.viewport().grab().size())
+            text = report.read_text(encoding="utf-8")
+            self.assertIn(f"EES (km/h): {window.project.damage_speed_kmh:.2f}", text)
+            self.assertIn(f"{window.project.total_energy_j:.2f}", text)
+
     def test_step_consultation_preserves_project_and_disables_tools(self) -> None:
         window = self._window()
         steps = window.workflow_step_labels
@@ -1075,9 +1128,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(steps["result"].property("progressStatus"), "complete")
         self.assertIn("#245b96", steps["result"].styleSheet())
         self.assertEqual(scrollbar.value(), 0)
-        self.assertEqual(window.lbl_result_ees_kmh.text(), f"EES {window._damage_speed_kmh:.2f} km/h")
+        self.assertEqual(window.lbl_result_ees_kmh.text(), f"{window._damage_speed_kmh:.2f} km/h")
         self.assertEqual(window.lbl_result_ees_mps.text(), f"{window._damage_speed_mps:.2f} m/s")
-        self.assertIn(f"{window._total_energy / 1000:.2f} kJ", window.lbl_result_energy.text())
+        self.assertEqual(window.lbl_result_energy.text(), f"{window._total_energy:.2f} J")
         viewport = window._controls_scroll.viewport()
         for label in (window.lbl_result_ees_kmh, window.lbl_result_ees_mps, window.lbl_result_energy):
             self.assertTrue(label.isVisible())

@@ -493,20 +493,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Restart marking",
         "pt": "Reiniciar marcação",
     },
-    "result.ees_kmh": {"en": "EES {value} km/h", "pt": "EES {value} km/h"},
+    "result.ees_title": {
+        "en": "Energy equivalent speed (EES)",
+        "pt": "Velocidade equivalente de energia (EES)",
+    },
+    "result.ees_kmh": {"en": "{value} km/h", "pt": "{value} km/h"},
     "result.ees_mps": {"en": "{value} m/s", "pt": "{value} m/s"},
-    "result.energy_kj": {
-        "en": "Deformation energy\n{value} kJ",
-        "pt": "Energia de deformação\n{value} kJ",
+    "result.energy_title": {
+        "en": "Deformation energy",
+        "pt": "Energia de deformação",
     },
-    "group.summary": {
-        "en": "Summary",
-        "pt": "Resumo",
-    },
-    "summary.status_default": {
-        "en": "Status: -",
-        "pt": "Status: -",
-    },
+    "result.energy_j": {"en": "{value} J", "pt": "{value} J"},
+    "result.context_title": {"en": "Calculation context", "pt": "Contexto do cálculo"},
     "dialog.export_report": {
         "en": "Export report",
         "pt": "Exportar relatório",

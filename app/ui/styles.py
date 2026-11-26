@@ -56,20 +56,21 @@ QPushButton[uiRole]:disabled, QToolButton[uiRole="disclosure"]:disabled {
 
 WORKFLOW_PANEL_STYLES = """
 QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle,
-QLabel#calculationTitle {
+QLabel#calculationTitle, QLabel#resultTitle {
     color: #172f50;
     font-size: 23px;
     font-weight: bold;
 }
 QLabel#imageCardDescription, QFrame#alignmentCard QLabel, QLabel#alignmentShortcuts,
 QLabel#measurementOrientation, QGroupBox[measurementCard="true"] QLabel,
-QGroupBox[calculationCard="true"] QLabel, QFrame[calculationCard="true"] QLabel {
+QGroupBox[calculationCard="true"] QLabel, QFrame[calculationCard="true"] QLabel,
+QFrame[resultCard="true"] QLabel {
     color: #44566c;
     font-size: 13px;
 }
 QFrame#imageLoadCard, QFrame#alignmentCard, QGroupBox#alignmentManualCard,
 QFrame[calibrationCard="true"], QGroupBox[measurementCard="true"], QFrame[measurementCard="true"],
-QGroupBox[calculationCard="true"], QFrame[calculationCard="true"] {
+QGroupBox[calculationCard="true"], QFrame[calculationCard="true"], QFrame[resultCard="true"] {
     background: #f8faff;
     border: 1px solid #d6dfe9;
     border-radius: 9px;
@@ -77,7 +78,8 @@ QGroupBox[calculationCard="true"], QFrame[calculationCard="true"] {
 QLabel#imageCardTitle, QLabel#alignmentMethodLabel, QLabel#alignmentTargetLabel,
 QLabel#alignmentStatusTitle, QFrame[calibrationCard="true"] QLabel[calibrationHeading="true"],
 QGroupBox[measurementCard="true"] QLabel[measurementHeading="true"],
-QGroupBox[calculationCard="true"] QLabel[calculationHeading="true"] {
+QGroupBox[calculationCard="true"] QLabel[calculationHeading="true"],
+QFrame[resultCard="true"] QLabel[resultHeading="true"] {
     color: #192f4c;
     font-size: 14px;
     font-weight: bold;
@@ -116,9 +118,9 @@ QToolButton[panelDisclosure="true"]:disabled {
     color: #566371;
 }
 QGroupBox#alignmentPanel, QGroupBox#calibrationPanel, QGroupBox#measurementPanel,
-QGroupBox#measurementCiGrid, QGroupBox#calculationPanel { border: none; }
+QGroupBox#measurementCiGrid, QGroupBox#calculationPanel, QGroupBox#resultPanel { border: none; }
 QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle,
-QLabel#calculationTitle {
+QLabel#calculationTitle, QLabel#resultTitle {
     padding: 4px 8px;
 }
 QLabel#measurementOrientation { padding: 0 8px; }
@@ -230,6 +232,20 @@ QLabel#calculationFormula {
     background: #edf1f6;
     border-radius: 5px;
     padding: 6px 8px;
+}
+QFrame#resultEesCard {
+    background: #eaf2fb;
+    border-color: #bfcede;
+}
+QLabel#resultEesValue {
+    color: #173f6b;
+    font-size: 30px;
+    font-weight: bold;
+}
+QLabel#resultEnergyValue {
+    color: #172f50;
+    font-size: 20px;
+    font-weight: bold;
 }
 """
 

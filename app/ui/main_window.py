@@ -864,23 +864,9 @@ class MainWindow(QMainWindow):
         self.calc_panel = CalcPanel(self)
         dock_layout.addWidget(self.calc_panel)
 
-        # --- Summary ---
-        summary_group = QGroupBox(tr("group.summary"))
-        self._summary_group = summary_group
-        summary_layout = QVBoxLayout(summary_group)
-        self.lbl_result_ees_kmh = QLabel()
-        self.lbl_result_ees_kmh.setStyleSheet("font-size: 23px; font-weight: bold;")
-        self.lbl_result_ees_mps = QLabel()
-        self.lbl_result_energy = QLabel()
-        for label in (self.lbl_result_ees_kmh, self.lbl_result_ees_mps, self.lbl_result_energy):
-            label.setWordWrap(True)
-            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-            summary_layout.addWidget(label)
-        self.lbl_summary = QLabel(tr("summary.status_default"))
-        self.lbl_summary.setWordWrap(True)
-        self.lbl_summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        summary_layout.addWidget(self.lbl_summary)
-        dock_layout.addWidget(summary_group)
+        # --- Result panel ---
+        self._build_result_panel()
+        dock_layout.addWidget(self._summary_group)
 
         dock_layout.addStretch(1)
 
@@ -1064,8 +1050,6 @@ class MainWindow(QMainWindow):
         self.chk_measure_ci_mode.setText(tr("check.measure_ci_mode"))
         self._update_ci_label()
         self.btn_finish_marking.setText(tr("button.finish_marking"))
-        self._summary_group.setTitle(tr("group.summary"))
-
         if self._w_px is None:
             self.lbl_w.setText(tr("label.w_default"))
 
@@ -2395,6 +2379,50 @@ class MainWindow(QMainWindow):
         else:
             self.project.c_points = None
 
+    def _build_result_panel(self) -> None:
+        self._summary_group = QGroupBox()
+        self._summary_group.setObjectName("resultPanel")
+        layout = QVBoxLayout(self._summary_group)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+
+        self.lbl_result_title = QLabel()
+        self.lbl_result_title.setObjectName("resultTitle")
+        layout.addWidget(self.lbl_result_title)
+
+        self.lbl_result_ees_heading = QLabel()
+        self.lbl_result_energy_heading = QLabel()
+        self.lbl_result_measurements_heading = QLabel()
+        self.lbl_result_context_heading = QLabel()
+        self.lbl_result_ees_kmh = QLabel()
+        self.lbl_result_ees_kmh.setObjectName("resultEesValue")
+        self.lbl_result_ees_mps = QLabel()
+        self.lbl_result_energy = QLabel()
+        self.lbl_result_energy.setObjectName("resultEnergyValue")
+        self.lbl_summary = QLabel()
+        self.lbl_result_context = QLabel()
+        self.lbl_result_context.setTextFormat(Qt.TextFormat.PlainText)
+
+        for heading, values in (
+            (self.lbl_result_ees_heading, (self.lbl_result_ees_kmh, self.lbl_result_ees_mps)),
+            (self.lbl_result_energy_heading, (self.lbl_result_energy,)),
+            (self.lbl_result_measurements_heading, (self.lbl_summary,)),
+            (self.lbl_result_context_heading, (self.lbl_result_context,)),
+        ):
+            card = QFrame()
+            card.setProperty("resultCard", True)
+            if heading is self.lbl_result_ees_heading:
+                card.setObjectName("resultEesCard")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 11, 12, 11)
+            card_layout.setSpacing(5)
+            heading.setProperty("resultHeading", True)
+            for label in (heading, *values):
+                label.setWordWrap(True)
+                label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+                card_layout.addWidget(label)
+            layout.addWidget(card)
+
     def _refresh_summary(self) -> None:
         if self._viewed_step is not None:
             steps = tuple(self.workflow_step_labels)
@@ -2404,9 +2432,18 @@ class MainWindow(QMainWindow):
         self.calc_panel.refresh_compute_action()
         self._refresh_marking_panel()
         self._refresh_workflow_progress()
+        self._refresh_result_panel()
+
+    def _refresh_result_panel(self) -> None:
+        self.lbl_result_title.setText(tr("progress.result"))
+        self._summary_group.setAccessibleName(self.lbl_result_title.text())
+        self.lbl_result_ees_heading.setText(tr("result.ees_title"))
+        self.lbl_result_energy_heading.setText(tr("result.energy_title"))
+        self.lbl_result_measurements_heading.setText(tr("progress.measurement"))
+        self.lbl_result_context_heading.setText(tr("result.context_title"))
         self.lbl_result_ees_kmh.setText(
             tr("result.ees_kmh", value=f"{self._damage_speed_kmh:.2f}")
-            if self._damage_speed_kmh is not None else ""
+            if self._damage_speed_kmh is not None else "—"
         )
         ees_mps = self._damage_speed_mps
         ees_kmh = self._damage_speed_kmh
@@ -2420,30 +2457,22 @@ class MainWindow(QMainWindow):
             tr("result.ees_mps", value=f"{ees_mps:.2f}") if ees_mps is not None else "—"
         )
         self.lbl_result_energy.setText(
-            tr("result.energy_kj", value=f"{self._total_energy / 1000:.2f}")
-            if self._total_energy is not None else ""
+            tr("result.energy_j", value=f"{self._total_energy:.2f}")
+            if self._total_energy is not None else "—"
         )
-        stage_key = f"stage.{self.stage.value}"
-
-        parts = []
-        parts.append(tr("summary.project", name=self.project.name))
-        parts.append(tr("summary.stage", stage=tr(stage_key)))
-        if bool(self.project.ref_path) != bool(self.project.dam_path):
-            parts.append(tr("summary.single_image_active"))
-
-        parts.append(
+        measurements = [
             tr("summary.scale_not_set")
             if self._m_per_px is None
             else tr("summary.scale_value", value=f"{self._m_per_px:.6f}")
-        )
+        ]
 
         if self._w_px is None:
-            parts.append(tr("summary.w_not_set"))
+            measurements.append(tr("summary.w_not_set"))
         else:
             if self._m_per_px is None:
-                parts.append(tr("summary.w_value_px_only", px=f"{self._w_px:.2f}"))
+                measurements.append(tr("summary.w_value_px_only", px=f"{self._w_px:.2f}"))
             else:
-                parts.append(
+                measurements.append(
                     tr(
                         "summary.w_value_full",
                         px=f"{self._w_px:.2f}",
@@ -2452,22 +2481,24 @@ class MainWindow(QMainWindow):
                 )
 
         c_done = sum(1 for i in range(1, 7) if i in self._ci_m)
-        parts.append(tr("summary.c_measures", done=c_done))
+        measurements.append(tr("summary.c_measures", done=c_done))
+        ready = self._m_per_px is not None and self._w_px is not None and c_done == 6
+        if not ready:
+            measurements.append(tr("summary.status_incomplete"))
+        self.lbl_summary.setText("\n".join(measurements))
 
-        parts.append(
+        context = []
+        if self.project.name:
+            context.append(tr("summary.project", name=self.project.name))
+        if bool(self.project.ref_path) != bool(self.project.dam_path):
+            context.append(tr("summary.single_image_active"))
+        context.append(
             tr("summary.vehicle_mass_default")
             if self._vehicle_mass_kg is None
             else tr("summary.vehicle_mass_value", value=f"{self._vehicle_mass_kg:.2f}")
         )
 
-        ready = (
-            (self._m_per_px is not None) and (self._w_px is not None) and (c_done == 6)
-        )
-        parts.append(
-            tr("summary.status_complete") if ready else tr("summary.status_incomplete")
-        )
-
-        self.lbl_summary.setText("\n".join(parts))
+        self.lbl_result_context.setText("\n".join(context))
 
     def _warn_if_alignment_scales_differ(self) -> bool:
         if not self.canvas.has_both_images():
