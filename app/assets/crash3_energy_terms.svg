@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="404" height="177" viewBox="0 0 354 155">
+  <title>Linear, quadratic and residual terms</title>
+  <desc>L = C₁ + 2C₂ + 2C₃ + 2C₄ + 2C₅ + C₆.
+  Q = C₁² + 2C₂² + 2C₃² + 2C₄² + 2C₅² + C₆² + C₁C₂ + C₂C₃ + C₃C₄ + C₄C₅ + C₅C₆.
+  G = A²/(2B).</desc>
+  <g fill="#173f6b" font-family="Cambria Math" font-size="20">
+    <text x="13" y="21" text-anchor="end">L</text>
+    <text x="13" y="49" text-anchor="end">Q</text>
+    <text x="13" y="136" text-anchor="end">G</text>
+    <text x="21" y="21">=</text>
+    <text x="21" y="49">=</text>
+    <text x="21" y="136">=</text>
+    <text x="43" y="21">C₁ + 2C₂ + 2C₃ + 2C₄ + 2C₅ + C₆</text>
+    <text x="43" y="49">C₁² + 2C₂² + 2C₃² + 2C₄²</text>
+    <text x="43" y="73">+ 2C₅² + C₆²</text>
+    <text x="43" y="97">+ C₁C₂ + C₂C₃ + C₃C₄ + C₄C₅ + C₅C₆</text>
+    <text x="59" y="124" text-anchor="middle">A²</text>
+    <text x="59" y="150" text-anchor="middle">2B</text>
+  </g>
+  <path d="M44 130h30" fill="none" stroke="#173f6b" stroke-width="1.2"/>
+</svg>

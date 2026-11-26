@@ -53,6 +53,7 @@ Thumbs.db
 # -----------------------------
 *.txt
 !requirements.txt
+!PUBLIC_RELEASE_MANIFEST.txt
 
 # -----------------------------
 # User data
