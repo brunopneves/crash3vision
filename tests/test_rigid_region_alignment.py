@@ -351,6 +351,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=point)
         self.assertFalse(window.canvas.set_w_mode)
         self.assertFalse(window.chk_set_w_mode.isChecked())
+        self.assertTrue(window.canvas.measure_ci_mode)
+        self.assertTrue(window.rb_c1.isChecked())
+        self.assertIn("Marque C1 com dois cliques", window.lbl_ci_instruction.text())
         self.assertEqual(window.chk_set_w_mode.text(), "Remarcar W")
         width_overlay = window.canvas.get_overlay_state()
         QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
@@ -370,6 +373,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         window.btn_toggle_marking_references.click()
         window.spn_bumper_offset.setValue(0.1)
         window.chk_set_guide_mode.click()
+        self.assertFalse(window.chk_measure_ci_mode.isChecked())
         QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
         self.assertIn("✓ Guia", window.btn_toggle_marking_references.text())
         self.assertIn("✓ Offset", window.btn_toggle_marking_references.text())
@@ -444,6 +448,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
         window.chk_set_w_mode.click()
         self.assertFalse(window.canvas.set_w_mode)
+        self.assertFalse(window.canvas.measure_ci_mode)
         self.assertEqual(window.project.to_dict(), before)
         self.assertEqual(window.canvas.get_overlay_state(), overlay)
 
@@ -464,7 +469,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(window.project.to_dict(), before)
         QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center + QPoint(90, 0))
         self.assertFalse(window.canvas.set_w_mode)
-        self.assertIsNone(window.canvas.ctrl.active_tool())
+        self.assertTrue(window.canvas.measure_ci_mode)
+        self.assertTrue(window.rb_c1.isChecked())
         self.assertNotEqual(window.project.w_px, before["w_px"])
         self.assertEqual(len(window.canvas.slice_x), 6)
         self.assertAlmostEqual(window.canvas.slice_x[1] - window.canvas.slice_x[0],
@@ -508,6 +514,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(window.project.damage_speed_kmh, data["damage_speed_kmh"])
         window.workflow.restart_from_marking()
         self.assertTrue(window.chk_measure_ci_mode.isEnabled())
+        self.assertFalse(window.canvas.measure_ci_mode)
 
     @staticmethod
     def _mark_calibration_points(window: MainWindow) -> None:
@@ -1626,6 +1633,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
 
         self.assertFalse(window.btn_finish_alignment.isHidden())
         self.assertFalse(window.btn_start_alignment.isEnabled())
+        self.assertTrue(window.btn_start_alignment.isHidden())
+        self.assertTrue(window.alignment_method_row.isHidden())
+        self.assertFalse(window.btn_toggle_manual_alignment.isHidden())
         window.btn_finish_alignment.click()
         self.assertEqual(window.stage, window.Stage.CALIBRATION)
 
@@ -1713,6 +1723,10 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertTrue(window._rigid_preview_active)
         self.assertFalse(window.btn_finish_alignment.isHidden())
         self.assertFalse(window.btn_finish_alignment.isEnabled())
+        self.assertTrue(window.alignment_method_row.isHidden())
+        self.assertTrue(window.btn_start_alignment.isHidden())
+        self.assertTrue(window.btn_toggle_manual_alignment.isHidden())
+        self.assertFalse(window.btn_rigid_try_again.isHidden())
         window.show()
         QApplication.processEvents()
         self.assertEqual(window.btn_rigid_apply.accessibleName(), "Aplicar alinhamento")

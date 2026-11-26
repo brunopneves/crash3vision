@@ -129,6 +129,7 @@ class MainWindow(QMainWindow):
 
         self._pending_auto_alignment: AlignmentHypothesis | None = None
         self._auto_preview_baseline_dam_transform: dict[str, float] | None = None
+        self._auto_alignment_undo_transform: dict[str, float] | None = None
         self._auto_preview_active = False
         self._rigid_reference_regions: list[RigidRegion] = []
         self._last_applied_rigid_reference_regions: tuple[RigidRegion, ...] = ()
@@ -509,8 +510,12 @@ class MainWindow(QMainWindow):
 
         self.btn_start_alignment = QPushButton(tr("button.start_alignment"))
         self.btn_start_alignment.setEnabled(False)
-        align_layout.addWidget(self.btn_start_alignment)
 
+        self.lbl_alignment_status_title = QLabel()
+        self.lbl_alignment_status_title.setWordWrap(True)
+        self.lbl_alignment_status_title.setStyleSheet("font-weight: bold;")
+        self.lbl_alignment_status_title.hide()
+        align_layout.addWidget(self.lbl_alignment_status_title)
         self.lbl_rigid_region_instruction = QLabel()
         self.lbl_rigid_region_instruction.setWordWrap(True)
         self.lbl_rigid_region_instruction.setText(
@@ -561,8 +566,14 @@ class MainWindow(QMainWindow):
         """)
         self.btn_rigid_try_again.hide()
         rigid_actions.addWidget(self.btn_rigid_try_again)
+        self.btn_undo_auto_alignment = QPushButton(tr("alignment.undo_auto"))
+        self.btn_undo_auto_alignment.setFlat(True)
+        self.btn_undo_auto_alignment.hide()
+        self.btn_undo_auto_alignment.clicked.connect(self._undo_auto_alignment)
+        rigid_actions.addWidget(self.btn_undo_auto_alignment)
         self.alignment_actions_widget.setVisible(False)
         align_layout.addWidget(self.alignment_actions_widget)
+        align_layout.addWidget(self.btn_start_alignment)
 
         self.btn_finish_alignment = QPushButton(tr("button.finish_alignment"))
         self.btn_finish_alignment.setVisible(False)
@@ -875,6 +886,7 @@ class MainWindow(QMainWindow):
         self.chk_lock_alignment.toggled.connect(self._on_lock_alignment_toggled)
         self.btn_reset_alignment.clicked.connect(self._on_reset_alignment)
         self.btn_start_alignment.clicked.connect(self._on_start_alignment)
+        self.rad_alignment_auto.toggled.connect(self._update_alignment_edit_availability)
         self.btn_rigid_apply.clicked.connect(self._on_apply_rigid_region_preview)
         self.btn_rigid_try_again.clicked.connect(
             self._on_try_another_rigid_region
@@ -967,18 +979,21 @@ class MainWindow(QMainWindow):
         self.rad_alignment_auto.setText(tr("alignment.method.auto"))
         self.rad_alignment_rigid.setText(tr("alignment.method.rigid"))
         self.alignment_method_row.update_direction()
-        self.btn_start_alignment.setText(tr("button.start_alignment"))
         self.btn_rigid_apply.setText(tr("button.rigid_apply"))
         self.btn_rigid_try_again.setText(tr("button.rigid_try_again"))
         self._refresh_alignment_cancel_label()
+        self.btn_undo_auto_alignment.setText(tr("alignment.undo_auto"))
         if self._rigid_instruction_key is not None:
             self.lbl_rigid_region_instruction.setText(
                 tr(self._rigid_instruction_key)
             )
+        elif 0 < len(self._rigid_reference_regions) < 3:
+            self.lbl_rigid_region_instruction.setText(tr(
+                "alignment.rigid.instruction.reference_progress",
+                count=len(self._rigid_reference_regions),
+            ))
         else:
-            self.lbl_rigid_region_instruction.setText(
-                tr("alignment.status.choose_method")
-            )
+            self.lbl_rigid_region_instruction.setText(tr(self._idle_alignment_instruction()))
         self.btn_apply_alignment_suggestion.setText(
             tr("button.apply_alignment_suggestion")
         )
@@ -1144,6 +1159,7 @@ class MainWindow(QMainWindow):
 
     def _on_lock_alignment_toggled(self, checked: bool) -> None:
         self.canvas.set_alignment_locked(checked)
+        self._update_alignment_actions_visibility()
 
     def _on_alignment_target_changed(self) -> None:
         target = self.cmb_alignment_target.currentData()
@@ -1179,6 +1195,8 @@ class MainWindow(QMainWindow):
 
     def _refresh_alignment_sections(self) -> None:
         manual_open = self.btn_toggle_manual_alignment.isChecked()
+        manual_visible = self.stage == Stage.ALIGNMENT and self._viewed_step is None
+        manual_visible = manual_visible and not self._workflow_navigation_blocked()
         if not manual_open and self.chk_alignment_mode.isChecked():
             self.chk_alignment_mode.setChecked(False)
         for toggle, content, key in (
@@ -1189,13 +1207,41 @@ class MainWindow(QMainWindow):
             title = tr(key)
             toggle.setText(f"{'▾' if expanded else '▸'} {title}")
             toggle.setAccessibleName(title)
-            content.setVisible(expanded)
+            content.setVisible(expanded and manual_visible)
+
+    def _idle_alignment_instruction(self) -> str:
+        if self.canvas.has_images() and not self.canvas.has_both_images():
+            return "alignment.status.single_image"
+        return "alignment.status.choose_method"
 
     def _update_alignment_edit_availability(self) -> None:
         pending = self._workflow_navigation_blocked()
         editable = self.stage == Stage.ALIGNMENT and self._viewed_step is None
-        self.fine_adjust_group.setEnabled(editable and not pending)
-        self.alignment_method_row.setEnabled(editable and not pending)
+        idle = editable and not pending
+        both_images = self.canvas.has_both_images()
+        applied = self._rigid_instruction_key == "alignment.status.auto_applied"
+        failed = self._rigid_instruction_key == "alignment.status.auto_low"
+        show_methods = idle and both_images and not applied
+        self.lbl_alignment_method.setVisible(show_methods)
+        self.alignment_method_row.setVisible(show_methods)
+        self.alignment_method_row.setEnabled(show_methods)
+        self.btn_start_alignment.setVisible(idle and both_images)
+        self.btn_start_alignment.setText(tr(
+            "alignment.retry_auto"
+            if applied or (failed and self.rad_alignment_auto.isChecked())
+            else "button.start_alignment"
+        ))
+        self.btn_toggle_manual_alignment.setVisible(idle)
+        self.fine_adjust_group.setEnabled(idle)
+        self.fine_adjust_group.setVisible(idle and self.btn_toggle_manual_alignment.isChecked())
+
+        heading = ""
+        if editable and self._auto_preview_active:
+            heading = tr("alignment.status.review_title")
+        elif editable and applied:
+            heading = tr("alignment.status.applied_title")
+        self.lbl_alignment_status_title.setText(heading)
+        self.lbl_alignment_status_title.setVisible(bool(heading))
         self._update_auto_align_availability()
         for shortcut in self._alignment_shortcuts:
             shortcut.setEnabled(editable and not pending)
@@ -1203,7 +1249,7 @@ class MainWindow(QMainWindow):
     def _on_start_alignment(self) -> None:
         if self._workflow_navigation_blocked():
             return
-        if self.rad_alignment_rigid.isChecked():
+        if self.rad_alignment_rigid.isChecked() and self._rigid_instruction_key != "alignment.status.auto_applied":
             self._on_start_rigid_region_alignment()
         else:
             self._on_auto_align()
@@ -1211,9 +1257,10 @@ class MainWindow(QMainWindow):
     def _set_rigid_instruction(self, key: str | None) -> None:
         self._rigid_instruction_key = key
         self.lbl_rigid_region_instruction.setText(
-            tr(key) if key else tr("alignment.status.choose_method")
+            tr(key or self._idle_alignment_instruction())
         )
         self.lbl_rigid_region_instruction.setVisible(True)
+        self._update_alignment_edit_availability()
 
     def _show_finish_alignment(self) -> None:
         self._set_rigid_action_visibility(
@@ -1280,11 +1327,21 @@ class MainWindow(QMainWindow):
 
     def _update_alignment_actions_visibility(self) -> None:
         self._refresh_alignment_cancel_label()
+        undo_available = (
+            self.stage == Stage.ALIGNMENT
+            and self._auto_alignment_undo_transform is not None
+            and not self._workflow_navigation_blocked()
+        )
+        self.btn_undo_auto_alignment.setVisible(undo_available)
+        self.btn_undo_auto_alignment.setEnabled(
+            undo_available and not self.chk_lock_alignment.isChecked()
+        )
         buttons = (
             self.btn_apply_alignment_suggestion,
             self.btn_rigid_apply,
             self.btn_rigid_try_again,
             self.btn_rigid_cancel,
+            self.btn_undo_auto_alignment,
         )
         self.alignment_actions_widget.setVisible(
             any(not button.isHidden() for button in buttons)
@@ -1296,6 +1353,11 @@ class MainWindow(QMainWindow):
     def _on_alignment_state_changed(self) -> None:
         if self._rigid_internal_transform_change:
             return
+        if self._auto_alignment_undo_transform is not None:
+            self._auto_alignment_undo_transform = None
+            self._sync_alignment_transforms_to_project()
+        if self._rigid_instruction_key == "alignment.status.auto_applied":
+            self._set_rigid_instruction(None)
         had_auto_preview = self._auto_preview_active
         self._invalidate_auto_alignment_suggestion()
         if had_auto_preview:
@@ -1307,6 +1369,7 @@ class MainWindow(QMainWindow):
             self._discard_rigid_region_state(restore=False, clear_visuals=True)
 
     def _on_images_changed(self) -> None:
+        self._auto_alignment_undo_transform = None
         self._last_applied_rigid_reference_regions = ()
         self._set_rigid_instruction(None)
         self.workflow.apply_stage_gating()
@@ -1368,6 +1431,7 @@ class MainWindow(QMainWindow):
                 tr("alignment.auto.locked"),
             )
             return
+        self._auto_alignment_undo_transform = None
         self._discard_auto_alignment_preview(restore=True)
         if self._rigid_baseline_ref_transform is not None:
             self._discard_rigid_region_state(restore=True, clear_visuals=True)
@@ -1547,6 +1611,7 @@ class MainWindow(QMainWindow):
             return
         if result.status != "success" or result.best is None:
             self.canvas.set_rigid_region_mode(False)
+            self._set_rigid_instruction("alignment.rigid.failure")
             self._set_rigid_action_visibility(
                 apply=False, try_again=True, cancel=True
             )
@@ -1640,6 +1705,8 @@ class MainWindow(QMainWindow):
         if restore and baseline is not None:
             self._set_canvas_alignment_transforms(None, baseline)
         self._invalidate_auto_alignment_suggestion()
+        if restore and baseline is not None:
+            self._sync_alignment_transforms_to_project()
 
     def _preview_auto_alignment(
         self, hypothesis: AlignmentHypothesis
@@ -1670,6 +1737,9 @@ class MainWindow(QMainWindow):
         self._set_rigid_instruction("alignment.status.auto_medium")
 
     def _on_apply_auto_alignment_suggestion(self) -> None:
+        self._commit_auto_alignment()
+
+    def _commit_auto_alignment(self, *, offer_undo: bool = False) -> None:
         hypothesis = self._pending_auto_alignment
         if hypothesis is None or not self._auto_preview_active:
             return
@@ -1680,16 +1750,16 @@ class MainWindow(QMainWindow):
                 tr("alignment.auto.locked"),
             )
             return
-        applied = self.canvas.get_deformed_transform()
+        self._auto_alignment_undo_transform = (
+            self._auto_preview_baseline_dam_transform if offer_undo else None
+        )
         self._invalidate_auto_alignment_suggestion()
         self.cmb_alignment_target.setCurrentIndex(0)
         self.canvas.set_alignment_target("dam")
-        self.project.dam_transform.x = applied["x"]
-        self.project.dam_transform.y = applied["y"]
-        self.project.dam_transform.scale = applied["scale"]
-        self.project.dam_transform.rotation_deg = applied["rotation_deg"]
+        self._sync_alignment_transforms_to_project()
         self._refresh_summary()
         self._show_finish_alignment()
+        self._set_rigid_instruction("alignment.status.auto_applied")
         logger.info(
             "Automatic alignment preview accepted: "
             "dx=%.3f dy=%.3f rotation=%.4f scale=%.6f",
@@ -1698,6 +1768,32 @@ class MainWindow(QMainWindow):
             hypothesis.rotation_deg,
             hypothesis.scale,
         )
+
+    def _sync_alignment_transforms_to_project(self) -> None:
+        deformed = (
+            self._auto_preview_baseline_dam_transform
+            if self._auto_preview_active
+            else None
+        ) or self.canvas.get_deformed_transform()
+        for target, values in (
+            (self.project.ref_transform, self.canvas.get_reference_transform()),
+            (self.project.dam_transform, deformed),
+        ):
+            target.x = values["x"]
+            target.y = values["y"]
+            target.scale = values["scale"]
+            target.rotation_deg = values["rotation_deg"]
+
+    def _undo_auto_alignment(self) -> None:
+        baseline = self._auto_alignment_undo_transform
+        if baseline is None or not self.btn_undo_auto_alignment.isEnabled():
+            return
+        self._auto_alignment_undo_transform = None
+        self._set_canvas_alignment_transforms(None, baseline)
+        self._sync_alignment_transforms_to_project()
+        self._set_rigid_instruction(None)
+        self._update_alignment_actions_visibility()
+        self._refresh_summary()
 
     @staticmethod
     def _format_alignment_diagnostics_for_log(
@@ -1817,9 +1913,10 @@ class MainWindow(QMainWindow):
                 return
 
             self._preview_auto_alignment(selected)
+            self._commit_auto_alignment(offer_undo=True)
 
             logger.info(
-                "Auto-alignment preview created: dx=%.3f dy=%.3f rotation=%.4f "
+                "Auto-alignment applied: dx=%.3f dy=%.3f rotation=%.4f "
                 "scale=%.6f; %s",
                 selected.dx,
                 selected.dy,
@@ -1878,6 +1975,7 @@ class MainWindow(QMainWindow):
         self.workflow.finish_alignment()
         if self.stage != Stage.CALIBRATION:
             return
+        self._auto_alignment_undo_transform = None
         self.canvas.set_rigid_region_mode(False)
         self.canvas.clear_rigid_region_visuals()
         self._discard_auto_alignment_preview(restore=False)
@@ -1993,6 +2091,8 @@ class MainWindow(QMainWindow):
             if positions == 6 else missing
         )
         instruction = tr("marking.ci_instruction") if positions == 6 else missing
+        if self.canvas.measure_ci_mode and positions == 6 and measured < 6:
+            instruction = tr("marking.ci_mark_current", idx=self._current_ci_index)
         if measured == 6:
             instruction = f"✓ {tr('marking.ci_complete')}\n{instruction}"
         self.lbl_ci_instruction.setText(instruction)
@@ -2021,6 +2121,7 @@ class MainWindow(QMainWindow):
             return
         if checked:
             self.chk_set_w_mode.setChecked(False)
+            self.chk_measure_ci_mode.setChecked(False)
         self.canvas.set_guide_mode(checked)
 
     # ---------------- Marking: Ci ----------------
@@ -2037,7 +2138,9 @@ class MainWindow(QMainWindow):
             return
         if checked:
             self.chk_set_w_mode.setChecked(False)
+            self.chk_set_guide_mode.setChecked(False)
         self.canvas.set_measure_ci_mode(checked)
+        self._refresh_marking_panel()
 
     def _on_ci_radio_selected(self, idx: int, checked: bool) -> None:
         if not checked:
@@ -2068,6 +2171,7 @@ class MainWindow(QMainWindow):
 
     def _update_ci_label(self) -> None:
         self.lbl_ci_index.setText(tr("label.current_ci", idx=self._current_ci_index))
+        self._refresh_marking_panel()
 
     def _on_finish_marking(self) -> None:
         self.workflow.finish_marking()
@@ -2094,17 +2198,7 @@ class MainWindow(QMainWindow):
         self.project.damage_speed_mps = self._damage_speed_mps
         self.project.damage_speed_kmh = self._damage_speed_kmh
 
-        ref_tr = self.canvas.get_reference_transform()
-        self.project.ref_transform.x = ref_tr["x"]
-        self.project.ref_transform.y = ref_tr["y"]
-        self.project.ref_transform.scale = ref_tr["scale"]
-        self.project.ref_transform.rotation_deg = ref_tr["rotation_deg"]
-
-        tr_dam = self.canvas.get_deformed_transform()
-        self.project.dam_transform.x = tr_dam["x"]
-        self.project.dam_transform.y = tr_dam["y"]
-        self.project.dam_transform.scale = tr_dam["scale"]
-        self.project.dam_transform.rotation_deg = tr_dam["rotation_deg"]
+        self._sync_alignment_transforms_to_project()
 
         st = self.canvas.get_overlay_state()
 

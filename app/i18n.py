@@ -206,9 +206,21 @@ STRINGS: dict[str, dict[str, str]] = {
         ),
     },
     "alignment.status.auto_medium": {
-        "en": "Preview ready. Use this alignment or cancel.",
-        "pt": "Prévia pronta. Use este alinhamento ou cancele.",
+        "en": "Check the overlap of the preserved structures.",
+        "pt": "Confira a sobreposição das estruturas preservadas.",
     },
+    "alignment.status.auto_applied": {
+        "en": "Visually check the overlap.",
+        "pt": "Confira visualmente a sobreposição.",
+    },
+    "alignment.status.review_title": {"en": "Review alignment", "pt": "Conferir alinhamento"},
+    "alignment.status.applied_title": {"en": "✓ Alignment applied", "pt": "✓ Alinhamento aplicado"},
+    "alignment.retry_auto": {"en": "Try again", "pt": "Tentar novamente"},
+    "alignment.status.single_image": {
+        "en": "Continue to calibration with the loaded image.",
+        "pt": "Continue para calibração com a imagem carregada.",
+    },
+    "alignment.undo_auto": {"en": "Undo alignment", "pt": "Desfazer alinhamento"},
     "progress.images": {"en": "Images", "pt": "Imagens"},
     "progress.alignment": {"en": "Alignment", "pt": "Alinhamento"},
     "progress.calibration": {"en": "Calibration", "pt": "Calibração"},
@@ -246,12 +258,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Escolha um método de alinhamento ou avance direto para a calibração.",
     },
     "alignment.status.auto_low": {
-        "en": "No reliable automatic alignment suggestion was found.",
-        "pt": "Nenhuma sugestão automática confiável foi encontrada.",
+        "en": "Automatic alignment was inconclusive. Try again, choose a rigid region, adjust manually, or continue.",
+        "pt": "O alinhamento automático foi inconclusivo. Tente novamente, escolha uma região rígida, ajuste manualmente ou avance.",
     },
     "button.apply_alignment_suggestion": {
-        "en": "Apply\nalignment",
-        "pt": "Aplicar\nalinhamento",
+        "en": "Accept\nalignment",
+        "pt": "Aceitar\nalinhamento",
     },
     "alignment.auto.title": {
         "en": "Automatic alignment",
@@ -379,6 +391,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "marking.ci_instruction": {
         "en": "Mark with two clicks per C or drag an existing endpoint to adjust it.",
         "pt": "Marque com dois cliques por C ou arraste um ponto existente para ajustá-lo.",
+    },
+    "marking.ci_mark_current": {
+        "en": "Mark C{idx} with two clicks, or drag an existing point.",
+        "pt": "Marque C{idx} com dois cliques ou arraste um ponto existente.",
     },
     "marking.ci_complete": {"en": "C1–C6 measured.", "pt": "C1–C6 medidos."},
     "marking.references": {"en": "Auxiliary references", "pt": "Referências auxiliares"},

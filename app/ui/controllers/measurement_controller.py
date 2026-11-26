@@ -81,6 +81,12 @@ class MeasurementController:
         self.host.workflow.invalidate_energy()
         self.host._sync_ui_to_project()
         self.host._refresh_summary()
+        if (
+            self.host.stage == self.host.Stage.MARKING
+            and self.host._viewed_step is None
+            and len(self.host.canvas.slice_x) == self.SLICE_COUNT
+        ):
+            self.host.chk_measure_ci_mode.setChecked(True)
 
     def refresh_w_labels(self) -> None:
         if self.host._w_px is None:

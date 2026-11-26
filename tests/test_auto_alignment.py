@@ -81,6 +81,12 @@ class AutoAlignmentTests(unittest.TestCase):
         self.assertTrue(background.near_identity)
         self.assertGreater(background.edge_fraction, 0.65)
         self.assertLess(background.score, best.score)
+        window = self._alignment_window()
+        with patch("app.ui.main_window.estimate_auto_alignment", return_value=result):
+            window.btn_start_alignment.click()
+        self.assertTrue(window._auto_preview_active)
+        self.assertEqual(window.lbl_alignment_status_title.text(), "Conferir alinhamento")
+        self.assertFalse(window.btn_apply_alignment_suggestion.isHidden())
 
     def test_known_similarity_is_recovered(self) -> None:
         rng = np.random.default_rng(20261119)
@@ -375,51 +381,53 @@ class AutoAlignmentTests(unittest.TestCase):
         assert refined.refinement is not None
         self.assertFalse(refined.refinement.used_refined)
 
-    def test_high_result_shows_preview_before_explicit_use(self) -> None:
+    def test_high_result_applies_can_be_undone_and_retried(self) -> None:
         window = self._alignment_window()
+        window.canvas.set_deformed_transform(19.25, -7.5, 0.97, 1.2)
+        window.canvas.set_reference_transform(2.5, 3.5, 1.0, 0.2)
         hypothesis = self._high_quality_hypothesis(dx=7.0, dy=11.0)
         result = self._alignment_result("high", hypothesis, selected_index=0)
         baseline = window.canvas.get_deformed_transform()
+        ref = window.canvas.get_reference_transform()
+        self.assertFalse(window.alignment_method_row.isHidden())
+        self.assertEqual(window.btn_start_alignment.text(), "Iniciar alinhamento")
 
-        with (
-            patch(
-                "app.ui.main_window.estimate_auto_alignment",
-                return_value=result,
-            ),
-            patch.object(QMessageBox, "information"),
-            patch.object(
-                window.canvas,
-                "apply_deformed_correction",
-                wraps=window.canvas.apply_deformed_correction,
-            ) as apply_correction,
-        ):
-            window._on_auto_align()
+        with patch("app.ui.main_window.estimate_auto_alignment", return_value=result) as estimate:
+            window.btn_start_alignment.click()
+            applied = window.canvas.get_deformed_transform()
+            self.assertNotEqual(applied, baseline)
+            self.assertEqual(window.project.dam_transform.to_dict(), applied)
+            self.assertEqual(window.project.ref_transform.to_dict(), ref)
+            self.assertEqual(window.stage, window.Stage.ALIGNMENT)
+            self.assertIsNone(window._pending_auto_alignment)
+            self.assertTrue(window.btn_apply_alignment_suggestion.isHidden())
+            self.assertIn("Confira visualmente", window.lbl_rigid_region_instruction.text())
+            self.assertTrue(window.btn_finish_alignment.isEnabled())
+            self.assertTrue(window.btn_undo_auto_alignment.isEnabled())
+            self.assertEqual(window.lbl_alignment_status_title.text(), "✓ Alinhamento aplicado")
+            self.assertTrue(window.alignment_method_row.isHidden())
+            self.assertEqual(window.btn_start_alignment.text(), "Tentar novamente")
+            self.assertFalse(window.btn_toggle_manual_alignment.isHidden())
+            self.assertTrue(window.btn_rigid_cancel.isHidden())
 
-        apply_correction.assert_called_once_with(7.0, 11.0, 1.0, 1.0)
-        self.assertIs(window._pending_auto_alignment, hypothesis)
-        self.assertNotEqual(window.canvas.get_deformed_transform(), baseline)
-        self.assertEqual(window.project.dam_transform.to_dict(), baseline)
-        self.assertFalse(window.btn_apply_alignment_suggestion.isHidden())
-        images = window.workflow_step_labels["images"]
-        self.assertFalse(images.isEnabled())
-        window._view_workflow_step("images")
-        self.assertIsNone(window._viewed_step)
-        self.assertFalse(window.btn_finish_alignment.isHidden())
-        self.assertFalse(window.btn_finish_alignment.isEnabled())
-        self.assertIn("andamento", window.lbl_navigation_hint.text())
-        self.assertFalse(window.btn_reset_alignment.isEnabled())
-        preview = window.canvas.get_deformed_transform()
-        with patch.object(QMessageBox, "question") as confirm:
-            window._on_reset_alignment()
-        confirm.assert_not_called()
-        self.assertEqual(window.canvas.get_deformed_transform(), preview)
-        self.assertFalse(window.btn_rotate_plus.isEnabled())
-        self.assertTrue(window.opacity_slider.isEnabled())
-        self.assertTrue(all(not shortcut.isEnabled() for shortcut in window._alignment_shortcuts))
-        window._on_finish_alignment()
-        window.workflow.finish_alignment()
-        self.assertEqual(window.stage, window.Stage.ALIGNMENT)
-        self.assertIs(window._pending_auto_alignment, hypothesis)
+            window.btn_undo_auto_alignment.click()
+            self.assertEqual(window.canvas.get_deformed_transform(), baseline)
+            self.assertEqual(window.project.dam_transform.to_dict(), baseline)
+            self.assertEqual(window.canvas.get_reference_transform(), ref)
+            self.assertTrue(window.btn_undo_auto_alignment.isHidden())
+            self.assertFalse(window.alignment_method_row.isHidden())
+            window.btn_start_alignment.click()
+        self.assertEqual(estimate.call_count, 2)
+        self.assertEqual(window.canvas.get_deformed_transform(), applied)
+
+        window.canvas.nudge_selected(1.0, -2.0)
+        adjusted = window.canvas.get_deformed_transform()
+        self.assertAlmostEqual(adjusted["x"], applied["x"] + 1)
+        self.assertEqual(window.project.dam_transform.to_dict(), adjusted)
+        self.assertTrue(window.btn_undo_auto_alignment.isHidden())
+        self.assertFalse(window.alignment_method_row.isHidden())
+        restored = Project.from_dict(window.project.to_dict())
+        self.assertEqual(restored.dam_transform.to_dict(), adjusted)
 
     def test_medium_result_waits_for_explicit_application(self) -> None:
         window = self._alignment_window()
@@ -449,6 +457,22 @@ class AutoAlignmentTests(unittest.TestCase):
         self.assertTrue(window.btn_apply_alignment_suggestion.isEnabled())
         self.assertFalse(window.btn_apply_alignment_suggestion.isHidden())
         self.assertFalse(window.alignment_actions_widget.isHidden())
+        self.assertTrue(window.alignment_method_row.isHidden())
+        self.assertTrue(window.btn_start_alignment.isHidden())
+        self.assertTrue(window.btn_toggle_manual_alignment.isHidden())
+        self.assertTrue(window.fine_adjust_group.isHidden())
+        self.assertEqual(window.btn_apply_alignment_suggestion.accessibleName(), "Aceitar alinhamento")
+        self.assertFalse(window.btn_finish_alignment.isEnabled())
+        self.assertFalse(window.workflow_step_labels["images"].isEnabled())
+        self.assertFalse(window.btn_reset_alignment.isEnabled())
+        self.assertTrue(all(not shortcut.isEnabled() for shortcut in window._alignment_shortcuts))
+        window._sync_ui_to_project()
+        self.assertEqual(window.project.dam_transform.to_dict(), before)
+        window.btn_apply_alignment_suggestion.click()
+        self.assertEqual(window.project.dam_transform.to_dict(), window.canvas.get_deformed_transform())
+        self.assertTrue(window.btn_finish_alignment.isEnabled())
+        self.assertTrue(window.btn_undo_auto_alignment.isHidden())
+        self.assertEqual(window.lbl_alignment_status_title.text(), "✓ Alinhamento aplicado")
 
     def test_cancel_automatic_preview_restores_previous_transform(self) -> None:
         window = self._alignment_window()
@@ -465,6 +489,8 @@ class AutoAlignmentTests(unittest.TestCase):
         self.assertIsNone(window._pending_auto_alignment)
         self.assertTrue(window.alignment_actions_widget.isHidden())
         self.assertFalse(window.btn_finish_alignment.isHidden())
+        self.assertFalse(window.alignment_method_row.isHidden())
+        self.assertFalse(window.btn_start_alignment.isHidden())
 
     def test_apply_suggestion_uses_exact_hypothesis_and_remains_editable(
         self,
@@ -485,7 +511,7 @@ class AutoAlignmentTests(unittest.TestCase):
         applied = window.canvas.get_deformed_transform()
         self.assertEqual(window.project.dam_transform.to_dict(), applied)
         self.assertIsNone(window._pending_auto_alignment)
-        self.assertTrue(window.lbl_rigid_region_instruction.isHidden())
+        self.assertEqual(window.lbl_alignment_status_title.text(), "✓ Alinhamento aplicado")
         self.assertFalse(window.btn_finish_alignment.isHidden())
 
         window.canvas.nudge_selected(1.0, -2.0)
@@ -521,6 +547,12 @@ class AutoAlignmentTests(unittest.TestCase):
         self.assertIsNone(window._pending_auto_alignment)
         self.assertFalse(window.btn_apply_alignment_suggestion.isEnabled())
         self.assertTrue(window.btn_apply_alignment_suggestion.isHidden())
+        self.assertFalse(window.alignment_method_row.isHidden())
+        self.assertFalse(window.btn_toggle_manual_alignment.isHidden())
+        self.assertTrue(window.btn_finish_alignment.isEnabled())
+        self.assertEqual(window.btn_start_alignment.text(), "Tentar novamente")
+        window.rad_alignment_rigid.click()
+        self.assertEqual(window.btn_start_alignment.text(), "Iniciar alinhamento")
 
     def test_pending_suggestion_is_invalidated_by_transform_change(self) -> None:
         window = self._alignment_window()
