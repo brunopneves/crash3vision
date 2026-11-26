@@ -54,6 +54,60 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    def test_measurement_panel_tracks_steps_and_collapses_guide_safely(self) -> None:
+        window = self._window()
+        window._m_per_px = 0.005
+        window.canvas.apply_scale(0.005)
+        window.workflow.set_stage(window.Stage.MARKING)
+        window.show()
+        QApplication.processEvents()
+        self.assertFalse(window.btn_generate_slices.isEnabled())
+        self.assertFalse(window.chk_measure_ci_mode.isEnabled())
+        self.assertTrue(window.marking_references.isHidden())
+
+        viewport = window.canvas.viewport()
+        center = viewport.rect().center()
+        window.chk_set_w_mode.click()
+        for point in (center - QPoint(150, 0), center + QPoint(150, 0)):
+            QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=point)
+        self.assertIn("✓", window.mark_width_group.title())
+        window.btn_generate_slices.click()
+        self.assertEqual(len(window.canvas.slice_x), 6)
+        self.assertIn("5 intervalos", window.lbl_slice_status.text())
+        self.assertIn("✓", window.mark_slices_group.title())
+
+        window.btn_toggle_marking_references.click()
+        window.spn_bumper_offset.setValue(0.1)
+        window.chk_set_guide_mode.click()
+        QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
+        self.assertIn("✓ Guia", window.btn_toggle_marking_references.text())
+        self.assertIn("✓ Offset", window.btn_toggle_marking_references.text())
+        guide_state = window.canvas.get_overlay_state()
+        window.btn_toggle_marking_references.click()
+        self.assertFalse(window.canvas.guide_mode)
+        self.assertIsNone(window.canvas.ctrl.active_tool())
+        self.assertEqual(window.canvas.get_overlay_state(), guide_state)
+
+        window.chk_measure_ci_mode.click()
+        for index in (4, 1, 2, 3, 5, 6):
+            getattr(window, f"rb_c{index}").click()
+            self.assertEqual(window._current_ci_index, index)
+            x = center.x() - 150 + (index - 1) * 60
+            for y in (center.y() - 40, center.y() + 40):
+                QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=QPoint(x, y))
+            self.assertEqual(window._current_ci_index, min(index + 1, 6))
+        self.assertEqual(window.stage, window.Stage.MARKING)
+        self.assertIn("✓ C1–C6 medidos", window.lbl_ci_instruction.text())
+        self.assertTrue(window.btn_finish_marking.isEnabled())
+        for language in ("pt", "en"):
+            window._set_language_and_refresh(language)
+            window.btn_toggle_marking_references.setChecked(True)
+            QApplication.processEvents()
+            self.assertEqual(window._controls_scroll.horizontalScrollBar().maximum(), 0, language)
+        self.assertIn("5 intervals", window.lbl_slice_status.text())
+        window.btn_finish_marking.click()
+        self.assertEqual(window.stage, window.Stage.DONE)
+
     @staticmethod
     def _mark_calibration_points(window: MainWindow) -> None:
         window.chk_calibration_mode.click()

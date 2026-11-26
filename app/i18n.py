@@ -358,6 +358,23 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Recommended orientation: keep the vehicle front facing upward. Mark C1–C6 from left to right.",
         "pt": "Orientação recomendada: mantenha a dianteira do veículo voltada para cima. Marque C1–C6 da esquerda para a direita.",
     },
+    "marking.width": {"en": "1. Damage width (W)", "pt": "1. Largura de dano (W)"},
+    "marking.slices": {"en": "2. Slice division", "pt": "2. Divisão em fatias"},
+    "marking.crush": {"en": "3. Crush (C1–C6)", "pt": "3. Deformações (C1–C6)"},
+    "marking.mark_width": {"en": "Mark W (two points)", "pt": "Marcar W (dois pontos)"},
+    "marking.slice_count": {
+        "en": "{count} positions · {intervals} intervals",
+        "pt": "{count} posições · {intervals} intervalos",
+    },
+    "marking.no_slices": {"en": "Generate the slices first.", "pt": "Gere as fatias primeiro."},
+    "marking.ci_instruction": {
+        "en": "Mark with two clicks per C or drag an existing endpoint to adjust it.",
+        "pt": "Marque com dois cliques por C ou arraste um ponto existente para ajustá-lo.",
+    },
+    "marking.ci_complete": {"en": "C1–C6 measured.", "pt": "C1–C6 medidos."},
+    "marking.references": {"en": "Auxiliary references", "pt": "Referências auxiliares"},
+    "marking.guide_configured": {"en": "✓ Guide", "pt": "✓ Guia"},
+    "marking.offset_configured": {"en": "✓ Offset", "pt": "✓ Offset"},
     "check.set_w_mode": {
         "en": "Set W mode (click 2 points: left/right)",
         "pt": "Modo definir W (2 cliques: esquerda/direita)",
@@ -367,20 +384,24 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "W: - px | - m",
     },
     "button.generate_slices": {
-        "en": "Generate 6 slices (equidistant)",
-        "pt": "Gerar 6 slices (equidistantes)",
+        "en": "Generate 6 slices",
+        "pt": "Gerar 6 fatias",
     },
     "label.delta_w_default": {
         "en": "Δw: - px | - m",
         "pt": "Δw: - px | - m",
     },
     "check.set_guide_mode": {
-        "en": "Set guide line mode (click to place horizontal guide)",
-        "pt": "Modo linha-guia (clique para posicionar guia horizontal)",
+        "en": "Place guide",
+        "pt": "Posicionar guia",
+    },
+    "marking.guide_hint": {
+        "en": "Click the canvas to place the perpendicular guide.",
+        "pt": "Clique no canvas para posicionar a guia perpendicular.",
     },
     "check.measure_ci_mode": {
-        "en": "Measure Ci mode (2 clicks per Ci)",
-        "pt": "Modo medir Ci (2 cliques por Ci)",
+        "en": "Measure or adjust C",
+        "pt": "Medir ou ajustar C",
     },
     "label.current_ci": {
         "en": "Current: C{idx}",
@@ -1465,8 +1486,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Offset até a travessa do para-choque (m)",
     },
     "label.bumper_offset_m": {
-        "en": "Offset to bumper crossmember (m)",
-        "pt": "Distância até a travessa do para-choque (m)",
+        "en": "Bumper crossmember offset (m)",
+        "pt": "Offset da travessa (m)",
     },
     "nhtsa.field.impact_speed_mps": {
         "en": "Impact speed (km/h)",

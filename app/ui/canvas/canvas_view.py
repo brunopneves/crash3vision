@@ -13,6 +13,7 @@ class CanvasView(QGraphicsView):
     w_cleared = Signal()
     ci_measured = Signal(int, float, float)
     ci_selected = Signal(int)
+    guide_placed = Signal()
     alignment_state_changed = Signal()
     images_changed = Signal()
     rigid_region_selected = Signal(str, object)
@@ -232,7 +233,10 @@ class CanvasView(QGraphicsView):
     def mousePressEvent(self, event: QMouseEvent) -> None:
         scene_pos = self.mapToScene(event.pos())
         tool = self.ctrl.active_tool()
+        placing_guide = self.guide_mode
         if tool and tool.mouse_press(self, scene_pos, event):
+            if placing_guide:
+                self.guide_placed.emit()
             event.accept()
             return
         super().mousePressEvent(event)

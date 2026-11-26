@@ -164,6 +164,7 @@ class MainWindow(QMainWindow):
         self.canvas.w_cleared.connect(self.meas.on_w_cleared)
         self.canvas.ci_measured.connect(self.meas.on_ci_measured)
         self.canvas.ci_selected.connect(self._on_canvas_ci_selected)
+        self.canvas.guide_placed.connect(self._refresh_marking_panel)
         self.canvas.alignment_state_changed.connect(self._on_alignment_state_changed)
         self.canvas.images_changed.connect(self._on_images_changed)
         self.canvas.rigid_region_selected.connect(self._on_rigid_region_selected)
@@ -699,43 +700,71 @@ class MainWindow(QMainWindow):
         # --- Marking group ---
         self.mark_group = QGroupBox(tr("group.marking"))
         mark_layout = QVBoxLayout(self.mark_group)
+        mark_layout.setContentsMargins(1, 10, 1, 10)
 
         self.lbl_marking_orientation = QLabel(tr("label.marking_orientation"))
         self.lbl_marking_orientation.setWordWrap(True)
         mark_layout.addWidget(self.lbl_marking_orientation)
 
-        self.chk_set_w_mode = QCheckBox(tr("check.set_w_mode"))
-        mark_layout.addWidget(self.chk_set_w_mode)
+        self.mark_width_group = QGroupBox()
+        width_layout = QVBoxLayout(self.mark_width_group)
+        self.chk_set_w_mode = QPushButton(tr("marking.mark_width"))
+        self.chk_set_w_mode.setCheckable(True)
+        width_layout.addWidget(self.chk_set_w_mode)
         self.lbl_w = QLabel(tr("label.w_default"))
-        mark_layout.addWidget(self.lbl_w)
+        self.lbl_w.setWordWrap(True)
+        width_layout.addWidget(self.lbl_w)
+        mark_layout.addWidget(self.mark_width_group)
 
+        self.mark_slices_group = QGroupBox()
+        slices_layout = QVBoxLayout(self.mark_slices_group)
         self.btn_generate_slices = QPushButton(tr("button.generate_slices"))
-        mark_layout.addWidget(self.btn_generate_slices)
+        slices_layout.addWidget(self.btn_generate_slices)
+        self.lbl_slice_status = QLabel()
+        self.lbl_slice_status.setWordWrap(True)
+        slices_layout.addWidget(self.lbl_slice_status)
         self.lbl_delta_w = QLabel(tr("label.delta_w_default"))
-        mark_layout.addWidget(self.lbl_delta_w)
+        self.lbl_delta_w.setWordWrap(True)
+        slices_layout.addWidget(self.lbl_delta_w)
+        mark_layout.addWidget(self.mark_slices_group)
 
+        self.btn_toggle_marking_references = QToolButton()
+        self._style_disclosure(self.btn_toggle_marking_references)
+        self.btn_toggle_marking_references.toggled.connect(self._on_marking_references_toggled)
+        self.marking_references = QWidget()
+        references_layout = QVBoxLayout(self.marking_references)
+        references_layout.setContentsMargins(0, 0, 0, 0)
         self.chk_set_guide_mode = QCheckBox(tr("check.set_guide_mode"))
-        mark_layout.addWidget(self.chk_set_guide_mode)
+        self.chk_set_guide_mode.setToolTip(tr("marking.guide_hint"))
+        references_layout.addWidget(self.chk_set_guide_mode)
 
         # --- Offset travessa do para-choque ---
         self.lbl_bumper_offset = QLabel(tr("label.bumper_offset_m"))
-        mark_layout.addWidget(self.lbl_bumper_offset)
+        self.lbl_bumper_offset.setWordWrap(True)
+        references_layout.addWidget(self.lbl_bumper_offset)
 
         self.spn_bumper_offset = QDoubleSpinBox()
         self.spn_bumper_offset.setDecimals(3)
         self.spn_bumper_offset.setRange(0.0, 2.0)
         self.spn_bumper_offset.setSingleStep(0.01)
         self.spn_bumper_offset.setValue(0.0)
-        mark_layout.addWidget(self.spn_bumper_offset)
+        references_layout.addWidget(self.spn_bumper_offset)
 
+        self.mark_ci_group = QGroupBox()
+        ci_layout = QVBoxLayout(self.mark_ci_group)
+        ci_layout.setContentsMargins(7, 10, 7, 10)
         self.chk_measure_ci_mode = QCheckBox(tr("check.measure_ci_mode"))
-        mark_layout.addWidget(self.chk_measure_ci_mode)
+        ci_layout.addWidget(self.chk_measure_ci_mode)
+        self.lbl_ci_instruction = QLabel()
+        self.lbl_ci_instruction.setWordWrap(True)
+        ci_layout.addWidget(self.lbl_ci_instruction)
 
         self.lbl_ci_index = QLabel(tr("label.current_ci", idx=1))
-        mark_layout.addWidget(self.lbl_ci_index)
+        ci_layout.addWidget(self.lbl_ci_index)
 
         self.ci_select_box = QGroupBox(tr("group.select_c"))
         ci_select_layout = QVBoxLayout(self.ci_select_box)
+        ci_select_layout.setContentsMargins(4, 10, 4, 10)
 
         ci_row_1 = QHBoxLayout()
         ci_row_2 = QHBoxLayout()
@@ -760,11 +789,15 @@ class MainWindow(QMainWindow):
         ci_select_layout.addLayout(ci_row_1)
         ci_select_layout.addLayout(ci_row_2)
 
-        mark_layout.addWidget(self.ci_select_box)
+        ci_layout.addWidget(self.ci_select_box)
 
         self.lbl_ci_values = QLabel(tr("label.c_values_default"))
         self.lbl_ci_values.setWordWrap(True)
-        mark_layout.addWidget(self.lbl_ci_values)
+        ci_layout.addWidget(self.lbl_ci_values)
+        mark_layout.addWidget(self.mark_ci_group)
+        mark_layout.addWidget(self.btn_toggle_marking_references)
+        mark_layout.addWidget(self.marking_references)
+        self.marking_references.hide()
 
         self.btn_finish_marking = QPushButton(tr("button.finish_marking"))
 
@@ -969,9 +1002,10 @@ class MainWindow(QMainWindow):
         self.mark_group.setTitle(tr("group.marking"))
         self.ci_select_box.setTitle(tr("group.select_c"))
         self.lbl_marking_orientation.setText(tr("label.marking_orientation"))
-        self.chk_set_w_mode.setText(tr("check.set_w_mode"))
+        self.chk_set_w_mode.setText(tr("marking.mark_width"))
         self.btn_generate_slices.setText(tr("button.generate_slices"))
         self.chk_set_guide_mode.setText(tr("check.set_guide_mode"))
+        self.chk_set_guide_mode.setToolTip(tr("marking.guide_hint"))
         self.lbl_bumper_offset.setText(tr("label.bumper_offset_m"))
         self.chk_measure_ci_mode.setText(tr("check.measure_ci_mode"))
         self._update_ci_label()
@@ -1923,6 +1957,49 @@ class MainWindow(QMainWindow):
 
     def _on_bumper_offset_changed(self, value: float) -> None:
         self.canvas.set_crossmember_offset_m(value)
+        self._refresh_marking_panel()
+
+    def _on_marking_references_toggled(self, expanded: bool) -> None:
+        if not expanded:
+            if self.canvas.guide_mode:
+                self.workflow.reset_canvas_tools()
+            else:
+                self.chk_set_guide_mode.setChecked(False)
+        self.marking_references.setVisible(expanded)
+        self._refresh_marking_panel()
+
+    def _refresh_marking_panel(self) -> None:
+        overlay = self.canvas.get_overlay_state()
+        has_width = self._w_px is not None
+        positions = len(self.canvas.slice_x)
+        measured = sum(i in self._ci_m for i in range(1, 7))
+        for group, key, complete in (
+            (self.mark_width_group, "marking.width", has_width),
+            (self.mark_slices_group, "marking.slices", positions == 6),
+        ):
+            group.setTitle(tr(key) + (" ✓" if complete else ""))
+        self.mark_ci_group.setTitle(tr("marking.crush"))
+        self.btn_generate_slices.setEnabled(has_width)
+        self.chk_measure_ci_mode.setEnabled(bool(positions))
+        self.chk_set_guide_mode.setEnabled(bool(positions))
+        self.lbl_slice_status.setText(
+            tr("marking.slice_count", count=positions, intervals=positions - 1)
+            if positions else tr("marking.no_slices")
+        )
+        instruction = tr("marking.ci_instruction" if positions else "marking.no_slices")
+        if measured == 6:
+            instruction = f"✓ {tr('marking.ci_complete')}\n{instruction}"
+        self.lbl_ci_instruction.setText(instruction)
+        title = tr("marking.references")
+        flags = []
+        if overlay.get("guide_y") is not None:
+            flags.append(tr("marking.guide_configured"))
+        if overlay.get("bumper_offset_m"):
+            flags.append(tr("marking.offset_configured"))
+        toggle = self.btn_toggle_marking_references
+        suffix = "\n" + " · ".join(flags) if flags else ""
+        toggle.setText(f"{'▾' if toggle.isChecked() else '▸'} {title}{suffix}")
+        toggle.setAccessibleName(f"{title}{suffix}".replace("\n", " — "))
 
     # ---------------- Marking: guide ----------------
     def _on_set_guide_mode_toggled(self, checked: bool) -> None:
@@ -2058,6 +2135,7 @@ class MainWindow(QMainWindow):
             if steps.index(self._viewed_step) >= steps.index(self._current_workflow_step()):
                 self._viewed_step = None
         self.workflow.apply_stage_gating()
+        self._refresh_marking_panel()
         self._refresh_workflow_progress()
         self.lbl_result_ees_kmh.setText(
             tr("result.ees_kmh", value=f"{self._damage_speed_kmh:.2f}")
