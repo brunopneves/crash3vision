@@ -1701,6 +1701,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(window.navigation_footer.pos(), before_scroll)
         bar = window.canvas_view_bar
         self.assertEqual(bar.width(), window.canvas.width())
+        self.assertAlmostEqual(bar.height(), window.navigation_footer.height(), delta=1)
         self.assertLessEqual(
             abs(
                 bar.mapToGlobal(QPoint(0, bar.height())).y()
@@ -1771,11 +1772,22 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         )
         self.assertIs(window.opacity_slider.parentWidget(), window.canvas_view_bar)
         self.assertTrue(window.opacity_slider.isEnabled())
+        window.show()
+        QApplication.processEvents()
+        opacity_bar_height = window.canvas_view_bar.height()
         window.workflow.finish_alignment()
+        QApplication.processEvents()
 
         self.assertEqual(window.stage, window.Stage.CALIBRATION)
         self.assertTrue(window.opacity_slider.isEnabled())
+        self.assertTrue(window.lbl_navigation_hint.isVisible())
+        self.assertGreater(window.navigation_footer.height(), opacity_bar_height)
+        self.assertEqual(window.canvas_view_bar.height(), opacity_bar_height)
         self.assertFalse(window.nudge_box.isEnabled())
+        for value in (0, 50, 100):
+            window.opacity_slider.setValue(value)
+            self.assertEqual(window.lbl_opacity_percent.text(), f"{value}%")
+            self.assertAlmostEqual(window.canvas.ctrl.dam_item.opacity(), value / 100)
         window.opacity_slider.setValue(35)
         self.assertAlmostEqual(window.project.opacity, 0.35)
         self.assertEqual(window.lbl_opacity_percent.text(), "35%")

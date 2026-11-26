@@ -93,6 +93,56 @@ QPushButton[workflowStep="true"][progressCurrent="true"] {
 QPushButton[workflowStep="true"][progressCurrent="true"]:enabled:hover { background: #1c4f86; }
 QPushButton[workflowStep="true"][progressCurrent="true"]:enabled:pressed { background: #153d69; }
 QPushButton[workflowStep="true"][progressCurrent="true"]:focus { border-color: #a9d3ff; }
+QWidget#navigationFooter, QWidget#canvasViewBar {
+    background: #f6f8fb;
+    border-top: 1px solid #d6dfe9;
+}
+QWidget#navigationFooter QPushButton {
+    font-size: 13px;
+}
+QLabel#navigationHint {
+    color: #4b5e76;
+    font-size: 12px;
+    padding: 0 2px;
+}
+QLabel#opacityLabel, QLabel#opacityPercent {
+    color: #23313f;
+    font-size: 13px;
+    font-weight: bold;
+}
+QLabel#opacityPercent {
+    background: #eaf0f8;
+    border-radius: 5px;
+    min-width: 48px;
+    padding: 3px 6px;
+}
+QLabel#opacityLabel:disabled, QLabel#opacityPercent:disabled {
+    color: #53657a;
+}
+QLabel#opacityPercent:disabled { background: #edf1f6; }
+QSlider#opacitySlider {
+    border: 1px solid transparent;
+    border-radius: 5px;
+}
+QSlider#opacitySlider:focus { border-color: #8eafd1; }
+QSlider#opacitySlider::groove:horizontal {
+    height: 5px;
+    background: #d9e2ed;
+    border-radius: 2px;
+}
+QSlider#opacitySlider::sub-page:horizontal {
+    background: #3975ab;
+    border-radius: 2px;
+}
+QSlider#opacitySlider::sub-page:horizontal:disabled { background: #c2cddb; }
+QSlider#opacitySlider::handle:horizontal {
+    width: 15px;
+    margin: -5px 0;
+    background: #245b96;
+    border-radius: 7px;
+}
+QSlider#opacitySlider::handle:horizontal:hover { background: #1c4f86; }
+QSlider#opacitySlider::handle:horizontal:disabled { background: #8493a5; }
 QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle,
 QLabel#calculationTitle, QLabel#resultTitle {
     color: #172f50;

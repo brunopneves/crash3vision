@@ -375,27 +375,21 @@ class MainWindow(QMainWindow):
         self.canvas_view_bar = QWidget()
         self.canvas_view_bar.setObjectName("canvasViewBar")
         self.canvas_view_bar.setMinimumHeight(40)
-        self.canvas_view_bar.setStyleSheet("""
-            QWidget#canvasViewBar { background: palette(window); border-top: 1px solid #b8cddd; }
-            QSlider::groove:horizontal { height: 5px; background: #9aafbf; border-radius: 2px; }
-            QSlider::sub-page:horizontal { background: #3975ab; border-radius: 2px; }
-            QSlider::handle:horizontal {
-                width: 14px; margin: -5px 0; background: #245b96; border-radius: 7px;
-            }
-            QSlider::handle:horizontal:disabled { background: #87939d; }
-        """)
+        self.canvas_view_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         bar_layout = QHBoxLayout(self.canvas_view_bar)
-        bar_layout.setContentsMargins(8, 3, 8, 3)
+        bar_layout.setContentsMargins(8, 5, 8, 5)
+        bar_layout.setSpacing(8)
         self.lbl_overlay_opacity = QLabel(tr("label.overlay_opacity"))
+        self.lbl_overlay_opacity.setObjectName("opacityLabel")
         self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.opacity_slider.setObjectName("opacitySlider")
         self.opacity_slider.setRange(0, 100)
         self.opacity_slider.setValue(50)
         self.opacity_slider.setMinimumHeight(22)
+        self.lbl_overlay_opacity.setBuddy(self.opacity_slider)
         self.lbl_opacity_percent = QLabel()
-        self.lbl_opacity_percent.setStyleSheet("font-weight: bold;")
-        self.lbl_opacity_percent.setMinimumWidth(
-            self.lbl_opacity_percent.fontMetrics().horizontalAdvance("100%")
-        )
+        self.lbl_opacity_percent.setObjectName("opacityPercent")
+        self.lbl_opacity_percent.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._refresh_opacity_percentage()
         bar_layout.addWidget(self.lbl_overlay_opacity)
         bar_layout.addWidget(self.opacity_slider, 1)
@@ -888,13 +882,13 @@ class MainWindow(QMainWindow):
         dock_content_layout.addWidget(scroll, 1)
 
         self.navigation_footer = QWidget()
+        self.navigation_footer.setObjectName("navigationFooter")
+        self.navigation_footer.setMinimumHeight(40)
         footer_layout = QVBoxLayout(self.navigation_footer)
-        footer_layout.setContentsMargins(6, 0, 6, 6)
+        footer_layout.setContentsMargins(8, 5, 8, 5)
         footer_layout.setSpacing(4)
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        footer_layout.addWidget(separator)
         self.lbl_navigation_hint = QLabel()
+        self.lbl_navigation_hint.setObjectName("navigationHint")
         self.lbl_navigation_hint.setWordWrap(True)
         self.lbl_navigation_hint.setSizePolicy(
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
@@ -907,6 +901,7 @@ class MainWindow(QMainWindow):
             self.btn_confirm_calibration, self.btn_finish_marking,
         ):
             button.setProperty("uiRole", "primary")
+            button.setMinimumHeight(30)
             footer_layout.addWidget(button)
         dock_content_layout.addWidget(self.navigation_footer)
         dock.setWidget(dock_content)
