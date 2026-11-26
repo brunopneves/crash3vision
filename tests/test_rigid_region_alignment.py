@@ -61,20 +61,31 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         window.workflow.set_stage(window.Stage.MARKING)
         window.show()
         QApplication.processEvents()
-        self.assertFalse(window.btn_generate_slices.isEnabled())
         self.assertFalse(window.chk_measure_ci_mode.isEnabled())
         self.assertTrue(window.marking_references.isHidden())
 
         viewport = window.canvas.viewport()
         center = viewport.rect().center()
         window.chk_set_w_mode.click()
-        for point in (center - QPoint(150, 0), center + QPoint(150, 0)):
+        for point in (center + QPoint(150, 0), center - QPoint(150, 0)):
             QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=point)
+        self.assertFalse(window.canvas.set_w_mode)
+        self.assertFalse(window.chk_set_w_mode.isChecked())
+        self.assertEqual(window.chk_set_w_mode.text(), "Remarcar W")
+        width_overlay = window.canvas.get_overlay_state()
+        QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
+        self.assertEqual(window.canvas.get_overlay_state(), width_overlay)
         self.assertIn("✓", window.mark_width_group.title())
-        window.btn_generate_slices.click()
-        self.assertEqual(len(window.canvas.slice_x), 6)
+        positions = window.canvas.slice_x
+        self.assertEqual(len(positions), 6)
+        self.assertTrue(all(
+            math.isclose(right - left, window._w_px / 5)
+            for left, right in zip(positions, positions[1:])
+        ))
         self.assertIn("5 intervalos", window.lbl_slice_status.text())
-        self.assertIn("✓", window.mark_slices_group.title())
+        self.assertEqual(window.lbl_w.text(), f"W: {window._w_m:.3f} m")
+        self.assertIn(f"{window._w_px / 5:.2f} px", window.lbl_delta_w.text())
+        self.assertIn(f"{window._w_m / 5:.3f} m", window.lbl_delta_w.text())
 
         window.btn_toggle_marking_references.click()
         window.spn_bumper_offset.setValue(0.1)
@@ -97,8 +108,22 @@ class RigidRegionAlignmentTests(unittest.TestCase):
                 QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=QPoint(x, y))
             self.assertEqual(window._current_ci_index, min(index + 1, 6))
         self.assertEqual(window.stage, window.Stage.MARKING)
+        self.assertTrue(window.canvas.measure_ci_mode)
+        corrected = window.canvas.c_points[3][1]
+        start = window.canvas.mapFromScene(QPointF(*corrected))
+        end = start + QPoint(0, 25)
+        QTest.mousePress(viewport, Qt.MouseButton.LeftButton, pos=start)
+        QTest.mouseMove(viewport, end)
+        QTest.mouseRelease(viewport, Qt.MouseButton.LeftButton, pos=end)
+        self.assertEqual(window._current_ci_index, 3)
+        self.assertEqual(window.canvas.c_points[3][1][0], corrected[0])
+        self.assertNotEqual(window.canvas.c_points[3][1][1], corrected[1])
         self.assertIn("✓ C1–C6 medidos", window.lbl_ci_instruction.text())
         self.assertTrue(window.btn_finish_marking.isEnabled())
+        complete = window.canvas.get_overlay_state()
+        window.chk_measure_ci_mode.click()
+        QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
+        self.assertEqual(window.canvas.get_overlay_state(), complete)
         for language in ("pt", "en"):
             window._set_language_and_refresh(language)
             window.btn_toggle_marking_references.setChecked(True)
@@ -107,6 +132,102 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertIn("5 intervals", window.lbl_slice_status.text())
         window.btn_finish_marking.click()
         self.assertEqual(window.stage, window.Stage.DONE)
+
+    def test_w_remarking_preserves_data_until_new_pair_is_complete(self) -> None:
+        window = self._window()
+        path = str(COMPASS / "crash3vision_reference_project.json")
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(path, "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        window.workflow.restart_from_marking()
+        # Exercise the commit boundary with dependent results still present.
+        window._total_energy = window.project.total_energy_j = 1000.0
+        window._damage_speed_mps = window.project.damage_speed_mps = 2.0
+        window._damage_speed_kmh = window.project.damage_speed_kmh = 7.2
+        before = window.project.to_dict()
+        overlay = window.canvas.get_overlay_state()
+        window.show()
+        QApplication.processEvents()
+        viewport = window.canvas.viewport()
+        center = viewport.rect().center()
+
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.No):
+            window.chk_set_w_mode.click()
+        self.assertFalse(window.canvas.set_w_mode)
+        self.assertEqual(window.project.to_dict(), before)
+        self.assertEqual(window.canvas.get_overlay_state(), overlay)
+
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            window.chk_set_w_mode.click()
+        QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
+        window.chk_set_w_mode.click()
+        self.assertFalse(window.canvas.set_w_mode)
+        self.assertEqual(window.project.to_dict(), before)
+        self.assertEqual(window.canvas.get_overlay_state(), overlay)
+
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            window.chk_set_w_mode.click()
+        QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
+        window.chk_measure_ci_mode.click()
+        self.assertTrue(window.canvas.measure_ci_mode)
+        self.assertFalse(window.chk_set_w_mode.isChecked())
+        self.assertEqual(window.canvas.get_overlay_state(), overlay)
+
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            window.chk_set_w_mode.click()
+        for point in (center, center + QPoint(0, 30)):
+            QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=point)
+        self.assertTrue(window.canvas.set_w_mode)
+        self.assertEqual(window.canvas.get_overlay_state(), overlay)
+        self.assertEqual(window.project.to_dict(), before)
+        QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center + QPoint(90, 0))
+        self.assertFalse(window.canvas.set_w_mode)
+        self.assertIsNone(window.canvas.ctrl.active_tool())
+        self.assertNotEqual(window.project.w_px, before["w_px"])
+        self.assertEqual(len(window.canvas.slice_x), 6)
+        self.assertAlmostEqual(window.canvas.slice_x[1] - window.canvas.slice_x[0],
+                               window.project.w_px / 5)
+        self.assertTrue(window.chk_measure_ci_mode.isEnabled())
+        self.assertFalse(window.canvas.c_points)
+        self.assertFalse(window._ci_m)
+        self.assertIsNone(window.project.total_energy_j)
+        self.assertIsNone(window.project.damage_speed_kmh)
+        self.assertEqual(window.project.m_per_px, before["m_per_px"])
+        self.assertEqual(window.canvas.get_overlay_state()["cal_p1"], overlay["cal_p1"])
+
+    def test_legacy_width_without_slices_is_restored_without_losing_crush(self) -> None:
+        window = self._window()
+        source = COMPASS / "crash3vision_reference_project.json"
+        data = json.loads(source.read_text(encoding="utf-8"))
+        saved_positions = data.pop("slice_x")
+        for key in ("ref_path", "dam_path"):
+            data[key] = str(COMPASS / data[key])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "legacy_width.json"
+            saved = json.dumps(data)
+            path.write_text(saved, encoding="utf-8")
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(path), "")),
+                patch.object(QMessageBox, "information"),
+                patch.object(QMessageBox, "warning") as warning,
+                patch.object(window.canvas, "generate_slices", wraps=window.canvas.generate_slices) as generate,
+            ):
+                window.io.load_project()
+                warning.assert_not_called()
+                window.workflow_step_labels["measurement"].click()
+                window.btn_return_to_current_step.click()
+                generate.assert_called_once_with()
+            self.assertEqual(path.read_text(encoding="utf-8"), saved)
+        self.assertEqual(len(window.canvas.slice_x), len(saved_positions))
+        for actual, expected in zip(window.canvas.slice_x, saved_positions):
+            self.assertAlmostEqual(actual, expected)
+        self.assertEqual(window.canvas.get_overlay_state()["c_points"], data["c_points"])
+        self.assertEqual(window.project.total_energy_j, data["total_energy_j"])
+        self.assertEqual(window.project.damage_speed_kmh, data["damage_speed_kmh"])
+        window.workflow.restart_from_marking()
+        self.assertTrue(window.chk_measure_ci_mode.isEnabled())
 
     @staticmethod
     def _mark_calibration_points(window: MainWindow) -> None:
@@ -403,7 +524,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertIn("C1–C6", window.lbl_navigation_hint.text())
         for index in range(1, 7):
             window.meas.on_ci_measured(index, 20.0, 0.1)
-        window.chk_set_w_mode.setChecked(True)
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            window.chk_set_w_mode.setChecked(True)
         window.workflow.apply_stage_gating()
         self.assertTrue(window.canvas.set_w_mode)
         window.btn_finish_marking.click()

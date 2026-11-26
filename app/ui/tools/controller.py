@@ -85,8 +85,8 @@ class ToolController:
         if enabled:
             self.flags = ToolFlags(set_w_mode=True)
             self.set_active(tool)
-        else:
-            self.flags.set_w_mode = False
+        elif self.flags.set_w_mode:
+            self.disable_all()
 
     def set_mode_marking_guide(self, enabled: bool, tool: ToolBase) -> None:
         if enabled:

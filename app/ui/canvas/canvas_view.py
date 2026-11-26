@@ -10,7 +10,6 @@ from app.ui.canvas.canvas_controller import CanvasController
 class CanvasView(QGraphicsView):
     calibration_px_measured = Signal(float)
     w_px_measured = Signal(float)
-    w_cleared = Signal()
     ci_measured = Signal(int, float, float)
     ci_selected = Signal(int)
     guide_placed = Signal()
@@ -33,7 +32,6 @@ class CanvasView(QGraphicsView):
             scene=scene,
             emit_calibration_px=lambda v: self.calibration_px_measured.emit(v),
             emit_w_px=lambda v: self.w_px_measured.emit(v),
-            emit_w_cleared=self.w_cleared.emit,
             emit_ci=lambda i, px, cm: self.ci_measured.emit(i, px, cm),
             emit_ci_selected=self.ci_selected.emit,
             emit_alignment_state_changed=self.alignment_state_changed.emit,

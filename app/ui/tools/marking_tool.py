@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QGraphicsView
@@ -20,7 +22,6 @@ class MarkingTool(ToolBase):
         emit_w_px,
         emit_ci,
         emit_ci_selected,
-        emit_w_cleared,
     ) -> None:
         self.state = state
         self.renderer = renderer
@@ -28,9 +29,9 @@ class MarkingTool(ToolBase):
         self.emit_w_px = emit_w_px
         self.emit_ci = emit_ci
         self.emit_ci_selected = emit_ci_selected
-        self.emit_w_cleared = emit_w_cleared
 
         self._mode: str = "idle"  # "setw" | "guide" | "ci" | "idle"
+        self._w_draft_point: tuple[float, float] | None = None
         self._ci_index: int = 1
         self._ci_ref: QPointF | None = None
         self._drag_ci_index: int | None = None
@@ -45,9 +46,13 @@ class MarkingTool(ToolBase):
 
     def deactivate(self, host) -> None:
         _ = host
+        self.set_w_mode(False)
         self._clear_ci_preview()
 
     def set_w_mode(self, enabled: bool) -> None:
+        if self._w_draft_point is not None:
+            self._w_draft_point = None
+            self.renderer.clear_w_preview()
         if enabled:
             self._mode = "setw"
             self._clear_ci_preview()
@@ -86,6 +91,8 @@ class MarkingTool(ToolBase):
         left_x, right_x = (x1, x2) if x1 <= x2 else (x2, x1)
 
         w_px = abs(right_x - left_x)
+        if not math.isfinite(w_px) or w_px <= 0:
+            return
         delta = w_px / (n - 1)
 
         self.state.slice_x = [left_x + k * delta for k in range(n)]
@@ -159,33 +166,22 @@ class MarkingTool(ToolBase):
         b = self.get_bounds_rect()
 
         if self._mode == "setw":
-            if self.state.w_p1 is None:
-                self.state.w_p1 = (float(scene_pos.x()), float(scene_pos.y()))
-                self.renderer.render_w_and_slices(self.state, b)
-                self.renderer.render_guide_line(self.state, b)
-                self.renderer.apply_scaling()
+            point = (float(scene_pos.x()), float(scene_pos.y()))
+            if self._w_draft_point is None:
+                self._w_draft_point = point
+                self.renderer.render_w_preview(point[0], b)
                 return True
 
-            if self.state.w_p2 is None:
-                self.state.w_p2 = (float(scene_pos.x()), float(scene_pos.y()))
-                self.renderer.render_w_and_slices(self.state, b)
-                self.renderer.render_guide_line(self.state, b)
-                self.renderer.apply_scaling()
-
-                w_px = abs(self.state.w_p2[0] - self.state.w_p1[0])
-                self.emit_w_px(float(w_px))
+            first = self._w_draft_point
+            width = abs(point[0] - first[0])
+            if not math.isfinite(width) or width <= 0:
                 return True
 
+            self.set_w_mode(False)
             self.state.clear_markings()
-            self._clear_ci_preview()
-            self.renderer.render_w_and_slices(self.state, b)
-            self.renderer.render_guide_line(self.state, b)
-            self.renderer.render_crossmember_line(self.state, b)
-            self.renderer.render_ci(self.state)
-            self.renderer.render_ci_profile(self.state)
-            self.renderer.clear_legend()
-            self.renderer.apply_scaling()
-            self.emit_w_cleared()
+            self.state.w_p1, self.state.w_p2 = first, point
+            self.generate_slices()
+            self.emit_w_px(width)
             return True
 
         if self._mode == "guide":

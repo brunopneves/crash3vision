@@ -345,6 +345,14 @@ class ProjectIOController:
             }
 
         self.host.canvas.restore_overlay_state(overlay_state)
+        # Older projects could be saved after marking W but before generating slices.
+        if (
+            not self.host.canvas.slice_x
+            and self.host._w_px is not None
+            and math.isfinite(self.host._w_px)
+            and self.host._w_px > 0
+        ):
+            self.host.canvas.generate_slices()
 
         if hasattr(self.host, "spn_bumper_offset"):
             self.host.spn_bumper_offset.blockSignals(True)

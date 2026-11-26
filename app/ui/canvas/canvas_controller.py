@@ -44,7 +44,6 @@ class CanvasController:
         emit_w_px: Callable[[float], None],
         emit_ci: Callable[[int, float, float], None],
         emit_ci_selected: Callable[[int], None],
-        emit_w_cleared: Callable[[], None],
         emit_alignment_state_changed: Callable[[], None],
         emit_images_changed: Callable[[], None],
         emit_rigid_region_selected: Callable[[str, object], None],
@@ -95,7 +94,6 @@ class CanvasController:
             emit_w_px=lambda v: self._emit_w_px(v),
             emit_ci=lambda i, px, cm: self._emit_ci(i, px, cm),
             emit_ci_selected=emit_ci_selected,
-            emit_w_cleared=emit_w_cleared,
         )
 
         self._welcome_item = None

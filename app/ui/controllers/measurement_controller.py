@@ -65,30 +65,21 @@ class MeasurementController:
         return True
 
     # ---------------- Marking: W/Δw ----------------
-    def on_w_cleared(self) -> None:
-        self.host._w_px = None
+    def on_w_px_measured(self, w_px: float) -> None:
+        self.host._w_px = w_px
         self.host._ci_px.clear()
         self.host._ci_m.clear()
         self.host._current_ci_index = 1
-        self.host.canvas.set_ci_index(1)
+        self.host.workflow.reset_canvas_tools()
         self.host._sync_ci_radio_buttons()
         self.host._update_ci_label()
         self.refresh_w_labels()
         self.update_ci_values_label()
-        for checkbox in (self.host.chk_measure_ci_mode, self.host.chk_set_guide_mode):
-            with QSignalBlocker(checkbox):
-                checkbox.setChecked(False)
         # clear_markings also removes the structural-reference offset.
         with QSignalBlocker(self.host.spn_bumper_offset):
             self.host.spn_bumper_offset.setValue(0.0)
         self.host.workflow.invalidate_energy()
         self.host._sync_ui_to_project()
-        self.host.workflow.set_stage(self.host.Stage.MARKING)
-
-    def on_w_px_measured(self, w_px: float) -> None:
-        self.host._w_px = w_px
-        self.refresh_w_labels()
-        self.host.workflow.invalidate_energy()
         self.host._refresh_summary()
 
     def refresh_w_labels(self) -> None:
@@ -107,7 +98,7 @@ class MeasurementController:
         self.host._w_m = w_m
 
         self.host.lbl_w.setText(
-            tr("measurement.w_value_full", px=f"{w_total_px:.2f}", m=f"{w_m:.3f}")
+            tr("measurement.w_value_full", m=f"{w_m:.3f}")
             if w_m is not None
             else tr("measurement.w_value_px_only", px=f"{w_total_px:.2f}")
         )

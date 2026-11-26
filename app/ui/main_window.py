@@ -161,7 +161,6 @@ class MainWindow(QMainWindow):
             self.meas.on_calibration_px_measured
         )
         self.canvas.w_px_measured.connect(self.meas.on_w_px_measured)
-        self.canvas.w_cleared.connect(self.meas.on_w_cleared)
         self.canvas.ci_measured.connect(self.meas.on_ci_measured)
         self.canvas.ci_selected.connect(self._on_canvas_ci_selected)
         self.canvas.guide_placed.connect(self._refresh_marking_panel)
@@ -714,19 +713,13 @@ class MainWindow(QMainWindow):
         self.lbl_w = QLabel(tr("label.w_default"))
         self.lbl_w.setWordWrap(True)
         width_layout.addWidget(self.lbl_w)
-        mark_layout.addWidget(self.mark_width_group)
-
-        self.mark_slices_group = QGroupBox()
-        slices_layout = QVBoxLayout(self.mark_slices_group)
-        self.btn_generate_slices = QPushButton(tr("button.generate_slices"))
-        slices_layout.addWidget(self.btn_generate_slices)
         self.lbl_slice_status = QLabel()
         self.lbl_slice_status.setWordWrap(True)
-        slices_layout.addWidget(self.lbl_slice_status)
+        width_layout.addWidget(self.lbl_slice_status)
         self.lbl_delta_w = QLabel(tr("label.delta_w_default"))
         self.lbl_delta_w.setWordWrap(True)
-        slices_layout.addWidget(self.lbl_delta_w)
-        mark_layout.addWidget(self.mark_slices_group)
+        width_layout.addWidget(self.lbl_delta_w)
+        mark_layout.addWidget(self.mark_width_group)
 
         self.btn_toggle_marking_references = QToolButton()
         self._style_disclosure(self.btn_toggle_marking_references)
@@ -904,7 +897,6 @@ class MainWindow(QMainWindow):
         self.btn_confirm_calibration.clicked.connect(self._on_confirm_calibration)
 
         self.chk_set_w_mode.toggled.connect(self._on_set_w_mode_toggled)
-        self.btn_generate_slices.clicked.connect(self._on_generate_slices)
         self.chk_set_guide_mode.toggled.connect(self._on_set_guide_mode_toggled)
         self.spn_bumper_offset.valueChanged.connect(self._on_bumper_offset_changed)
         self.chk_measure_ci_mode.toggled.connect(self._on_measure_ci_mode_toggled)
@@ -1003,7 +995,6 @@ class MainWindow(QMainWindow):
         self.ci_select_box.setTitle(tr("group.select_c"))
         self.lbl_marking_orientation.setText(tr("label.marking_orientation"))
         self.chk_set_w_mode.setText(tr("marking.mark_width"))
-        self.btn_generate_slices.setText(tr("button.generate_slices"))
         self.chk_set_guide_mode.setText(tr("check.set_guide_mode"))
         self.chk_set_guide_mode.setToolTip(tr("marking.guide_hint"))
         self.lbl_bumper_offset.setText(tr("label.bumper_offset_m"))
@@ -1945,15 +1936,22 @@ class MainWindow(QMainWindow):
 
     # ---------------- Marking: W ----------------
     def _on_set_w_mode_toggled(self, checked: bool) -> None:
+        if checked and self._w_px is not None:
+            answer = QMessageBox.question(
+                self,
+                tr("marking.remark_width"),
+                tr("marking.remark_width_confirm"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                self.chk_set_w_mode.setChecked(False)
+                return
+        if checked:
+            self.chk_set_guide_mode.setChecked(False)
+            self.chk_measure_ci_mode.setChecked(False)
         self.canvas.set_w_measure_mode(checked)
-
-    def _on_generate_slices(self) -> None:
-        if self._w_px is None:
-            QMessageBox.warning(self, tr("group.marking"), tr("warning.set_w_first"))
-            return
-        self.canvas.generate_slices(n=6)
-        self.meas.refresh_w_labels()
-        self._refresh_summary()
+        self._refresh_marking_panel()
 
     def _on_bumper_offset_changed(self, value: float) -> None:
         self.canvas.set_crossmember_offset_m(value)
@@ -1971,22 +1969,23 @@ class MainWindow(QMainWindow):
     def _refresh_marking_panel(self) -> None:
         overlay = self.canvas.get_overlay_state()
         has_width = self._w_px is not None
+        if self.canvas.set_w_mode:
+            action = "marking.cancel_width"
+        else:
+            action = "marking.remark_width" if has_width else "marking.mark_width"
+        self.chk_set_w_mode.setText(tr(action))
         positions = len(self.canvas.slice_x)
         measured = sum(i in self._ci_m for i in range(1, 7))
-        for group, key, complete in (
-            (self.mark_width_group, "marking.width", has_width),
-            (self.mark_slices_group, "marking.slices", positions == 6),
-        ):
-            group.setTitle(tr(key) + (" ✓" if complete else ""))
+        self.mark_width_group.setTitle(tr("marking.width") + (" ✓" if positions == 6 else ""))
         self.mark_ci_group.setTitle(tr("marking.crush"))
-        self.btn_generate_slices.setEnabled(has_width)
-        self.chk_measure_ci_mode.setEnabled(bool(positions))
-        self.chk_set_guide_mode.setEnabled(bool(positions))
+        self.chk_measure_ci_mode.setEnabled(positions == 6)
+        self.chk_set_guide_mode.setEnabled(positions == 6)
+        missing = tr("marking.remark_for_positions" if has_width else "marking.no_slices")
         self.lbl_slice_status.setText(
             tr("marking.slice_count", count=positions, intervals=positions - 1)
-            if positions else tr("marking.no_slices")
+            if positions == 6 else missing
         )
-        instruction = tr("marking.ci_instruction" if positions else "marking.no_slices")
+        instruction = tr("marking.ci_instruction") if positions == 6 else missing
         if measured == 6:
             instruction = f"✓ {tr('marking.ci_complete')}\n{instruction}"
         self.lbl_ci_instruction.setText(instruction)
@@ -2003,30 +2002,34 @@ class MainWindow(QMainWindow):
 
     # ---------------- Marking: guide ----------------
     def _on_set_guide_mode_toggled(self, checked: bool) -> None:
-        if checked and not self.canvas.slice_x:
+        if checked and len(self.canvas.slice_x) != 6:
             QMessageBox.warning(
                 self,
                 tr("group.marking"),
-                tr("warning.generate_slices_first"),
+                tr("marking.remark_for_positions" if self._w_px is not None else "marking.no_slices"),
             )
             self.chk_set_guide_mode.blockSignals(True)
             self.chk_set_guide_mode.setChecked(False)
             self.chk_set_guide_mode.blockSignals(False)
             return
+        if checked:
+            self.chk_set_w_mode.setChecked(False)
         self.canvas.set_guide_mode(checked)
 
     # ---------------- Marking: Ci ----------------
     def _on_measure_ci_mode_toggled(self, checked: bool) -> None:
-        if checked and not self.canvas.slice_x:
+        if checked and len(self.canvas.slice_x) != 6:
             QMessageBox.warning(
                 self,
                 tr("group.marking"),
-                tr("warning.generate_slices_first"),
+                tr("marking.remark_for_positions" if self._w_px is not None else "marking.no_slices"),
             )
             self.chk_measure_ci_mode.blockSignals(True)
             self.chk_measure_ci_mode.setChecked(False)
             self.chk_measure_ci_mode.blockSignals(False)
             return
+        if checked:
+            self.chk_set_w_mode.setChecked(False)
         self.canvas.set_measure_ci_mode(checked)
 
     def _on_ci_radio_selected(self, idx: int, checked: bool) -> None:

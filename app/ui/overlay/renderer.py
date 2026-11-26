@@ -168,6 +168,17 @@ class OverlayRenderer:
 
         self.apply_scaling()
 
+    def render_w_preview(self, x: float, bounds: Optional[QRectF]) -> None:
+        self._set_vertical_dashed(
+            "w_preview", x=x,
+            bounds=bounds if bounds is not None else self._scene.sceneRect(),
+            pen=self._pen_w_dashed,
+        )
+        self.apply_scaling()
+
+    def clear_w_preview(self) -> None:
+        self._remove("w_preview")
+
     def render_w_and_slices(
         self, state: OverlayState, bounds_rect: Optional[QRectF]
     ) -> None:

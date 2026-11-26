@@ -359,14 +359,23 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Orientação recomendada: mantenha a dianteira do veículo voltada para cima. Marque C1–C6 da esquerda para a direita.",
     },
     "marking.width": {"en": "1. Damage width (W)", "pt": "1. Largura de dano (W)"},
-    "marking.slices": {"en": "2. Slice division", "pt": "2. Divisão em fatias"},
-    "marking.crush": {"en": "3. Crush (C1–C6)", "pt": "3. Deformações (C1–C6)"},
+    "marking.crush": {"en": "2. Crush (C1–C6)", "pt": "2. Deformações (C1–C6)"},
     "marking.mark_width": {"en": "Mark W (two points)", "pt": "Marcar W (dois pontos)"},
+    "marking.remark_width": {"en": "Mark W again", "pt": "Remarcar W"},
+    "marking.cancel_width": {"en": "Cancel W capture", "pt": "Cancelar captura de W"},
+    "marking.remark_width_confirm": {
+        "en": "Mark W again? Completing a new width will clear the slices, C1–C6, auxiliary references, energy and EES. Calibration will be kept.",
+        "pt": "Remarcar W? Concluir uma nova largura apagará as fatias, C1–C6, as referências auxiliares, a energia e a EES. A calibração será preservada.",
+    },
     "marking.slice_count": {
         "en": "{count} positions · {intervals} intervals",
         "pt": "{count} posições · {intervals} intervalos",
     },
-    "marking.no_slices": {"en": "Generate the slices first.", "pt": "Gere as fatias primeiro."},
+    "marking.no_slices": {"en": "Mark W to generate C1–C6.", "pt": "Marque W para gerar C1–C6."},
+    "marking.remark_for_positions": {
+        "en": "Mark W again to generate C1–C6.",
+        "pt": "Remarque W para gerar C1–C6.",
+    },
     "marking.ci_instruction": {
         "en": "Mark with two clicks per C or drag an existing endpoint to adjust it.",
         "pt": "Marque com dois cliques por C ou arraste um ponto existente para ajustá-lo.",
@@ -796,8 +805,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "A escala parece incomum: {value} m/px. Verifique os pontos/valor.",
     },
     "measurement.w_value_full": {
-        "en": "W: {px} px | {m} m",
-        "pt": "W: {px} px | {m} m",
+        "en": "W: {m} m",
+        "pt": "W: {m} m",
     },
     "measurement.w_value_px_only": {
         "en": "W: {px} px | - m",
