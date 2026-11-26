@@ -703,6 +703,59 @@ class RigidRegionAlignmentTests(unittest.TestCase):
                     self.assertIsNone(window._w_px)
                     self.assertFalse(window._ci_m)
 
+    def test_image_cards_follow_loading_and_allow_read_only_consultation(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        window.show()
+        ref_card, _, ref_status, ref_button = window._image_cards["reference"]
+        dam_card, _, dam_status, dam_button = window._image_cards["deformed"]
+        self.assertEqual(window._images_title.text(), "Imagens")
+        self.assertTrue(window._images_instructions.isVisible())
+        self.assertEqual(ref_status.text(), "Ausente")
+        self.assertEqual(dam_status.text(), "Ausente")
+        self.assertEqual(dam_button.property("uiRole"), "primary")
+        self.assertEqual(ref_button.property("uiRole"), "secondary")
+
+        dam_path = str(COMPASS / "deformed_vehicle_frame_300.png")
+        with patch.object(window.io, "pick_image_file", return_value=dam_path):
+            dam_button.click()
+        self.assertEqual(window.stage, window.Stage.ALIGNMENT)
+        self.assertTrue(ref_card.isHidden())
+        self.assertTrue(dam_card.isHidden())
+        self.assertEqual(window.btn_toggle_image_controls.text(), "▸ ✓ Deformada")
+        window.btn_toggle_image_controls.click()
+        self.assertTrue(ref_card.isVisible())
+        self.assertTrue(dam_card.isVisible())
+        self.assertFalse(ref_status.property("imageLoaded"))
+        self.assertTrue(dam_status.property("imageLoaded"))
+        self.assertEqual(dam_button.property("uiRole"), "secondary")
+        self.assertEqual(dam_button.text(), "Substituir imagem")
+        self.assertEqual(dam_button.accessibleName(), "Substituir imagem deformada")
+
+        ref_path = str(COMPASS / "reference_vehicle_frame_000.png")
+        with patch.object(window.io, "pick_image_file", return_value=ref_path):
+            ref_button.click()
+        window.btn_toggle_image_controls.click()
+        self.assertEqual(window.btn_toggle_image_controls.text(), "▸ ✓ Ambas as imagens")
+        before = window.project.to_dict()
+        window.workflow_step_labels["images"].click()
+        window.btn_toggle_image_controls.click()
+        self.assertTrue(window._images_title.isVisible())
+        self.assertTrue(window._images_instructions.isHidden())
+        self.assertTrue(ref_card.isVisible())
+        self.assertTrue(ref_status.property("imageLoaded"))
+        self.assertTrue(dam_status.property("imageLoaded"))
+        self.assertFalse(ref_button.isEnabled())
+        self.assertFalse(dam_button.isEnabled())
+        window.resize(900, 550)
+        window.resizeDocks([window._controls_dock], [350], Qt.Orientation.Horizontal)
+        for language, title in (("pt", "Imagens"), ("en", "Images")):
+            window._set_language_and_refresh(language)
+            QApplication.processEvents()
+            self.assertEqual(window._images_title.text(), title)
+            self.assertEqual(window._controls_scroll.horizontalScrollBar().maximum(), 0)
+        self.assertEqual(window.project.to_dict(), before)
+
     def test_reference_only_stays_in_images_until_deformed_is_loaded(self) -> None:
         window = MainWindow()
         self.addCleanup(window.close)
@@ -741,10 +794,15 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             QBoxLayout.Direction.LeftToRight if row.width() >= required
             else QBoxLayout.Direction.TopToBottom,
         )
-        self.assertEqual(row.layout().direction(), QBoxLayout.Direction.LeftToRight)
         window._set_language_and_refresh("en")
         self.assertEqual(window.rad_alignment_auto.text(), "Automatic")
         self.assertEqual(window.btn_toggle_image_controls.text(), "▸ ✓ Both images")
+        required = (
+            window.rad_alignment_auto.sizeHint().width()
+            + window.rad_alignment_rigid.sizeHint().width()
+            + row.layout().spacing()
+        )
+        row.resize(required, row.height())
         self.assertEqual(row.layout().direction(), QBoxLayout.Direction.LeftToRight)
         row.resize(max(window.rad_alignment_auto.sizeHint().width(),
                        window.rad_alignment_rigid.sizeHint().width()), row.height())
@@ -1398,16 +1456,16 @@ class RigidRegionAlignmentTests(unittest.TestCase):
     def test_alignment_controls_are_grouped_and_contextual(self) -> None:
         window = self._window()
 
-        self.assertEqual(window.align_group.title(), "Alinhamento das imagens")
+        self.assertEqual(window.lbl_alignment_title.text(), "Alinhamento das imagens")
         self.assertEqual(window.btn_toggle_manual_alignment.text(), "▸ Ajuste manual")
         self.assertIs(window.rad_alignment_auto.parentWidget(), window.alignment_method_row)
         self.assertIs(window.rad_alignment_rigid.parentWidget(), window.alignment_method_row)
-        self.assertIs(window.btn_start_alignment.parentWidget(), window.align_group)
+        self.assertIs(window.btn_start_alignment.parentWidget(), window.alignment_card)
         self.assertIs(
             window.lbl_rigid_region_instruction.parentWidget(),
-            window.align_group,
+            window.alignment_card,
         )
-        self.assertIs(window.alignment_actions_widget.parentWidget(), window.align_group)
+        self.assertIs(window.alignment_actions_widget.parentWidget(), window.alignment_card)
         self.assertIs(window.btn_finish_alignment.parentWidget(), window.navigation_footer)
         self.assertIs(window.navigation_footer.parentWidget(), window._controls_scroll.parentWidget())
         self.assertTrue(window.rad_alignment_auto.isChecked())

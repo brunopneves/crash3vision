@@ -57,25 +57,25 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Controls",
         "pt": "Controles",
     },
-    "group.load_images": {
-        "en": "Load images",
-        "pt": "Carregar imagens",
-    },
     "group.images": {"en": "Images", "pt": "Imagens"},
+    "images.instructions": {
+        "en": "Load the deformed image to start. Add a reference image if you want to compare the two.",
+        "pt": "Carregue a imagem deformada para começar. Adicione uma imagem de referência se quiser comparar as duas.",
+    },
+    "images.reference": {"en": "Reference image", "pt": "Imagem de referência"},
+    "images.deformed": {"en": "Deformed image", "pt": "Imagem deformada"},
+    "images.status_loaded": {"en": "✓ Loaded", "pt": "✓ Carregada"},
+    "images.status_missing": {"en": "Missing", "pt": "Ausente"},
+    "images.choose": {"en": "Load image", "pt": "Carregar imagem"},
+    "images.replace": {"en": "Replace image", "pt": "Substituir imagem"},
+    "images.choose_named": {"en": "Load {image}", "pt": "Carregar {image}"},
+    "images.replace_named": {"en": "Replace {image}", "pt": "Substituir {image}"},
     "images.none_loaded": {"en": "No images loaded", "pt": "Nenhuma imagem carregada"},
     "images.both_loaded": {"en": "Both images", "pt": "Ambas as imagens"},
     "images.loaded": {"en": "Loaded images", "pt": "Imagens carregadas"},
     "images.toggle_controls": {
         "en": "Show or hide image loading and replacement controls",
         "pt": "Mostrar ou ocultar os controles de carregamento e substituição",
-    },
-    "button.load_ref": {
-        "en": "Load reference image (ref)",
-        "pt": "Carregar imagem de referência (ref)",
-    },
-    "button.load_dam": {
-        "en": "Load deformed image (dam)",
-        "pt": "Carregar imagem deformada (dam)",
     },
     "label.overlay_opacity": {
         "en": "Overlay opacity",
@@ -215,6 +215,10 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "alignment.status.review_title": {"en": "Review alignment", "pt": "Conferir alinhamento"},
     "alignment.status.applied_title": {"en": "✓ Alignment applied", "pt": "✓ Alinhamento aplicado"},
+    "alignment.status.inconclusive_title": {
+        "en": "Automatic alignment inconclusive",
+        "pt": "Alinhamento automático inconclusivo",
+    },
     "alignment.retry_auto": {"en": "Try again", "pt": "Tentar novamente"},
     "alignment.status.single_image": {
         "en": "Continue to calibration with the loaded image.",
@@ -258,8 +262,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Escolha um método de alinhamento ou avance direto para a calibração.",
     },
     "alignment.status.auto_low": {
-        "en": "Automatic alignment was inconclusive. Try again, choose a rigid region, adjust manually, or continue.",
-        "pt": "O alinhamento automático foi inconclusivo. Tente novamente, escolha uma região rígida, ajuste manualmente ou avance.",
+        "en": "Try again, choose a rigid region, adjust manually, or continue to calibration.",
+        "pt": "Tente novamente, escolha uma região rígida, ajuste manualmente ou avance para a calibração.",
     },
     "button.apply_alignment_suggestion": {
         "en": "Accept\nalignment",

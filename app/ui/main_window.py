@@ -55,6 +55,7 @@ from app.ui.controllers.project_io_controller import ProjectIOController
 from app.ui.controllers.measurement_controller import MeasurementController
 from app.ui.controllers.workflow_controller import WorkflowController
 from app.ui.controllers.calc_controller import CalcController
+from app.ui.styles import ACTION_STYLES, WORKFLOW_PANEL_STYLES, set_style_property
 from app.ui.widgets.calc_panel import CalcPanel
 from app.report import generate_report
 from app.i18n import tr, set_language, get_language
@@ -233,6 +234,8 @@ class MainWindow(QMainWindow):
                 background: rgba(255,255,255,30);
             }
             """
+            + ACTION_STYLES
+            + WORKFLOW_PANEL_STYLES
         )
 
         bold = QFont()
@@ -406,16 +409,7 @@ class MainWindow(QMainWindow):
         toggle.setCheckable(True)
         toggle.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         toggle.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        toggle.setStyleSheet("""
-            QToolButton {
-                background: #edf0f2; color: #23313a;
-                border: 2px solid #c8cfd4; border-radius: 4px;
-                padding: 3px 7px; font-size: 11px;
-            }
-            QToolButton:hover { background: #e0e5e8; }
-            QToolButton:focus { border-color: #245b96; }
-            QToolButton:disabled { color: #59636a; background: #f3f4f5; }
-        """)
+        toggle.setProperty("uiRole", "disclosure")
 
     def _build_dock(self) -> None:
         dock = QDockWidget(tr("dock.controls"), self)
@@ -430,47 +424,105 @@ class MainWindow(QMainWindow):
         dock_layout = QVBoxLayout(dock_widget)
         dock_layout.setContentsMargins(6, 9, 6, 9)
         self.btn_return_to_current_step = QPushButton(tr("progress.return_current"))
+        self.btn_return_to_current_step.setProperty("uiRole", "secondary")
         self.btn_return_to_current_step.clicked.connect(self._return_to_current_step)
         self.btn_return_to_current_step.hide()
         dock_layout.addWidget(self.btn_return_to_current_step)
         self.btn_redo_step = QPushButton(tr("progress.redo"))
+        self.btn_redo_step.setProperty("uiRole", "destructive")
         self.btn_redo_step.clicked.connect(self._redo_viewed_step)
         self.btn_redo_step.hide()
         dock_layout.addWidget(self.btn_redo_step)
 
         # --- Load images ---
-        self.load_group = QGroupBox(tr("group.load_images"))
+        self.load_group = QWidget()
         load_layout = QVBoxLayout(self.load_group)
+        load_layout.setContentsMargins(0, 0, 0, 0)
+        load_layout.setSpacing(10)
+        self._images_intro = QWidget()
+        intro_layout = QVBoxLayout(self._images_intro)
+        intro_layout.setContentsMargins(8, 4, 8, 4)
+        intro_layout.setSpacing(5)
+        self._images_title = QLabel()
+        self._images_title.setObjectName("imagesTitle")
+        self._images_instructions = QLabel()
+        self._images_instructions.setObjectName("imagesInstructions")
+        self._images_instructions.setWordWrap(True)
+        intro_layout.addWidget(self._images_title)
+        intro_layout.addWidget(self._images_instructions)
+        load_layout.addWidget(self._images_intro)
+
         self.btn_toggle_image_controls = QToolButton()
+        self.btn_toggle_image_controls.setObjectName("imagesDisclosure")
         self._style_disclosure(self.btn_toggle_image_controls)
         self.btn_toggle_image_controls.toggled.connect(self._refresh_image_controls)
         load_layout.addWidget(self.btn_toggle_image_controls)
-        self.btn_load_ref = QPushButton(tr("button.load_ref"))
-        self.btn_load_dam = QPushButton(tr("button.load_dam"))
-        load_layout.addWidget(self.btn_load_ref)
-        load_layout.addWidget(self.btn_load_dam)
+
+        self.btn_load_ref = QPushButton()
+        self.btn_load_dam = QPushButton()
+        self._image_cards = {}
+        for key, button in (("reference", self.btn_load_ref), ("deformed", self.btn_load_dam)):
+            card = QFrame()
+            card.setObjectName("imageLoadCard")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 11, 12, 11)
+            card_layout.setSpacing(8)
+            heading = QHBoxLayout()
+            heading.setSpacing(6)
+            title = QLabel()
+            title.setObjectName("imageCardTitle")
+            title.setWordWrap(True)
+            status = QLabel()
+            status.setObjectName("imageCardStatus")
+            heading.addWidget(title, 1)
+            heading.addWidget(status, 0, Qt.AlignmentFlag.AlignVCenter)
+            card_layout.addLayout(heading)
+            button.setProperty("uiRole", "secondary")
+            button.setProperty("imageAction", True)
+            card_layout.addWidget(button)
+            load_layout.addWidget(card)
+            self._image_cards[key] = (card, title, status, button)
         dock_layout.addWidget(self.load_group)
 
         self.fine_adjust_group = QGroupBox()
+        self.fine_adjust_group.setObjectName("alignmentManualCard")
         fine_layout = QVBoxLayout(self.fine_adjust_group)
-        fine_layout.setContentsMargins(8, 10, 8, 10)
+        fine_layout.setContentsMargins(12, 11, 12, 11)
+        fine_layout.setSpacing(8)
         self.btn_toggle_manual_alignment = QToolButton()
         self.btn_toggle_advanced_alignment = QToolButton()
+        self.btn_toggle_advanced_alignment.setObjectName("alignmentPrecisionDisclosure")
         for toggle in (self.btn_toggle_manual_alignment, self.btn_toggle_advanced_alignment):
             self._style_disclosure(toggle)
+            toggle.setProperty("panelDisclosure", True)
             toggle.toggled.connect(self._refresh_alignment_sections)
         self.alignment_advanced = QWidget()
         advanced_layout = QGridLayout(self.alignment_advanced)
         advanced_layout.setContentsMargins(0, 0, 0, 0)
-        advanced_layout.setHorizontalSpacing(3)
+        advanced_layout.setSpacing(8)
 
         # --- Alignment group ---
-        self.align_group = QGroupBox(tr("group.alignment"))
+        self.align_group = QGroupBox()
+        self.align_group.setObjectName("alignmentPanel")
+        self.align_group.setAccessibleName(tr("group.alignment"))
         align_layout = QVBoxLayout(self.align_group)
+        align_layout.setContentsMargins(0, 0, 0, 0)
+        align_layout.setSpacing(10)
+        self.lbl_alignment_title = QLabel(tr("group.alignment"))
+        self.lbl_alignment_title.setObjectName("alignmentTitle")
+        self.lbl_alignment_title.setWordWrap(True)
+        self.lbl_alignment_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        align_layout.addWidget(self.lbl_alignment_title)
+        self.alignment_card = QFrame()
+        self.alignment_card.setObjectName("alignmentCard")
+        alignment_card_layout = QVBoxLayout(self.alignment_card)
+        alignment_card_layout.setContentsMargins(12, 11, 12, 11)
+        alignment_card_layout.setSpacing(8)
+        align_layout.addWidget(self.alignment_card)
         self.lbl_alignment_consultation = QLabel()
         self.lbl_alignment_consultation.setWordWrap(True)
         self.lbl_alignment_consultation.hide()
-        align_layout.addWidget(self.lbl_alignment_consultation)
+        alignment_card_layout.addWidget(self.lbl_alignment_consultation)
 
         self.chk_alignment_mode = QCheckBox(tr("check.alignment_mode"))
         self.chk_alignment_mode.setToolTip(tr("check.alignment_mode_hint"))
@@ -479,6 +531,7 @@ class MainWindow(QMainWindow):
         fine_layout.addWidget(self.chk_lock_alignment)
 
         self.lbl_editable_image = QLabel(tr("label.editable_image"))
+        self.lbl_editable_image.setObjectName("alignmentTargetLabel")
         fine_layout.addWidget(self.lbl_editable_image)
 
         self.cmb_alignment_target = QComboBox()
@@ -488,16 +541,17 @@ class MainWindow(QMainWindow):
         fine_layout.addWidget(self.cmb_alignment_target)
 
         self.btn_reset_alignment = QPushButton(tr("button.reset_selected_transform"))
+        self.btn_reset_alignment.setProperty("uiRole", "destructive")
+        self.btn_reset_alignment.setProperty("panelAction", True)
         self.btn_reset_alignment.setAccessibleName(self.btn_reset_alignment.text())
         self.btn_reset_alignment.setToolTip(tr("alignment.reset.tooltip"))
         self.btn_reset_alignment.setFlat(True)
 
         self.lbl_alignment_method = QLabel(tr("label.alignment_method"))
-        align_layout.addWidget(self.lbl_alignment_method)
+        self.lbl_alignment_method.setObjectName("alignmentMethodLabel")
+        alignment_card_layout.addWidget(self.lbl_alignment_method)
         self.rad_alignment_auto = QRadioButton(tr("alignment.method.auto"))
         self.rad_alignment_rigid = QRadioButton(tr("alignment.method.rigid"))
-        for radio in (self.rad_alignment_auto, self.rad_alignment_rigid):
-            radio.setStyleSheet("QRadioButton { font-size: 10px; }")
         self.alignment_method_buttons = QButtonGroup(self)
         self.alignment_method_buttons.setExclusive(True)
         self.alignment_method_buttons.addButton(self.rad_alignment_auto)
@@ -506,28 +560,34 @@ class MainWindow(QMainWindow):
         self.alignment_method_row = AlignmentMethodRow(
             self.rad_alignment_auto, self.rad_alignment_rigid
         )
-        align_layout.addWidget(self.alignment_method_row)
+        alignment_card_layout.addWidget(self.alignment_method_row)
 
         self.btn_start_alignment = QPushButton(tr("button.start_alignment"))
+        self.btn_start_alignment.setProperty("uiRole", "primary")
+        self.btn_start_alignment.setProperty("panelAction", True)
         self.btn_start_alignment.setEnabled(False)
 
         self.lbl_alignment_status_title = QLabel()
+        self.lbl_alignment_status_title.setObjectName("alignmentStatusTitle")
         self.lbl_alignment_status_title.setWordWrap(True)
-        self.lbl_alignment_status_title.setStyleSheet("font-weight: bold;")
         self.lbl_alignment_status_title.hide()
-        align_layout.addWidget(self.lbl_alignment_status_title)
+        alignment_card_layout.addWidget(self.lbl_alignment_status_title)
         self.lbl_rigid_region_instruction = QLabel()
         self.lbl_rigid_region_instruction.setWordWrap(True)
         self.lbl_rigid_region_instruction.setText(
             tr("alignment.status.choose_method")
         )
-        align_layout.addWidget(self.lbl_rigid_region_instruction)
+        alignment_card_layout.addWidget(self.lbl_rigid_region_instruction)
 
         self.alignment_actions_widget = QWidget()
         rigid_actions = QVBoxLayout(self.alignment_actions_widget)
         rigid_actions.setContentsMargins(0, 0, 0, 0)
-        preview_row = QHBoxLayout()
-        rigid_actions.addLayout(preview_row)
+        rigid_actions.setSpacing(8)
+        self._alignment_decisions = QWidget()
+        preview_row = QHBoxLayout(self._alignment_decisions)
+        preview_row.setContentsMargins(0, 0, 0, 0)
+        preview_row.setSpacing(8)
+        rigid_actions.addWidget(self._alignment_decisions)
         self.btn_rigid_apply = QPushButton(tr("button.rigid_apply"))
         self.btn_rigid_try_again = QPushButton(tr("button.rigid_try_again"))
         self.btn_rigid_cancel = QPushButton(tr("button.rigid_cancel"))
@@ -543,52 +603,37 @@ class MainWindow(QMainWindow):
             self.btn_rigid_cancel,
         ):
             button.setVisible(False)
+            button.setProperty("alignmentDecision", True)
             preview_row.addWidget(button, 1)
         for button in (self.btn_apply_alignment_suggestion, self.btn_rigid_apply):
             button.setAccessibleName(button.text().replace("\n", " "))
-            button.setStyleSheet("""
-                QPushButton {
-                    background: #245b96; color: white;
-                    border: 2px solid #245b96; border-radius: 4px;
-                    padding: 4px; font-size: 10px; font-weight: bold;
-                }
-                QPushButton:hover { background: #1b4c80; }
-                QPushButton:focus { border-color: #8fc5ff; }
-            """)
-        self.btn_rigid_cancel.setStyleSheet("""
-            QPushButton {
-                background: #edf0f2; color: #23313a;
-                border: 2px solid #c8cfd4; border-radius: 4px;
-                padding: 4px; font-size: 10px;
-            }
-            QPushButton:hover { background: #e0e5e8; }
-            QPushButton:focus { border-color: #245b96; }
-        """)
+            button.setProperty("uiRole", "primary")
+        self.btn_rigid_cancel.setProperty("uiRole", "destructive")
+        self.btn_rigid_try_again.setProperty("uiRole", "secondary")
+        self.btn_rigid_try_again.setProperty("panelAction", True)
         self.btn_rigid_try_again.hide()
         rigid_actions.addWidget(self.btn_rigid_try_again)
         self.btn_undo_auto_alignment = QPushButton(tr("alignment.undo_auto"))
+        self.btn_undo_auto_alignment.setProperty("uiRole", "destructive")
+        self.btn_undo_auto_alignment.setProperty("panelAction", True)
         self.btn_undo_auto_alignment.setFlat(True)
         self.btn_undo_auto_alignment.hide()
         self.btn_undo_auto_alignment.clicked.connect(self._undo_auto_alignment)
         rigid_actions.addWidget(self.btn_undo_auto_alignment)
         self.alignment_actions_widget.setVisible(False)
-        align_layout.addWidget(self.alignment_actions_widget)
-        align_layout.addWidget(self.btn_start_alignment)
+        alignment_card_layout.addWidget(self.alignment_actions_widget)
+        alignment_card_layout.addWidget(self.btn_start_alignment)
 
         self.btn_finish_alignment = QPushButton(tr("button.finish_alignment"))
         self.btn_finish_alignment.setVisible(False)
         self.btn_finish_alignment.setEnabled(False)
 
         self.nudge_box = QGroupBox(tr("group.nudge"))
+        self.nudge_box.setProperty("alignmentSection", True)
         nudge_layout = QVBoxLayout(self.nudge_box)
-        nudge_layout.setSpacing(2)
-
-        grid_top = QHBoxLayout()
-        grid_mid = QHBoxLayout()
-        grid_bot = QHBoxLayout()
-        grid_top.setSpacing(2)
-        grid_mid.setSpacing(2)
-        grid_bot.setSpacing(2)
+        nudge_layout.setContentsMargins(0, 5, 0, 0)
+        directions = QGridLayout()
+        directions.setSpacing(4)
 
         self.btn_up = QPushButton("↑")
         self.btn_left = QPushButton("←")
@@ -598,26 +643,20 @@ class MainWindow(QMainWindow):
         for b in (self.btn_up, self.btn_left, self.btn_right, self.btn_down):
             b.setFixedWidth(44)
 
-        grid_top.addStretch(1)
-        grid_top.addWidget(self.btn_up)
-        grid_top.addStretch(1)
-
-        grid_mid.addWidget(self.btn_left)
-        grid_mid.addStretch(1)
-        grid_mid.addWidget(self.btn_right)
-
-        grid_bot.addStretch(1)
-        grid_bot.addWidget(self.btn_down)
-        grid_bot.addStretch(1)
-
-        nudge_layout.addLayout(grid_top)
-        nudge_layout.addLayout(grid_mid)
-        nudge_layout.addLayout(grid_bot)
+        directions.addWidget(self.btn_up, 0, 1)
+        directions.addWidget(self.btn_left, 1, 0)
+        directions.addWidget(self.btn_down, 1, 1)
+        directions.addWidget(self.btn_right, 1, 2)
+        nudge_layout.addLayout(directions)
+        nudge_layout.setAlignment(directions, Qt.AlignmentFlag.AlignHCenter)
 
         advanced_layout.addWidget(self.nudge_box, 0, 0, 1, 2)
 
         self.rotate_box = QGroupBox(tr("group.rotate"))
+        self.rotate_box.setProperty("alignmentSection", True)
         rotate_layout = QGridLayout(self.rotate_box)
+        rotate_layout.setContentsMargins(0, 5, 0, 0)
+        rotate_layout.setSpacing(8)
 
         self.btn_rotate_minus = QPushButton("−")
         self.btn_rotate_plus = QPushButton("+")
@@ -640,7 +679,10 @@ class MainWindow(QMainWindow):
         fine_layout.addWidget(self.rotate_box)
 
         self.scale_box = QGroupBox(tr("group.scale"))
+        self.scale_box.setProperty("alignmentSection", True)
         scale_layout = QGridLayout(self.scale_box)
+        scale_layout.setContentsMargins(0, 5, 0, 0)
+        scale_layout.setSpacing(8)
 
         self.btn_scale_minus = QPushButton(tr("button.scale_minus"))
         self.btn_scale_plus = QPushButton(tr("button.scale_plus"))
@@ -657,6 +699,7 @@ class MainWindow(QMainWindow):
         ]
 
         for btn in repeat_buttons:
+            btn.setProperty("uiRole", "secondary")
             btn.setAutoRepeat(True)
             btn.setAutoRepeatDelay(300)
             btn.setAutoRepeatInterval(60)
@@ -677,6 +720,7 @@ class MainWindow(QMainWindow):
         fine_layout.addWidget(self.scale_box)
 
         self.lbl_alignment_shortcuts = QLabel(tr("label.alignment_shortcuts"))
+        self.lbl_alignment_shortcuts.setObjectName("alignmentShortcuts")
         self.lbl_alignment_shortcuts.setWordWrap(True)
         fine_layout.addWidget(self.lbl_alignment_shortcuts)
         fine_layout.addWidget(self.btn_toggle_advanced_alignment)
@@ -694,6 +738,7 @@ class MainWindow(QMainWindow):
         cal_layout = QVBoxLayout(self.cal_group)
 
         self.chk_calibration_mode = QPushButton(tr("calibration.mark_points"))
+        self.chk_calibration_mode.setProperty("uiRole", "secondary")
         self.chk_calibration_mode.setCheckable(True)
         cal_layout.addWidget(self.chk_calibration_mode)
 
@@ -726,6 +771,7 @@ class MainWindow(QMainWindow):
         self.mark_width_group = QGroupBox()
         width_layout = QVBoxLayout(self.mark_width_group)
         self.chk_set_w_mode = QPushButton(tr("marking.mark_width"))
+        self.chk_set_w_mode.setProperty("uiRole", "secondary")
         self.chk_set_w_mode.setCheckable(True)
         width_layout.addWidget(self.chk_set_w_mode)
         self.lbl_w = QLabel(tr("label.w_default"))
@@ -859,19 +905,8 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
         )
         footer_layout.addWidget(self.lbl_navigation_hint)
-        self.navigation_footer.setStyleSheet("""
-            QPushButton {
-                background: #dbe8f5; color: #183c5c;
-                border: 2px solid #b8cddd; border-radius: 4px;
-                padding: 4px; font-size: 11px; font-weight: bold;
-            }
-            QPushButton:hover { background: #ccdff1; }
-            QPushButton:focus { border-color: #245b96; }
-            QPushButton:disabled {
-                background: #edf0f2; color: #53616b; border-color: #c8cfd4;
-            }
-        """)
         for button in (self.btn_finish_alignment, self.btn_confirm_calibration, self.btn_finish_marking):
+            button.setProperty("uiRole", "primary")
             footer_layout.addWidget(button)
         dock_content_layout.addWidget(self.navigation_footer)
         dock.setWidget(dock_content)
@@ -958,11 +993,10 @@ class MainWindow(QMainWindow):
         self._refresh_alignment_consultation()
 
         self._refresh_image_controls()
-        self.btn_load_ref.setText(tr("button.load_ref"))
-        self.btn_load_dam.setText(tr("button.load_dam"))
         self.lbl_overlay_opacity.setText(tr("label.overlay_opacity"))
 
-        self.align_group.setTitle(tr("group.alignment"))
+        self.align_group.setAccessibleName(tr("group.alignment"))
+        self.lbl_alignment_title.setText(tr("group.alignment"))
         self._refresh_alignment_sections()
         self.rotate_box.setTitle(tr("group.rotate"))
         self.scale_box.setTitle(tr("group.scale"))
@@ -1101,12 +1135,31 @@ class MainWindow(QMainWindow):
             toggle.setChecked(False)
         toggle.setVisible(not loading)
         expanded = toggle.isChecked()
-        self.load_group.setTitle(tr("group.load_images" if loading else "images.loaded"))
+        self._images_intro.setVisible(loading or self._viewed_step == "images")
+        self._images_instructions.setVisible(loading)
+        self._images_title.setText(tr("group.images"))
+        self._images_instructions.setText(tr("images.instructions"))
         roles = []
-        if self.canvas.ctrl.ref_item is not None:
-            roles.append(tr("combo.reference"))
-        if self.canvas.ctrl.dam_item is not None:
-            roles.append(tr("combo.deformed"))
+        for key, item in (
+            ("reference", self.canvas.ctrl.ref_item), ("deformed", self.canvas.ctrl.dam_item)
+        ):
+            card, title, badge, button = self._image_cards[key]
+            loaded = item is not None
+            if loaded:
+                roles.append(tr(f"combo.{key}"))
+            image_name = tr(f"images.{key}")
+            title.setText(image_name)
+            badge.setText(tr("images.status_loaded" if loaded else "images.status_missing"))
+            button.setText(tr("images.replace" if loaded else "images.choose"))
+            button.setAccessibleName(tr(
+                "images.replace_named" if loaded else "images.choose_named",
+                image=image_name.lower(),
+            ))
+            role = "primary" if loading and key == "deformed" and not loaded else "secondary"
+            set_style_property(badge, "imageLoaded", loaded)
+            set_style_property(button, "uiRole", role)
+            card.setVisible(loading or expanded)
+            button.setVisible(loading or expanded)
         if len(roles) == 2:
             status = f"✓ {tr('images.both_loaded')}"
         else:
@@ -1114,8 +1167,6 @@ class MainWindow(QMainWindow):
         toggle.setText(f"{'▾' if expanded else '▸'} {status}")
         toggle.setAccessibleName(f"{tr('images.loaded')} — {status}")
         toggle.setToolTip("\n".join([tr("images.toggle_controls"), *roles]))
-        self.btn_load_ref.setVisible(loading or expanded)
-        self.btn_load_dam.setVisible(loading or expanded)
 
     def _on_load_ref(self) -> None:
         self.io.load_ref()
@@ -1231,15 +1282,22 @@ class MainWindow(QMainWindow):
             if applied or (failed and self.rad_alignment_auto.isChecked())
             else "button.start_alignment"
         ))
+        set_style_property(self.btn_start_alignment, "uiRole", "secondary" if applied else "primary")
         self.btn_toggle_manual_alignment.setVisible(idle)
         self.fine_adjust_group.setEnabled(idle)
         self.fine_adjust_group.setVisible(idle and self.btn_toggle_manual_alignment.isChecked())
 
         heading = ""
-        if editable and self._auto_preview_active:
+        tone = ""
+        if editable and (self._auto_preview_active or self._rigid_preview_active):
             heading = tr("alignment.status.review_title")
         elif editable and applied:
             heading = tr("alignment.status.applied_title")
+            tone = "success"
+        elif editable and failed:
+            heading = tr("alignment.status.inconclusive_title")
+            tone = "warning"
+        set_style_property(self.lbl_alignment_status_title, "tone", tone)
         self.lbl_alignment_status_title.setText(heading)
         self.lbl_alignment_status_title.setVisible(bool(heading))
         self._update_auto_align_availability()
@@ -1336,15 +1394,16 @@ class MainWindow(QMainWindow):
         self.btn_undo_auto_alignment.setEnabled(
             undo_available and not self.chk_lock_alignment.isChecked()
         )
-        buttons = (
+        decisions = (
             self.btn_apply_alignment_suggestion,
             self.btn_rigid_apply,
-            self.btn_rigid_try_again,
             self.btn_rigid_cancel,
-            self.btn_undo_auto_alignment,
         )
+        self._alignment_decisions.setVisible(any(not button.isHidden() for button in decisions))
         self.alignment_actions_widget.setVisible(
-            any(not button.isHidden() for button in buttons)
+            any(not button.isHidden() for button in (
+                *decisions, self.btn_rigid_try_again, self.btn_undo_auto_alignment
+            ))
         )
         self._refresh_navigation_footer()
         self._update_alignment_edit_availability()

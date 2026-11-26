@@ -90,7 +90,8 @@ class CalcPanel(QGroupBox):
         src_layout.addWidget(self.cmb_class)
 
         self.btn_ab_menu = QPushButton(tr("calc.ab_menu"))
-        self.btn_ab_menu.setStyleSheet("QPushButton { font-size: 10px; }")
+        self.btn_ab_menu.setProperty("uiRole", "secondary")
+        self.btn_ab_menu.setProperty("uiCompact", "true")
         self.ab_menu = QMenu(self)
         self.act_load_ab_library = QAction(tr("calc.ab_menu.load_library"), self)
         self.act_import_ab_file = QAction(tr("calc.ab_menu.import_file"), self)
@@ -106,7 +107,8 @@ class CalcPanel(QGroupBox):
         self.btn_edit_ab_nhtsa = QPushButton(tr("calc.edit_ab_from_nhtsa"))
         nhtsa_row = QHBoxLayout()
         for button in (self.btn_compute_ab_nhtsa, self.btn_edit_ab_nhtsa):
-            button.setStyleSheet("QPushButton { font-size: 10px; }")
+            button.setProperty("uiRole", "secondary")
+            button.setProperty("uiCompact", "true")
             nhtsa_row.addWidget(button, 1)
         src_layout.addLayout(nhtsa_row)
 
@@ -140,22 +142,14 @@ class CalcPanel(QGroupBox):
         params_layout.addWidget(self.lbl_mass_hint, 4, 0, 1, 2)
 
         self.btn_compute = QPushButton(tr("calc.compute_energy"))
-        self.btn_compute.setStyleSheet("""
-            QPushButton {
-                background: #dbe8f5; color: #183c5c;
-                border: 2px solid #b8cddd; border-radius: 4px;
-                padding: 4px; font-size: 11px; font-weight: bold;
-            }
-            QPushButton:hover { background: #ccdff1; }
-            QPushButton:focus { border-color: #245b96; }
-            QPushButton:disabled { background: #edf0f2; color: #53616b; }
-        """)
+        self.btn_compute.setProperty("uiRole", "primary")
         self.lbl_energy = QLabel(tr("calc.total_energy_default"))
         self.lbl_speed = QLabel(tr("calc.damage_speed_default"))
         for widget in (self.btn_compute, self.lbl_energy, self.lbl_speed):
             calc_layout.addWidget(widget)
 
         self.btn_show_profile = QPushButton(tr("calc.show_crush_profile"))
+        self.btn_show_profile.setProperty("uiRole", "secondary")
         self.btn_show_profile.setFlat(True)
         self.btn_toggle_details = QToolButton()
         self.main._style_disclosure(self.btn_toggle_details)

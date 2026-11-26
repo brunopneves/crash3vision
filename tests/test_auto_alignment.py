@@ -405,8 +405,10 @@ class AutoAlignmentTests(unittest.TestCase):
             self.assertTrue(window.btn_finish_alignment.isEnabled())
             self.assertTrue(window.btn_undo_auto_alignment.isEnabled())
             self.assertEqual(window.lbl_alignment_status_title.text(), "✓ Alinhamento aplicado")
+            self.assertEqual(window.lbl_alignment_status_title.property("tone"), "success")
             self.assertTrue(window.alignment_method_row.isHidden())
             self.assertEqual(window.btn_start_alignment.text(), "Tentar novamente")
+            self.assertEqual(window.btn_start_alignment.property("uiRole"), "secondary")
             self.assertFalse(window.btn_toggle_manual_alignment.isHidden())
             self.assertTrue(window.btn_rigid_cancel.isHidden())
 
@@ -462,6 +464,8 @@ class AutoAlignmentTests(unittest.TestCase):
         self.assertTrue(window.btn_toggle_manual_alignment.isHidden())
         self.assertTrue(window.fine_adjust_group.isHidden())
         self.assertEqual(window.btn_apply_alignment_suggestion.accessibleName(), "Aceitar alinhamento")
+        self.assertEqual(window.btn_apply_alignment_suggestion.property("uiRole"), "primary")
+        self.assertEqual(window.btn_rigid_cancel.property("uiRole"), "destructive")
         self.assertFalse(window.btn_finish_alignment.isEnabled())
         self.assertFalse(window.workflow_step_labels["images"].isEnabled())
         self.assertFalse(window.btn_reset_alignment.isEnabled())
@@ -551,6 +555,7 @@ class AutoAlignmentTests(unittest.TestCase):
         self.assertFalse(window.btn_toggle_manual_alignment.isHidden())
         self.assertTrue(window.btn_finish_alignment.isEnabled())
         self.assertEqual(window.btn_start_alignment.text(), "Tentar novamente")
+        self.assertEqual(window.lbl_alignment_status_title.property("tone"), "warning")
         window.rad_alignment_rigid.click()
         self.assertEqual(window.btn_start_alignment.text(), "Iniciar alinhamento")
 
