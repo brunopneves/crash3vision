@@ -54,6 +54,54 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    @staticmethod
+    def _mark_calibration_points(window: MainWindow) -> None:
+        window.chk_calibration_mode.click()
+        viewport = window.canvas.viewport()
+        origin = viewport.rect().center()
+        for point in (origin, origin + QPoint(50, 0)):
+            QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=point)
+
+    def test_calibration_uses_current_points_and_distance_after_warning(self) -> None:
+        window = self._window()
+        window.show()
+        QApplication.processEvents()
+        window.canvas.set_reference_transform(0, 0, 1.1, 0)
+        window.btn_finish_alignment.click()
+        self._mark_calibration_points(window)
+        self.assertFalse(window.canvas.calibration_mode)
+        self.assertEqual(window.chk_calibration_mode.text(), "Remarcar pontos")
+        points = (window.canvas.cal_p1, window.canvas.cal_p2)
+        QTest.mouseClick(window.canvas.viewport(), Qt.MouseButton.LeftButton)
+        self.assertEqual((window.canvas.cal_p1, window.canvas.cal_p2), points)
+
+        window._m_per_px = window.project.m_per_px = 0.005
+        window.txt_real_m.setText("0")
+        self.assertFalse(window.btn_confirm_calibration.isEnabled())
+        window.txt_real_m.setText("0,5")
+        first = window.lbl_m_per_px.text()
+        window.txt_real_m.setText("0,6")
+        self.assertNotEqual(window.lbl_m_per_px.text(), first)
+        self.assertTrue(window.btn_confirm_calibration.isEnabled())
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.No) as warning:
+            window.btn_confirm_calibration.click()
+        warning.assert_called_once()
+        self.assertEqual(window.stage, window.Stage.CALIBRATION)
+        self.assertEqual(window.project.m_per_px, 0.005)
+        self.assertEqual((window.canvas.cal_p1, window.canvas.cal_p2), points)
+        self.assertEqual(window.txt_real_m.text(), "0,6")
+
+        window.chk_calibration_mode.click()
+        self.assertFalse(window.btn_confirm_calibration.isEnabled())
+        self.assertIsNone(window.canvas.cal_p1)
+        self.assertEqual(window.project.m_per_px, 0.005)
+        window.chk_calibration_mode.click()
+        self._mark_calibration_points(window)
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            window.btn_confirm_calibration.click()
+        self.assertEqual(window.stage, window.Stage.MARKING)
+        self.assertAlmostEqual(window.project.m_per_px, 0.6 / window._calibration_px)
+
     def test_legacy_project_displays_ees_in_mps_without_changing_stored_results(self) -> None:
         window = self._window()
         source = COMPASS / "crash3vision_reference_project.json"
@@ -278,17 +326,20 @@ class RigidRegionAlignmentTests(unittest.TestCase):
 
         self.assertFalse(window.btn_confirm_calibration.isHidden())
         self.assertFalse(window.btn_confirm_calibration.isEnabled())
-        self.assertIn("calibração", window.lbl_navigation_hint.text())
+        self.assertIn("2 pontos", window.lbl_navigation_hint.text())
         window.btn_confirm_calibration.click()
         self.assertEqual(window.stage, window.Stage.CALIBRATION)
-        window._m_per_px = 0.005
-        window._refresh_summary()
+        window.canvas.set_deformed_transform(0, 0, 1.1, 0)
+        self._mark_calibration_points(window)
+        window.txt_real_m.setText("0.5")
         window.workflow_step_labels["alignment"].click()
         self.assertTrue(window.navigation_footer.isHidden())
         window.workflow.confirm_calibration()
         self.assertEqual(window.stage, window.Stage.CALIBRATION)
         window.btn_return_to_current_step.click()
-        window.btn_confirm_calibration.click()
+        with patch.object(QMessageBox, "question") as warning:
+            window.btn_confirm_calibration.click()
+        warning.assert_not_called()
         self.assertTrue(window.cal_group.isHidden())
         self.assertFalse(window.mark_group.isHidden())
         self.assertFalse(window.btn_finish_marking.isEnabled())
@@ -401,8 +452,10 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         window.workflow.restart_from_calibration()
         self.assertEqual(steps["calibration"].property("progressStatus"), "current")
         self.assertEqual(steps["measurement"].property("progressStatus"), "future")
-        window._m_per_px = 0.005
-        window.workflow.confirm_calibration()
+        self._mark_calibration_points(window)
+        window.txt_real_m.setText("0.5")
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            window.btn_confirm_calibration.click()
         self.assertEqual(steps["calibration"].property("progressStatus"), "complete")
         self.assertEqual(steps["measurement"].property("progressStatus"), "current")
 
@@ -939,6 +992,17 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         scrollbar.setValue(scrollbar.maximum())
         self.assertTrue(window.btn_finish_alignment.isVisible())
         self.assertEqual(window.navigation_footer.pos(), before_scroll)
+        bar = window.canvas_view_bar
+        self.assertEqual(bar.width(), window.canvas.width())
+        self.assertLessEqual(
+            abs(
+                bar.mapToGlobal(QPoint(0, bar.height())).y()
+                - window.navigation_footer.mapToGlobal(
+                    QPoint(0, window.navigation_footer.height())
+                ).y()
+            ),
+            4,
+        )
         window.btn_toggle_advanced_alignment.click()
         self.assertTrue(window.alignment_advanced.isHidden())
         self.assertTrue(window.sc_nudge_right.isEnabled())

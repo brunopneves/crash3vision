@@ -363,19 +363,33 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.canvas, 1)
 
         self.canvas_view_bar = QWidget()
+        self.canvas_view_bar.setObjectName("canvasViewBar")
+        self.canvas_view_bar.setMinimumHeight(40)
+        self.canvas_view_bar.setStyleSheet("""
+            QWidget#canvasViewBar { background: palette(window); border-top: 1px solid #b8cddd; }
+            QSlider::groove:horizontal { height: 5px; background: #9aafbf; border-radius: 2px; }
+            QSlider::sub-page:horizontal { background: #3975ab; border-radius: 2px; }
+            QSlider::handle:horizontal {
+                width: 14px; margin: -5px 0; background: #245b96; border-radius: 7px;
+            }
+            QSlider::handle:horizontal:disabled { background: #87939d; }
+        """)
         bar_layout = QHBoxLayout(self.canvas_view_bar)
         bar_layout.setContentsMargins(8, 3, 8, 3)
         self.lbl_overlay_opacity = QLabel(tr("label.overlay_opacity"))
         self.opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self.opacity_slider.setRange(0, 100)
         self.opacity_slider.setValue(50)
-        self.opacity_slider.setMaximumWidth(180)
+        self.opacity_slider.setMinimumHeight(22)
         self.lbl_opacity_percent = QLabel()
+        self.lbl_opacity_percent.setStyleSheet("font-weight: bold;")
+        self.lbl_opacity_percent.setMinimumWidth(
+            self.lbl_opacity_percent.fontMetrics().horizontalAdvance("100%")
+        )
         self._refresh_opacity_percentage()
         bar_layout.addWidget(self.lbl_overlay_opacity)
-        bar_layout.addWidget(self.opacity_slider)
+        bar_layout.addWidget(self.opacity_slider, 1)
         bar_layout.addWidget(self.lbl_opacity_percent)
-        bar_layout.addStretch()
         layout.addWidget(self.canvas_view_bar)
         self.setCentralWidget(central)
 
@@ -661,24 +675,21 @@ class MainWindow(QMainWindow):
         self.cal_group = QGroupBox(tr("group.calibration"))
         cal_layout = QVBoxLayout(self.cal_group)
 
-        self.chk_calibration_mode = QCheckBox(tr("check.calibration_mode"))
+        self.chk_calibration_mode = QPushButton(tr("calibration.mark_points"))
+        self.chk_calibration_mode.setCheckable(True)
         cal_layout.addWidget(self.chk_calibration_mode)
 
         self.lbl_px_distance = QLabel(tr("label.measured_distance"))
         cal_layout.addWidget(self.lbl_px_distance)
 
-        row_real = QHBoxLayout()
         self.lbl_real_distance_m = QLabel(tr("label.real_distance_m"))
-        row_real.addWidget(self.lbl_real_distance_m)
+        cal_layout.addWidget(self.lbl_real_distance_m)
         self.txt_real_m = QLineEdit()
         self.txt_real_m.setPlaceholderText("e.g., 1.0")
-        row_real.addWidget(self.txt_real_m)
-        cal_layout.addLayout(row_real)
-
-        self.btn_apply_calibration = QPushButton(tr("button.apply_calibration"))
-        cal_layout.addWidget(self.btn_apply_calibration)
+        cal_layout.addWidget(self.txt_real_m)
 
         self.lbl_m_per_px = QLabel(tr("label.scale_m_per_px"))
+        self.lbl_m_per_px.setWordWrap(True)
         cal_layout.addWidget(self.lbl_m_per_px)
 
         self.btn_confirm_calibration = QPushButton(tr("button.confirm_calibration"))
@@ -856,7 +867,7 @@ class MainWindow(QMainWindow):
         self.btn_finish_alignment.clicked.connect(self._on_finish_alignment)
 
         self.chk_calibration_mode.toggled.connect(self._on_calibration_mode_toggled)
-        self.btn_apply_calibration.clicked.connect(self._on_apply_calibration)
+        self.txt_real_m.textChanged.connect(self._refresh_calibration_panel)
         self.btn_confirm_calibration.clicked.connect(self._on_confirm_calibration)
 
         self.chk_set_w_mode.toggled.connect(self._on_set_w_mode_toggled)
@@ -952,9 +963,7 @@ class MainWindow(QMainWindow):
         self.btn_finish_alignment.setText(tr("button.finish_alignment"))
 
         self.cal_group.setTitle(tr("group.calibration"))
-        self.chk_calibration_mode.setText(tr("check.calibration_mode"))
         self.lbl_real_distance_m.setText(tr("label.real_distance_m"))
-        self.btn_apply_calibration.setText(tr("button.apply_calibration"))
         self.btn_confirm_calibration.setText(tr("button.confirm_calibration"))
 
         self.mark_group.setTitle(tr("group.marking"))
@@ -1201,8 +1210,8 @@ class MainWindow(QMainWindow):
                 "navigation.resolve_alignment" if self._workflow_navigation_blocked()
                 else "navigation.load_image"
             )
-        elif active == Stage.CALIBRATION and self._m_per_px is None:
-            hint = "workflow.error.apply_calibration_first"
+        elif active == Stage.CALIBRATION:
+            _, hint = self.meas.calibration_candidate()
         elif active == Stage.MARKING:
             hint = self.workflow.marking_block_reason()
 
@@ -1870,15 +1879,32 @@ class MainWindow(QMainWindow):
 
     # ---------------- Calibration ----------------
     def _on_calibration_mode_toggled(self, checked: bool) -> None:
-        self.canvas.set_calibration_mode(checked)
         if checked:
+            self.canvas.clear_calibration()
             self._calibration_px = None
-            self.lbl_px_distance.setText(tr("label.measured_distance"))
+        self.canvas.set_calibration_mode(checked)
+        self._refresh_calibration_panel()
 
-    def _on_apply_calibration(self) -> None:
-        if not self._warn_if_alignment_scales_differ():
-            return
-        self.meas.apply_calibration()
+    def _refresh_calibration_panel(self) -> None:
+        has_points = self.canvas.cal_p1 is not None and self.canvas.cal_p2 is not None
+        if self.chk_calibration_mode.isChecked():
+            action = "calibration.cancel_points"
+        else:
+            action = "calibration.remark_points" if has_points else "calibration.mark_points"
+        self.chk_calibration_mode.setText(tr(action))
+        self.lbl_px_distance.setText(
+            tr("measurement.measured_distance_value", value=f"{self._calibration_px:.2f}")
+            if has_points and self._calibration_px is not None else tr("label.measured_distance")
+        )
+        if self.stage == Stage.CALIBRATION and self._viewed_step is None:
+            candidate, _ = self.meas.calibration_candidate()
+            value = f"{candidate:.6g}" if candidate is not None else "—"
+            self.lbl_m_per_px.setText(tr("calibration.calculated_scale", value=value))
+        elif self._m_per_px is not None:
+            self.lbl_m_per_px.setText(tr("measurement.scale_value", value=f"{self._m_per_px:.6f}"))
+        else:
+            self.lbl_m_per_px.setText(tr("label.scale_m_per_px"))
+        self._refresh_navigation_footer()
 
     def _on_confirm_calibration(self) -> None:
         self.workflow.confirm_calibration()
@@ -2099,6 +2125,8 @@ class MainWindow(QMainWindow):
         self.lbl_summary.setText("\n".join(parts))
 
     def _warn_if_alignment_scales_differ(self) -> bool:
+        if not self.canvas.has_both_images():
+            return True
         ref_tr = self.canvas.get_reference_transform()
         dam_tr = self.canvas.get_deformed_transform()
 

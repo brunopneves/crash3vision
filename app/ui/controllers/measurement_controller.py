@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSignalBlocker
@@ -20,38 +22,34 @@ class MeasurementController:
     # ---------------- Calibration ----------------
     def on_calibration_px_measured(self, dist_px: float) -> None:
         self.host._calibration_px = dist_px
-        self.host.lbl_px_distance.setText(
-            tr("measurement.measured_distance_value", value=f"{dist_px:.2f}")
-        )
+        self.host.chk_calibration_mode.setChecked(False)
+        self.host._refresh_calibration_panel()
 
-    def apply_calibration(self) -> None:
-        if self.host._calibration_px is None or self.host._calibration_px <= 0:
-            QMessageBox.warning(
-                self.host,
-                tr("group.calibration"),
-                tr("measurement.error.measure_2_points_first"),
-            )
-            return
-
+    def calibration_candidate(self) -> tuple[float | None, str | None]:
+        p1, p2 = self.host.canvas.cal_p1, self.host.canvas.cal_p2
+        if p1 is None or p2 is None:
+            return None, "measurement.error.measure_2_points_first"
+        dist_px = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+        if not math.isfinite(dist_px) or dist_px <= 0:
+            return None, "measurement.error.measure_2_points_first"
         try:
             real_m = float(self.host.txt_real_m.text().replace(",", "."))
         except ValueError:
-            QMessageBox.warning(
-                self.host,
-                tr("group.calibration"),
-                tr("measurement.error.invalid_real_distance"),
-            )
-            return
+            return None, "measurement.error.invalid_real_distance"
+        if not math.isfinite(real_m) or real_m <= 0:
+            return None, "measurement.error.real_distance_positive"
+        scale = real_m / dist_px
+        if not math.isfinite(scale) or scale <= 0:
+            return None, "measurement.error.invalid_real_distance"
+        return scale, None
 
-        if real_m <= 0:
-            QMessageBox.warning(
-                self.host,
-                tr("group.calibration"),
-                tr("measurement.error.real_distance_positive"),
-            )
-            return
+    def apply_calibration(self) -> bool:
+        m_per_px, reason = self.calibration_candidate()
+        if m_per_px is None:
+            assert reason is not None
+            QMessageBox.warning(self.host, tr("group.calibration"), tr(reason))
+            return False
 
-        m_per_px = real_m / self.host._calibration_px
         self.host._m_per_px = m_per_px
         self.host.canvas.apply_scale(m_per_px)
         self.host.project.m_per_px = m_per_px
@@ -63,12 +61,8 @@ class MeasurementController:
                 tr("measurement.warning.unusual_scale", value=f"{m_per_px:.6f}"),
             )
 
-        self.host.lbl_m_per_px.setText(
-            tr("measurement.scale_value", value=f"{m_per_px:.6f}")
-        )
-
         self.refresh_w_labels()
-        self.host._refresh_summary()
+        return True
 
     # ---------------- Marking: W/Δw ----------------
     def on_w_cleared(self) -> None:

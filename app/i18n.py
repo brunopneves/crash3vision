@@ -331,6 +331,13 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Real distance (m):",
         "pt": "Distância real (m):",
     },
+    "calibration.mark_points": {"en": "Mark two points", "pt": "Marcar dois pontos"},
+    "calibration.remark_points": {"en": "Mark points again", "pt": "Remarcar pontos"},
+    "calibration.cancel_points": {"en": "Cancel point selection", "pt": "Cancelar marcação"},
+    "calibration.calculated_scale": {
+        "en": "Calculated scale (m/px): {value}",
+        "pt": "Escala calculada (m/px): {value}",
+    },
     "button.apply_calibration": {
         "en": "Apply calibration",
         "pt": "Aplicar calibração",

@@ -41,7 +41,4 @@ class CalibrationTool(ToolBase):
             self.emit_px_measured(float(dist_px))
             return True
 
-        # third click resets
-        self.state.clear_calibration()
-        self.renderer.render_calibration(self.state)
-        return True
+        return False

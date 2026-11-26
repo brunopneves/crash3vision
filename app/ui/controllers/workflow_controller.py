@@ -76,7 +76,7 @@ class WorkflowController:
         panel = viewed or host._current_workflow_step()
         entering_result = panel == "result" and host._summary_group.isHidden()
         host._refresh_image_controls()
-        host._refresh_navigation_footer()
+        host._refresh_calibration_panel()
         host.canvas_view_bar.setEnabled(host.canvas.has_both_images() and not consulting)
         host.btn_return_to_current_step.setVisible(consulting)
         host.btn_redo_step.setVisible(viewed in ("alignment", "calibration", "measurement"))
@@ -329,12 +329,10 @@ class WorkflowController:
         if self.host.stage != Stage.CALIBRATION or self.host._viewed_step is not None:
             return
 
-        if self.host._m_per_px is None:
-            QMessageBox.warning(
-                self.host,
-                tr("group.calibration"),
-                tr("workflow.error.apply_calibration_first"),
-            )
+        candidate, _ = self.host.meas.calibration_candidate()
+        if candidate is not None and not self.host._warn_if_alignment_scales_differ():
+            return
+        if not self.host.meas.apply_calibration():
             return
 
         self.host.canvas.set_calibration_mode(False)

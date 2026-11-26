@@ -261,7 +261,7 @@ class ProjectIOController:
 
             if self.host._m_per_px is not None:
                 real_m = self.host._calibration_px * self.host._m_per_px
-                self.host.txt_real_m.setText(f"{real_m:.3f}")
+                self.host.txt_real_m.setText(str(real_m))
             else:
                 self.host.txt_real_m.setText("")
         else:
