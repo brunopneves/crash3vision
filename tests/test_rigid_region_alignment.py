@@ -15,7 +15,9 @@ import numpy as np
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
 from PySide6.QtGui import QImage, QMouseEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QBoxLayout, QFileDialog, QGraphicsView, QMessageBox
+from PySide6.QtWidgets import (
+    QApplication, QBoxLayout, QDialog, QFileDialog, QGraphicsView, QInputDialog, QMessageBox,
+)
 
 from app.core.project import Project
 from app.core.rigid_region_alignment import (
@@ -54,6 +56,98 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    def test_calculation_layout_keeps_sources_and_actions_available(self) -> None:
+        window = self._window()
+        source = COMPASS / "crash3vision_reference_project.json"
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(str(source), "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        window.workflow_step_labels["calculation"].click()
+        panel = window.calc_panel
+        before = window.project.to_dict()
+        self.assertIs(panel.cmb_class.parentWidget(), panel.grp_source)
+        self.assertIs(panel.txt_vehicle_mass.parentWidget(), panel.grp_params)
+        self.assertTrue(panel.details.isHidden())
+        window.show()
+        for language in ("pt", "en"):
+            window._set_language_and_refresh(language)
+            panel.btn_toggle_details.setChecked(True)
+            QApplication.processEvents()
+            self.assertTrue(panel.details.isVisible())
+            self.assertTrue(panel.lbl_ab_source.isVisible())
+            self.assertAlmostEqual(window._controls_dock.width(), 370, delta=15)
+            self.assertEqual(window._controls_scroll.horizontalScrollBar().maximum(), 0)
+        self.assertEqual(window.project.to_dict(), before)
+
+        panel.cmb_class.setCurrentIndex(1)
+        self.assertEqual(window.project.ab_source_type, "generic_class")
+        self.assertTrue(panel.txt_A.isReadOnly())
+        panel.cmb_class.setCurrentIndex(0)
+        self.assertFalse(panel.txt_B.isReadOnly())
+        self.assertEqual(window.project.ab_source_type, "manual")
+        panel.txt_A.setText("170000")
+        panel.txt_B.setText("1800000")
+        panel.btn_compute.click()
+        self.assertGreater(window._total_energy, 0)
+
+        def select_compass(_parent, _title, _label, options, *_args):
+            return next(item for item in options if "Compass" in item), True
+
+        with patch.object(QInputDialog, "getItem", side_effect=select_compass):
+            panel.act_load_ab_library.trigger()
+        self.assertEqual(window.project.ab_source_type, "nhtsa_library")
+        self.assertIn("M20240300", panel.lbl_ab_details.text())
+        with tempfile.TemporaryDirectory() as tmp:
+            ab_path = str(Path(tmp) / "coefficients.json")
+            with (
+                patch.object(QFileDialog, "getSaveFileName", return_value=(ab_path, "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                panel.act_export_ab_file.trigger()
+            self.assertTrue(Path(ab_path).is_file())
+            with patch.object(QFileDialog, "getOpenFileName", return_value=(ab_path, "")):
+                panel.act_import_ab_file.trigger()
+        self.assertEqual(window.project.ab_source_type, "nhtsa_file")
+
+        with patch(
+            "app.ui.widgets.calc_panel.NhtsaAbDialog.exec",
+            return_value=QDialog.DialogCode.Rejected,
+        ) as dialog:
+            panel.btn_compute_ab_nhtsa.click()
+            panel.btn_edit_ab_nhtsa.click()
+        self.assertEqual(dialog.call_count, 2)
+        self.assertEqual(window.project.ab_source_type, "nhtsa_file")
+
+        def compute_and_accept(dialog):
+            dialog._on_compute()
+            self.assertIsNotNone(dialog._last_result)
+            return QDialog.DialogCode.Accepted
+
+        with (
+            patch("app.ui.widgets.calc_panel.NhtsaAbDialog.exec", new=compute_and_accept),
+            patch.object(QMessageBox, "warning") as warning,
+        ):
+            panel.btn_edit_ab_nhtsa.click()
+        warning.assert_not_called()
+        self.assertEqual(window.project.ab_source_type, "nhtsa_report")
+        self.assertGreater(window._total_energy, 0)
+        self.assertIsNone(window._damage_speed_kmh)
+
+        panel.txt_vehicle_mass.clear()
+        panel.btn_compute.click()
+        self.assertGreater(window._total_energy, 0)
+        self.assertIsNone(window._damage_speed_kmh)
+        with patch("app.ui.widgets.calc_panel.CrushProfileDialog.exec") as profile:
+            panel.btn_show_profile.click()
+        profile.assert_called_once()
+        panel.txt_vehicle_mass.setText("1800")
+        self.assertGreater(window._total_energy, 0)
+        panel.btn_compute_speed.click()
+        self.assertGreater(window._damage_speed_kmh, 0)
+        self.assertEqual(window._current_workflow_step(), "result")
+
     def test_measurement_panel_tracks_steps_and_collapses_guide_safely(self) -> None:
         window = self._window()
         window._m_per_px = 0.005

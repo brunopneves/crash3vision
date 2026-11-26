@@ -665,16 +665,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Aplicar valores da classe",
     },
     "calc.a_coefficient": {
-        "en": "A coefficient",
-        "pt": "Coeficiente A",
+        "en": "A",
+        "pt": "A",
     },
     "calc.b_coefficient": {
-        "en": "B coefficient",
-        "pt": "Coeficiente B",
+        "en": "B",
+        "pt": "B",
     },
     "calc.alpha_deg": {
-        "en": "Alpha (deg)",
-        "pt": "Alpha (graus)",
+        "en": "Angle α (°)",
+        "pt": "Ângulo α (°)",
     },
     "calc.formula_hint": {
         "en": "Extended formula. Units: A in N/m, B in N/m², alpha in degrees.",
@@ -693,12 +693,17 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "<b>Energia Total:</b> <b>{value} {unit}</b>",
     },
     "calc.vehicle_mass": {
-        "en": "Vehicle mass (kg)",
-        "pt": "Massa do veículo (kg)",
+        "en": "Mass for EES (kg)",
+        "pt": "Massa para EES (kg)",
     },
+    "calc.mass_hint": {
+        "en": "Mass is optional for energy and required for EES.",
+        "pt": "Massa opcional para energia e necessária para EES.",
+    },
+    "calc.technical_details": {"en": "Technical details", "pt": "Detalhes técnicos"},
     "calc.compute_speed": {
-        "en": "Compute Damage Speed",
-        "pt": "Calcular velocidade de dano",
+        "en": "Compute EES",
+        "pt": "Calcular EES",
     },
     "calc.damage_speed_default": {
         "en": "<b>Damage Speed:</b> -",
@@ -709,8 +714,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "<b>Velocidade de Dano:</b> <b>{value} {unit}</b>",
     },
     "calc.show_crush_profile": {
-        "en": "Show Crush Profile",
-        "pt": "Mostrar perfil de danos",
+        "en": "Crush profile",
+        "pt": "Perfil de deformação",
     },
     "calc.dialog.title": {
         "en": "CRASH3",
@@ -1367,8 +1372,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Registro salvo na biblioteca NHTSA.",
     },
     "calc.compute_ab_from_nhtsa": {
-        "en": "Compute A/B from NHTSA report",
-        "pt": "Calcular A/B a partir de relatório NHTSA",
+        "en": "A/B from NHTSA",
+        "pt": "A/B via NHTSA",
     },
     "calc.ab_source_nhtsa_report": {
         "en": "A/B source: NHTSA report | {label}",
@@ -1379,8 +1384,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Documento de origem",
     },
     "calc.edit_ab_from_nhtsa": {
-        "en": "Edit NHTSA A/B inputs",
-        "pt": "Editar entradas NHTSA de A/B",
+        "en": "Edit NHTSA",
+        "pt": "Editar NHTSA",
     },
     "calc.no_nhtsa_snapshot": {
         "en": "No saved NHTSA input data in current project.",
@@ -1427,8 +1432,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "A massa do veículo está fora da faixa plausível (300 a 4000 kg).",
     },
     "calc.group.source": {
-        "en": "A/B Source",
-        "pt": "Origem dos coeficientes A/B",
+        "en": "A/B coefficients",
+        "pt": "Coeficientes A/B",
     },
     "calc.group.params": {
         "en": "Parameters",

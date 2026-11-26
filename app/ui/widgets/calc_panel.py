@@ -5,13 +5,14 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 
 from PySide6.QtWidgets import (
-    QFrame,
     QFileDialog,
     QComboBox,
     QGroupBox,
+    QGridLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -20,6 +21,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QMenu,
+    QSizePolicy,
+    QToolButton,
+    QWidget,
 )
 
 from app.core.nhtsa_ab_library import (
@@ -61,132 +65,111 @@ class CalcPanel(QGroupBox):
         self._profile_dialog: CrushProfileDialog | None = None
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(7, 9, 7, 7)
+        layout.setSpacing(5)
 
         self.grp_source = QGroupBox(tr("calc.group.source"))
         src_layout = QVBoxLayout(self.grp_source)
-
         self.grp_params = QGroupBox(tr("calc.group.params"))
-        params_layout = QVBoxLayout(self.grp_params)
-
+        params_layout = QGridLayout(self.grp_params)
         self.grp_calc = QGroupBox(tr("calc.group.calc"))
         calc_layout = QVBoxLayout(self.grp_calc)
+        for section_layout in (src_layout, params_layout, calc_layout):
+            section_layout.setContentsMargins(8, 10, 8, 8)
+            section_layout.setSpacing(4)
 
-        # ---------------- Generic stiffness class ----------------
-        row_class = QHBoxLayout()
         self.lbl_generic_class = QLabel(tr("calc.generic_class"))
-        row_class.addWidget(self.lbl_generic_class)
-
         self.cmb_class = QComboBox()
+        self.lbl_generic_class.setBuddy(self.cmb_class)
         self.cmb_class.addItem(tr("calc.manual_entry"), None)
-        for class_name in sorted(self._stiffness_classes.keys()):
+        for class_name in sorted(self._stiffness_classes):
             self.cmb_class.addItem(class_name, class_name)
-        row_class.addWidget(self.cmb_class)
-        params_layout.addLayout(row_class)
-
-        # self.btn_apply_class = QPushButton(tr("calc.apply_class_values"))
-        # params_layout.addWidget(self.btn_apply_class)
-
         self.cmb_class.currentIndexChanged.connect(self._on_class_changed)
-
-        self.btn_compute_ab_nhtsa = QPushButton(tr("calc.compute_ab_from_nhtsa"))
-        src_layout.addWidget(self.btn_compute_ab_nhtsa)
-
-        self.btn_edit_ab_nhtsa = QPushButton(tr("calc.edit_ab_from_nhtsa"))
-        src_layout.addWidget(self.btn_edit_ab_nhtsa)
+        src_layout.addWidget(self.lbl_generic_class)
+        src_layout.addWidget(self.cmb_class)
 
         self.btn_ab_menu = QPushButton(tr("calc.ab_menu"))
+        self.btn_ab_menu.setStyleSheet("QPushButton { font-size: 10px; }")
         self.ab_menu = QMenu(self)
-
         self.act_load_ab_library = QAction(tr("calc.ab_menu.load_library"), self)
         self.act_import_ab_file = QAction(tr("calc.ab_menu.import_file"), self)
         self.act_export_ab_file = QAction(tr("calc.ab_menu.export_file"), self)
-
         self.ab_menu.addAction(self.act_load_ab_library)
         self.ab_menu.addSeparator()
         self.ab_menu.addAction(self.act_import_ab_file)
         self.ab_menu.addAction(self.act_export_ab_file)
-
         self.btn_ab_menu.setMenu(self.ab_menu)
         src_layout.addWidget(self.btn_ab_menu)
 
+        self.btn_compute_ab_nhtsa = QPushButton(tr("calc.compute_ab_from_nhtsa"))
+        self.btn_edit_ab_nhtsa = QPushButton(tr("calc.edit_ab_from_nhtsa"))
+        nhtsa_row = QHBoxLayout()
+        for button in (self.btn_compute_ab_nhtsa, self.btn_edit_ab_nhtsa):
+            button.setStyleSheet("QPushButton { font-size: 10px; }")
+            nhtsa_row.addWidget(button, 1)
+        src_layout.addLayout(nhtsa_row)
+
         self.lbl_ab_source = QLabel(tr("calc.ab_source_default"))
         src_layout.addWidget(self.lbl_ab_source)
-        self.lbl_ab_source.setWordWrap(True)
-        self.lbl_ab_source.setMinimumWidth(0)
 
-        sep1 = QFrame()
-        sep1.setFrameShape(QFrame.Shape.HLine)
-        sep1.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(sep1)
-        # ---------------- Active parameters ----------------
-        # ---------------- A coefficient ----------------
-        row_a = QHBoxLayout()
         self.lbl_a = QLabel(f"{tr('calc.a_coefficient')} ({self.A_UNIT})")
-        row_a.addWidget(self.lbl_a)
         self.txt_A = QLineEdit()
-        self.txt_A.setPlaceholderText("e.g. 65637")
-        row_a.addWidget(self.txt_A)
-        params_layout.addLayout(row_a)
-
-        # ---------------- B coefficient ----------------
-        row_b = QHBoxLayout()
+        self.txt_A.setPlaceholderText("65637")
         self.lbl_b = QLabel(f"{tr('calc.b_coefficient')} ({self.B_UNIT})")
-        row_b.addWidget(self.lbl_b)
         self.txt_B = QLineEdit()
-        self.txt_B.setPlaceholderText("e.g. 856265")
-        row_b.addWidget(self.txt_B)
-        params_layout.addLayout(row_b)
-
-        # ---------------- Alpha ----------------
-        row_alpha = QHBoxLayout()
+        self.txt_B.setPlaceholderText("856265")
         self.lbl_alpha = QLabel(tr("calc.alpha_deg"))
-        row_alpha.addWidget(self.lbl_alpha)
-        self.txt_alpha_deg = QLineEdit()
-        self.txt_alpha_deg.setPlaceholderText("e.g. 0.0")
-        self.txt_alpha_deg.setText("0.0")
-        row_alpha.addWidget(self.txt_alpha_deg)
-        params_layout.addLayout(row_alpha)
-
-        self.lbl_formula_hint = QLabel(tr("calc.formula_hint"))
-        self.lbl_formula_hint.setWordWrap(True)
-        params_layout.addWidget(self.lbl_formula_hint)
-
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(sep2)
-
-        # ---------------- Compute energy ----------------
-        self.btn_compute = QPushButton(tr("calc.compute_energy"))
-        calc_layout.addWidget(self.btn_compute)
-
-        self.lbl_energy = QLabel(tr("calc.total_energy_default"))
-        calc_layout.addWidget(self.lbl_energy)
-
-        # ---------------- Vehicle mass ----------------
-        row_mass = QHBoxLayout()
+        self.txt_alpha_deg = QLineEdit("0.0")
         self.lbl_vehicle_mass = QLabel(tr("calc.vehicle_mass"))
-        row_mass.addWidget(self.lbl_vehicle_mass)
-
         self.txt_vehicle_mass = QLineEdit()
-        self.txt_vehicle_mass.setPlaceholderText("e.g. 1700")
-        row_mass.addWidget(self.txt_vehicle_mass)
+        self.txt_vehicle_mass.setPlaceholderText("1700")
 
-        calc_layout.addLayout(row_mass)
+        for label, field, row, column in (
+            (self.lbl_a, self.txt_A, 0, 0),
+            (self.lbl_b, self.txt_B, 0, 1),
+            (self.lbl_alpha, self.txt_alpha_deg, 2, 0),
+            (self.lbl_vehicle_mass, self.txt_vehicle_mass, 2, 1),
+        ):
+            label.setBuddy(field)
+            params_layout.addWidget(label, row, column)
+            params_layout.addWidget(field, row + 1, column)
+        for column in range(2):
+            params_layout.setColumnStretch(column, 1)
+        self.lbl_mass_hint = QLabel(tr("calc.mass_hint"))
+        params_layout.addWidget(self.lbl_mass_hint, 4, 0, 1, 2)
 
+        self.btn_compute = QPushButton(tr("calc.compute_energy"))
+        self.lbl_energy = QLabel(tr("calc.total_energy_default"))
         self.btn_compute_speed = QPushButton(tr("calc.compute_speed"))
-        calc_layout.addWidget(self.btn_compute_speed)
-
         self.lbl_speed = QLabel(tr("calc.damage_speed_default"))
-        calc_layout.addWidget(self.lbl_speed)
+        for widget in (self.btn_compute, self.lbl_energy, self.btn_compute_speed, self.lbl_speed):
+            calc_layout.addWidget(widget)
 
-        # ---------------- Profile ----------------
         self.btn_show_profile = QPushButton(tr("calc.show_crush_profile"))
-        calc_layout.addWidget(self.btn_show_profile)
+        self.btn_show_profile.setFlat(True)
+        self.btn_toggle_details = QToolButton()
+        self.main._style_disclosure(self.btn_toggle_details)
+        self.btn_toggle_details.toggled.connect(self._refresh_details_visibility)
+        self.details = QWidget()
+        details_layout = QVBoxLayout(self.details)
+        details_layout.setContentsMargins(8, 2, 8, 2)
+        self.lbl_formula_hint = QLabel(tr("calc.formula_hint"))
+        self.lbl_ab_details = QLabel()
+        self.lbl_ab_details.setTextFormat(Qt.TextFormat.PlainText)
+        details_layout.addWidget(self.lbl_formula_hint)
+        details_layout.addWidget(self.lbl_ab_details)
 
-        layout.addWidget(self.grp_source)
-        layout.addWidget(self.grp_params)
-        layout.addWidget(self.grp_calc)
+        for label in (
+            self.lbl_generic_class, self.lbl_ab_source, self.lbl_vehicle_mass, self.lbl_mass_hint,
+            self.lbl_energy, self.lbl_speed, self.lbl_formula_hint, self.lbl_ab_details,
+        ):
+            label.setWordWrap(True)
+            label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        for widget in (
+            self.grp_source, self.grp_params, self.grp_calc,
+            self.btn_show_profile, self.btn_toggle_details, self.details,
+        ):
+            layout.addWidget(widget)
 
         # ---------------- Signals ----------------
         self.act_load_ab_library.triggered.connect(self._on_load_ab_from_library)
@@ -259,6 +242,7 @@ class CalcPanel(QGroupBox):
             )
 
         self.lbl_vehicle_mass.setText(tr("calc.vehicle_mass"))
+        self.lbl_mass_hint.setText(tr("calc.mass_hint"))
         self.btn_compute_speed.setText(tr("calc.compute_speed"))
 
         if self.main._damage_speed_kmh is None:
@@ -278,6 +262,14 @@ class CalcPanel(QGroupBox):
 
         self._refresh_ab_source_ui()
         self.btn_show_profile.setText(tr("calc.show_crush_profile"))
+        self._refresh_details_visibility()
+
+    def _refresh_details_visibility(self) -> None:
+        expanded = self.btn_toggle_details.isChecked()
+        title = tr("calc.technical_details")
+        self.btn_toggle_details.setText(f"{'▾' if expanded else '▸'} {title}")
+        self.btn_toggle_details.setAccessibleName(title)
+        self.details.setVisible(expanded)
 
     def _to_float(self, value: object, default: float = 0.0) -> float:
         return parse_float(value, default=default)
@@ -1047,6 +1039,8 @@ class CalcPanel(QGroupBox):
             )
         else:
             self.lbl_ab_source.setToolTip("")
+        self.lbl_ab_details.setText(self.lbl_ab_source.toolTip())
+        self.lbl_ab_details.setVisible(bool(snap))
 
     def _parse_ab_alpha(self):
         try:
