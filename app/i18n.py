@@ -677,13 +677,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Ângulo α (°)",
     },
     "calc.formula_hint": {
-        "en": "Extended formula. Units: A in N/m, B in N/m², alpha in degrees.",
-        "pt": "Fórmula estendida. Unidades: A em N/m, B em N/m², alpha em graus.",
+        "en": "Deformation energy uses the extended CRASH3 formula, including the angle correction.",
+        "pt": "A energia de deformação usa a fórmula estendida do CRASH3, com correção angular.",
     },
     "calc.compute_energy": {
-        "en": "Compute CRASH3 Energy",
-        "pt": "Calcular energia CRASH3",
+        "en": "Calculate energy",
+        "pt": "Calcular energia",
     },
+    "calc.compute_energy_and_ees": {
+        "en": "Calculate energy and EES",
+        "pt": "Calcular energia e EES",
+    },
+    "calc.view_result": {"en": "View result", "pt": "Ver resultado"},
     "calc.total_energy_default": {
         "en": "<b>Total Energy:</b> -",
         "pt": "<b>Energia Total:</b> -",
@@ -702,7 +707,7 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "calc.technical_details": {"en": "Technical details", "pt": "Detalhes técnicos"},
     "calc.compute_speed": {
-        "en": "Compute EES",
+        "en": "Calculate EES",
         "pt": "Calcular EES",
     },
     "calc.damage_speed_default": {
@@ -750,8 +755,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Classe selecionada não encontrada na biblioteca de rigidez.",
     },
     "calc.error.invalid_vehicle_mass": {
-        "en": "Enter a valid vehicle mass in kg.",
-        "pt": "Informe uma massa de veículo válida em kg.",
+        "en": "Enter a finite, positive vehicle mass in kg.",
+        "pt": "Informe uma massa de veículo finita e positiva em kg.",
+    },
+    "calc.error.invalid_energy_result": {
+        "en": "A finite, positive energy value is required.",
+        "pt": "É necessário um valor de energia finito e positivo.",
+    },
+    "calc.error.invalid_speed_result": {
+        "en": "The calculation did not produce a valid EES.",
+        "pt": "O cálculo não produziu uma EES válida.",
     },
     "profile.window_title": {
         "en": "Crush Profile",
@@ -1102,16 +1115,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Registro:",
     },
     "calc.ab_source_default": {
-        "en": "A/B source: -",
-        "pt": "Origem de A/B: -",
+        "en": "A/B source not specified",
+        "pt": "Origem de A/B não informada",
     },
     "calc.ab_source_nhtsa": {
-        "en": "A/B source: NHTSA library | {label}",
-        "pt": "Origem de A/B: Biblioteca NHTSA | {label}",
+        "en": "A/B source: NHTSA library{label}",
+        "pt": "Origem de A/B: Biblioteca NHTSA{label}",
     },
     "calc.ab_source_generic": {
-        "en": "A/B source: Generic class | {label}",
-        "pt": "Origem de A/B: Classe genérica | {label}",
+        "en": "A/B source: Generic class{label}",
+        "pt": "Origem de A/B: Classe genérica{label}",
     },
     "calc.ab_source_manual": {
         "en": "A/B source: Manual entry",
@@ -1145,32 +1158,15 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Success",
         "pt": "Sucesso",
     },
-    "calc.ab_tooltip": {
-        "en": (
-            "Test: {label}\n"
-            "Test #: {test_number}\n"
-            "Report: {report_number}\n"
-            "Impact speed: {impact_speed} km/h\n"
-            "Velocity change: {velocity_change} km/h\n"
-            "Damage speed: {damage_speed} km/h\n"
-            "Basis: {speed_basis}\n"
-            "Angle: {angle} deg\n"
-            "A: {A}\n"
-            "B: {B}"
-        ),
-        "pt": (
-            "Teste: {label}\n"
-            "Teste #: {test_number}\n"
-            "Relatório: {report_number}\n"
-            "Velocidade de impacto: {impact_speed} km/h\n"
-            "Variação de velocidade: {velocity_change} km/h\n"
-            "Velocidade de danos: {damage_speed} km/h\n"
-            "Base: {speed_basis}\n"
-            "Ângulo: {angle} graus\n"
-            "A: {A}\n"
-            "B: {B}"
-        ),
+    "calc.ab.test_speed_used": {
+        "en": "Speed used for A/B (km/h)",
+        "pt": "Velocidade usada para A/B (km/h)",
     },
+    "calc.ab.test_angle": {"en": "Test angle (°)", "pt": "Ângulo do ensaio (°)"},
+    "calc.ab.test_mass": {"en": "Test mass (kg)", "pt": "Massa do ensaio (kg)"},
+    "calc.ab.test_crush": {"en": "Test crush (m)", "pt": "Deformações do ensaio (m)"},
+    "calc.ab.overlap": {"en": "Overlap (%)", "pt": "Sobreposição (%)"},
+    "calc.ab.notes": {"en": "Notes", "pt": "Observações"},
     "nhtsa.dialog.title": {
         "en": "Compute A/B from NHTSA report",
         "pt": "Calcular A/B a partir de relatório NHTSA",
@@ -1376,8 +1372,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "A/B via NHTSA",
     },
     "calc.ab_source_nhtsa_report": {
-        "en": "A/B source: NHTSA report | {label}",
-        "pt": "Origem de A/B: Relatório NHTSA | {label}",
+        "en": "A/B source: NHTSA report{label}",
+        "pt": "Origem de A/B: Relatório NHTSA{label}",
     },
     "report.ab_source_reference": {
         "en": "Source document",
@@ -1492,8 +1488,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Arquivo A/B exportado com sucesso.",
     },
     "calc.ab_source_nhtsa_file": {
-        "en": "A/B source: A/B file | {label}",
-        "pt": "Origem de A/B: Arquivo A/B | {label}",
+        "en": "A/B source: A/B file{label}",
+        "pt": "Origem de A/B: Arquivo A/B{label}",
     },
     "report.bumper_offset_m": {
         "en": "Offset to bumper crossmember (m)",

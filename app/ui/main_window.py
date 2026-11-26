@@ -265,11 +265,18 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(strip)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
+    def has_energy_result(self) -> bool:
+        energy = self._total_energy
+        return energy is not None and math.isfinite(energy) and energy > 0
+
+    def has_ees_result(self) -> bool:
+        speed = self._damage_speed_kmh
+        return self.has_energy_result() and speed is not None and math.isfinite(speed) and speed >= 0
+
     def _current_workflow_step(self) -> str:
         if (
             self.stage == Stage.DONE
-            and self._total_energy is not None
-            and self._damage_speed_kmh is not None
+            and self.has_ees_result()
         ):
             return "result"
         return {
@@ -2138,6 +2145,7 @@ class MainWindow(QMainWindow):
             if steps.index(self._viewed_step) >= steps.index(self._current_workflow_step()):
                 self._viewed_step = None
         self.workflow.apply_stage_gating()
+        self.calc_panel.refresh_compute_action()
         self._refresh_marking_panel()
         self._refresh_workflow_progress()
         self.lbl_result_ees_kmh.setText(

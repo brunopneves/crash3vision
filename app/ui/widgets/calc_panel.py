@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 from collections import Counter
 from pathlib import Path
@@ -139,10 +140,19 @@ class CalcPanel(QGroupBox):
         params_layout.addWidget(self.lbl_mass_hint, 4, 0, 1, 2)
 
         self.btn_compute = QPushButton(tr("calc.compute_energy"))
+        self.btn_compute.setStyleSheet("""
+            QPushButton {
+                background: #dbe8f5; color: #183c5c;
+                border: 2px solid #b8cddd; border-radius: 4px;
+                padding: 4px; font-size: 11px; font-weight: bold;
+            }
+            QPushButton:hover { background: #ccdff1; }
+            QPushButton:focus { border-color: #245b96; }
+            QPushButton:disabled { background: #edf0f2; color: #53616b; }
+        """)
         self.lbl_energy = QLabel(tr("calc.total_energy_default"))
-        self.btn_compute_speed = QPushButton(tr("calc.compute_speed"))
         self.lbl_speed = QLabel(tr("calc.damage_speed_default"))
-        for widget in (self.btn_compute, self.lbl_energy, self.btn_compute_speed, self.lbl_speed):
+        for widget in (self.btn_compute, self.lbl_energy, self.lbl_speed):
             calc_layout.addWidget(widget)
 
         self.btn_show_profile = QPushButton(tr("calc.show_crush_profile"))
@@ -176,8 +186,7 @@ class CalcPanel(QGroupBox):
         self.act_import_ab_file.triggered.connect(self._on_import_ab_file)
         self.act_export_ab_file.triggered.connect(self._on_export_ab_file)
 
-        self.btn_compute.clicked.connect(self._on_compute)
-        self.btn_compute_speed.clicked.connect(self._on_compute_speed)
+        self.btn_compute.clicked.connect(self._on_calculate)
         self.btn_show_profile.clicked.connect(self._on_show_profile)
         self.btn_compute_ab_nhtsa.clicked.connect(self._on_compute_ab_from_nhtsa)
         self.btn_edit_ab_nhtsa.clicked.connect(self._on_edit_ab_from_nhtsa)
@@ -200,12 +209,16 @@ class CalcPanel(QGroupBox):
             value = parse_float(text)
         except ValueError:
             value = None
+        if value is not None and not math.isfinite(value):
+            value = None
         setattr(self.main.project, attribute, value)
         if attribute == "vehicle_mass_kg":
             self.main._vehicle_mass_kg = value
             self.main.workflow.invalidate_speed()
         else:
             self.main.workflow.invalidate_energy()
+        if attribute in ("vehicle_mass_kg", "crash3_alpha_deg"):
+            self._refresh_ab_source_ui()
 
     def retranslate_ui(self) -> None:
         self.setTitle(tr("calc.group.title"))
@@ -228,7 +241,7 @@ class CalcPanel(QGroupBox):
         self.lbl_b.setText(f"{tr('calc.b_coefficient')} ({self.B_UNIT})")
         self.lbl_alpha.setText(tr("calc.alpha_deg"))
         self.lbl_formula_hint.setText(tr("calc.formula_hint"))
-        self.btn_compute.setText(tr("calc.compute_energy"))
+        self.refresh_compute_action()
 
         if self.main._total_energy is None:
             self.lbl_energy.setText(tr("calc.total_energy_default"))
@@ -243,7 +256,6 @@ class CalcPanel(QGroupBox):
 
         self.lbl_vehicle_mass.setText(tr("calc.vehicle_mass"))
         self.lbl_mass_hint.setText(tr("calc.mass_hint"))
-        self.btn_compute_speed.setText(tr("calc.compute_speed"))
 
         if self.main._damage_speed_kmh is None:
             self.lbl_speed.setText(tr("calc.damage_speed_default"))
@@ -710,7 +722,45 @@ class CalcPanel(QGroupBox):
             tr("calc.ab_file.exported"),
         )
 
-    def _on_compute(self):
+    def refresh_compute_action(self) -> None:
+        if self.main.has_ees_result():
+            key = "calc.view_result"
+        elif not self.txt_vehicle_mass.text().strip():
+            key = "calc.compute_energy"
+        elif self.main.has_energy_result():
+            key = "calc.compute_speed"
+        else:
+            key = "calc.compute_energy_and_ees"
+        self.btn_compute.setText(tr(key))
+
+    def _parse_mass(self) -> float:
+        try:
+            mass_kg = parse_float(self.txt_vehicle_mass.text())
+        except ValueError as error:
+            raise ValueError(tr("calc.error.invalid_vehicle_mass")) from error
+        if not math.isfinite(mass_kg) or mass_kg <= 0:
+            raise ValueError(tr("calc.error.invalid_vehicle_mass"))
+        return mass_kg
+
+    def _on_calculate(self) -> None:
+        if self.main.has_ees_result():
+            self.main._view_workflow_step("result")
+            return
+        if not self.txt_vehicle_mass.text().strip():
+            self._on_compute()
+            return
+        try:
+            mass_kg = self._parse_mass()
+        except ValueError as error:
+            QMessageBox.warning(self, tr("calc.speed.dialog.title"), str(error))
+            return
+
+        if not self.main.has_energy_result() and not self._on_compute():
+            return
+        if self._on_compute_speed(mass_kg):
+            self.main._view_workflow_step("result")
+
+    def _on_compute(self) -> bool:
         try:
             A, B, alpha_deg = self._parse_ab_alpha()
         except ValueError as e:
@@ -719,26 +769,27 @@ class CalcPanel(QGroupBox):
                 tr("calc.dialog.title"),
                 str(e),
             )
-            return
-
-        self.main.project.crash3_A = A
-        self.main.project.crash3_B = B
-        self.main.project.crash3_alpha_deg = alpha_deg
-        self.main.project.crash3_units = "SI_N_per_m"
+            return False
 
         self.main._sync_ui_to_project()
 
         try:
             result = self.main.calc.compute_crash3(A, B, alpha_deg)
+            energy_j = float(result["total_energy_j"])
+            if not math.isfinite(energy_j) or energy_j <= 0:
+                raise ValueError(tr("calc.error.invalid_energy_result"))
         except Exception as e:
             QMessageBox.warning(
                 self,
                 tr("calc.dialog.title"),
                 str(e),
             )
-            return
+            return False
 
-        energy_j = float(result["total_energy_j"])
+        self.main.project.crash3_A = A
+        self.main.project.crash3_B = B
+        self.main.project.crash3_alpha_deg = alpha_deg
+        self.main.project.crash3_units = "SI_N_per_m"
 
         self.lbl_energy.setText(
             tr(
@@ -775,31 +826,29 @@ class CalcPanel(QGroupBox):
             self._refresh_ab_source_ui()
 
         self.main._refresh_summary()
+        return True
 
-    def _on_compute_speed(self):
+    def _on_compute_speed(self, mass_kg: float | None = None) -> bool:
         try:
-            mass_kg = parse_float(self.txt_vehicle_mass.text())
-        except ValueError:
-            QMessageBox.warning(
-                self,
-                tr("calc.speed.dialog.title"),
-                tr("calc.error.invalid_vehicle_mass"),
-            )
-            return
-
-        self.main._sync_ui_to_project()
-
-        try:
+            if mass_kg is None:
+                mass_kg = self._parse_mass()
+            if not math.isfinite(mass_kg) or mass_kg <= 0:
+                raise ValueError(tr("calc.error.invalid_vehicle_mass"))
+            if not self.main.has_energy_result():
+                raise ValueError(tr("calc.error.invalid_energy_result"))
+            self.main._sync_ui_to_project()
             result = self.main.calc.compute_damage_speed(mass_kg)
+            speed_mps = float(result["speed_mps"])
+            speed_kmh = float(result["speed_kmh"])
+            if not all(math.isfinite(value) and value > 0 for value in (speed_mps, speed_kmh)):
+                raise ValueError(tr("calc.error.invalid_speed_result"))
         except Exception as e:
             QMessageBox.warning(
                 self,
                 tr("calc.speed.dialog.title"),
                 str(e),
             )
-            return
-
-        speed_kmh = float(result["speed_kmh"])
+            return False
 
         self.lbl_speed.setText(
             tr(
@@ -810,14 +859,15 @@ class CalcPanel(QGroupBox):
         )
 
         self.main._vehicle_mass_kg = mass_kg
-        self.main._damage_speed_mps = float(result["speed_mps"])
+        self.main._damage_speed_mps = speed_mps
         self.main._damage_speed_kmh = speed_kmh
 
         self.main.project.vehicle_mass_kg = mass_kg
-        self.main.project.damage_speed_mps = float(result["speed_mps"])
+        self.main.project.damage_speed_mps = speed_mps
         self.main.project.damage_speed_kmh = speed_kmh
 
         self.main._refresh_summary()
+        return True
 
     def _on_show_profile(self):
         try:
@@ -989,58 +1039,143 @@ class CalcPanel(QGroupBox):
         self._refresh_ab_source_ui()
         self._on_compute()
 
+    @staticmethod
+    def _metadata_text(value: object) -> str:
+        if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+            return ""
+        if isinstance(value, float) and not math.isfinite(value):
+            return ""
+        text = str(value).strip()
+        return "" if text.casefold() in {
+            "", "-", "—", "none", "null", "n/a", "na", "not applicable", "não aplicável",
+        } else text
+
     def _refresh_ab_source_ui(self) -> None:
-        p = self.main.project
-
-        if p.ab_source_type == "nhtsa_library":
-            label = p.ab_source_label or "-"
-            self.lbl_ab_source.setText(tr("calc.ab_source_nhtsa", label=label))
-
-        elif p.ab_source_type == "nhtsa_report":
-            label = p.ab_source_label or "-"
-            self.lbl_ab_source.setText(tr("calc.ab_source_nhtsa_report", label=label))
-
-        elif p.ab_source_type == "nhtsa_file":
-            label = p.ab_source_label or "-"
-            self.lbl_ab_source.setText(tr("calc.ab_source_nhtsa_file", label=label))
-
-        elif p.ab_source_type == "generic_class":
-            label = p.ab_source_label or "-"
-            self.lbl_ab_source.setText(tr("calc.ab_source_generic", label=label))
-
-        elif p.ab_source_type == "manual":
-            self.lbl_ab_source.setText(tr("calc.ab_source_manual"))
-
-        else:
-            self.lbl_ab_source.setText(tr("calc.ab_source_default"))
-
-        snap = p.ab_source_snapshot or {}
-        if snap:
-
-            def _to_kmh(v):
-                return round(float(v) * 3.6, 2) if v is not None else None
-
-            self.lbl_ab_source.setToolTip(
-                tr(
-                    "calc.ab_tooltip",
-                    label=snap.get("test_label"),
-                    test_number=snap.get("test_number"),
-                    report_number=snap.get("report_number"),
-                    impact_speed=_to_kmh(
-                        snap.get("impact_speed_mps", snap.get("test_speed_mps"))
-                    ),
-                    velocity_change=_to_kmh(snap.get("velocity_change_mps")),
-                    damage_speed=_to_kmh(snap.get("damage_speed_mps")),
-                    speed_basis=snap.get("speed_basis"),
-                    angle=snap.get("impact_angle_deg"),
-                    A=snap.get("A_n_per_m"),
-                    B=snap.get("B_n_per_m2"),
-                )
+        project = self.main.project
+        snap = project.ab_source_snapshot
+        snap = snap if isinstance(snap, dict) else {}
+        source_type = project.ab_source_type
+        source_key = {
+            "nhtsa_library": "calc.ab_source_nhtsa",
+            "nhtsa_report": "calc.ab_source_nhtsa_report",
+            "nhtsa_file": "calc.ab_source_nhtsa_file",
+            "generic_class": "calc.ab_source_generic",
+            "manual": "calc.ab_source_manual",
+        }.get(source_type, "calc.ab_source_default")
+        label = self._metadata_text(project.ab_source_label)
+        lines = []
+        if source_type == "generic_class":
+            class_name = self._metadata_text(snap.get("class_name")) or label or (
+                self._metadata_text(project.ab_source_ref)
             )
-        else:
-            self.lbl_ab_source.setToolTip("")
-        self.lbl_ab_details.setText(self.lbl_ab_source.toolTip())
-        self.lbl_ab_details.setVisible(bool(snap))
+            label = class_name
+            reference = self._metadata_text(snap.get("source_reference")) or (
+                self._metadata_text(project.ab_source_reference)
+            )
+            if class_name:
+                lines.append(f"{tr('calc.generic_class')}: {class_name}")
+            if reference and reference != class_name:
+                lines.append(f"{tr('report.ab_source_reference')}: {reference}")
+        elif source_type in ("nhtsa_library", "nhtsa_file", "nhtsa_report"):
+            vehicle = " ".join(
+                value for key in ("make", "model", "year")
+                if (value := self._metadata_text(snap.get(key)))
+            )
+            label = vehicle or label
+            lines = self._nhtsa_source_details(snap, label)
+
+        self.lbl_ab_source.setText(tr(source_key, label=f" | {label}" if label else ""))
+        details = "\n".join(lines)
+        self.lbl_ab_source.setToolTip(details)
+        self.lbl_ab_details.setText(details)
+        self.lbl_ab_details.setVisible(bool(details))
+
+    def _nhtsa_source_details(self, snap: dict, source_label: str) -> list[str]:
+        lines = []
+
+        def add(label_key: str, value: object) -> None:
+            if text := self._metadata_text(value):
+                lines.append(f"{tr(label_key)}: {text}")
+
+        def number(value: object) -> float | None:
+            if not self._metadata_text(value):
+                return None
+            try:
+                result = parse_float(value)
+            except (TypeError, ValueError, OverflowError):
+                return None
+            return result if math.isfinite(result) else None
+
+        def add_number(label_key: str, value: float | None, decimals: int = 3) -> None:
+            if value is not None and math.isfinite(value):
+                add(label_key, format_float(value, decimals))
+
+        for key in ("test_agency", "test_number", "report_number"):
+            add(f"nhtsa.field.{key}", snap.get(key))
+        reference = self._metadata_text(snap.get("source_reference")) or (
+            self._metadata_text(self.main.project.ab_source_reference)
+        )
+        if reference != self._metadata_text(snap.get("report_number")):
+            add("report.ab_source_reference", reference)
+
+        test_label = self._metadata_text(snap.get("test_label"))
+        if test_label != source_label:
+            add("nhtsa.field.test_label", test_label)
+        for key, prefix in (
+            ("test_type", "nhtsa.test_type"),
+            ("test_configuration", "nhtsa.config"),
+            ("barrier_type", "nhtsa.barrier_type"),
+            ("impact_direction", "nhtsa.direction"),
+            ("speed_basis", "nhtsa.speed_basis"),
+        ):
+            if value := self._metadata_text(snap.get(key)):
+                translation_key = f"{prefix}.{value}"
+                translated = tr(translation_key)
+                add(f"nhtsa.field.{key}", value if translated == translation_key else translated)
+        add_number("calc.ab.overlap", number(snap.get("overlap_pct")), 1)
+
+        impact_speed = number(snap.get("impact_speed_mps"))
+        if impact_speed is None:
+            impact_speed = number(snap.get("test_speed_mps"))
+        for label_key, speed_mps in (
+            ("nhtsa.field.impact_speed_mps", impact_speed),
+            ("nhtsa.field.velocity_change_mps", number(snap.get("velocity_change_mps"))),
+            ("nhtsa.output.rebound_speed_mps", number(snap.get("rebound_speed_mps"))),
+            ("nhtsa.output.damage_speed_mps", number(snap.get("damage_speed_mps"))),
+            ("calc.ab.test_speed_used", number(snap.get("speed_used_mps"))),
+        ):
+            if speed_mps is not None:
+                add_number(label_key, speed_mps * 3.6, 2)
+
+        for key, field, label_key in (
+            ("impact_angle_deg", self.txt_alpha_deg, "calc.ab.test_angle"),
+            ("vehicle_mass_kg", self.txt_vehicle_mass, "calc.ab.test_mass"),
+        ):
+            value = number(snap.get(key))
+            active = number(field.text())
+            if value is not None and (active is None or round(value, 2) != round(active, 2)):
+                add_number(label_key, value, 2)
+
+        for label_key, key in (
+            ("nhtsa.field.L_m", "L_m"),
+            ("nhtsa.field.b0_mps", "b0_mps"),
+            ("nhtsa.output.b1_per_s", "b1_per_s"),
+            ("nhtsa.output.crush_area_m2", "crush_area_m2"),
+            ("nhtsa.output.c_mean_m", "c_mean_m"),
+        ):
+            add_number(label_key, number(snap.get(key)))
+        c_values = snap.get("c_values_m")
+        if isinstance(c_values, (tuple, list)):
+            values = [number(raw) for raw in c_values[:6]]
+            points = [
+                f"C{index}={format_float(value, 3)}"
+                for index, value in enumerate(values, 1) if value is not None
+            ]
+            # The library may represent missing crush measurements as six zeroes.
+            if any(value is not None and value > 0 for value in values):
+                add("calc.ab.test_crush", " · ".join(points))
+        add("calc.ab.notes", snap.get("notes"))
+        return lines
 
     def _parse_ab_alpha(self):
         try:
@@ -1050,13 +1185,13 @@ class CalcPanel(QGroupBox):
         except ValueError:
             raise ValueError(tr("calc.error.invalid_ab_alpha"))
 
-        if A <= 0:
+        if not math.isfinite(A) or A <= 0:
             raise ValueError(tr("calc.error.a_positive"))
 
-        if B <= 0:
+        if not math.isfinite(B) or B <= 0:
             raise ValueError(tr("calc.error.b_positive"))
 
-        if alpha_deg < 0 or alpha_deg >= 89.0:
+        if not math.isfinite(alpha_deg) or alpha_deg < 0 or alpha_deg >= 89.0:
             raise ValueError(tr("calc.error.alpha_range"))
 
         return A, B, alpha_deg

@@ -56,6 +56,191 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    def test_ab_details_show_only_applicable_source_metadata(self) -> None:
+        window = self._window()
+        panel = window.calc_panel
+        project = window.project
+        project.ab_source_type = "manual"
+        project.ab_source_snapshot = {"A_n_per_m": 100000, "B_n_per_m2": 1000000}
+        panel._refresh_ab_source_ui()
+        self.assertTrue(panel.lbl_ab_details.isHidden())
+        self.assertIn("Entrada manual", panel.lbl_ab_source.text())
+
+        project.ab_source_type = "generic_class"
+        project.ab_source_reference = "Catálogo técnico"
+        project.ab_source_snapshot = {
+            "class_name": "compact", "A_n_per_m": 100000, "B_n_per_m2": 1000000,
+            "test_number": "not-applicable-to-generic",
+        }
+        panel._refresh_ab_source_ui()
+        self.assertIn("compact", panel.lbl_ab_details.text())
+        self.assertIn("Catálogo técnico", panel.lbl_ab_details.text())
+        self.assertNotIn("not-applicable-to-generic", panel.lbl_ab_details.text())
+        self.assertNotIn("100000", panel.lbl_ab_details.text())
+
+        panel.txt_vehicle_mass.setText("1815,00")
+        project.ab_source_label = None
+        project.ab_source_reference = "M20240300"
+        project.ab_source_snapshot = {
+            "report_number": "M20240300", "test_number": "N/A",
+            "make": "Jeep", "model": "Compass", "test_agency": None,
+            "test_configuration": "rigid_frontal_barrier",
+            "impact_speed_mps": None, "test_speed_mps": 15.639,
+            "rebound_speed_mps": 0.0, "velocity_change_mps": "NaN",
+            "speed_basis": "impact", "impact_angle_deg": 0,
+            "vehicle_mass_kg": 1815, "c_values_m": [0.34, None, 0.37],
+            "A_n_per_m": 100000, "B_n_per_m2": 1000000,
+        }
+        for source in ("nhtsa_library", "nhtsa_report", "nhtsa_file"):
+            project.ab_source_type = source
+            before = project.to_dict()
+            panel._refresh_ab_source_ui()
+            details = panel.lbl_ab_details.text()
+            self.assertIn("Jeep Compass", panel.lbl_ab_source.text())
+            self.assertEqual(details.count("M20240300"), 1)
+            self.assertIn("56,30", details)
+            self.assertIn("0,00", details)
+            self.assertIn("C3=0,370", details)
+            for absent in ("None", "N/A", "NaN", "C2=", "Massa do ensaio", "Ângulo do ensaio", "100000"):
+                self.assertNotIn(absent, details)
+            self.assertEqual(project.to_dict(), before)
+
+        panel.txt_vehicle_mass.setText("1800")
+        window._set_language_and_refresh("en")
+        self.assertIn("Test mass (kg): 1815.00", panel.lbl_ab_details.text())
+        self.assertIn("Rigid Frontal Barrier", panel.lbl_ab_details.text())
+        project.ab_source_snapshot = None
+        project.ab_source_reference = None
+        panel._refresh_ab_source_ui()
+        self.assertTrue(panel.lbl_ab_details.isHidden())
+        self.assertEqual(panel.lbl_ab_source.text(), "A/B source: A/B file")
+
+    def test_contextual_calculation_actions_reuse_energy_and_stored_result(self) -> None:
+        window = self._window()
+        path = str(COMPASS / "crash3vision_reference_project.json")
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(path, "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        panel = window.calc_panel
+        window.workflow_step_labels["calculation"].click()
+        saved = window.project.to_dict()
+        self.assertEqual(panel.btn_compute.text(), "Ver resultado")
+        with (
+            patch.object(window.calc, "compute_crash3") as energy,
+            patch.object(window.calc, "compute_damage_speed") as ees,
+        ):
+            panel.btn_compute.click()
+        energy.assert_not_called()
+        ees.assert_not_called()
+        self.assertIsNone(window._viewed_step)
+        self.assertEqual(window.project.to_dict(), saved)
+
+        window.workflow_step_labels["calculation"].click()
+        with (
+            patch.object(window.calc, "compute_crash3", side_effect=ValueError("calculation failed")),
+            patch.object(QMessageBox, "warning") as warning,
+        ):
+            self.assertFalse(panel._on_compute())
+        warning.assert_called_once()
+        self.assertEqual(window.project.total_energy_j, saved["total_energy_j"])
+        self.assertEqual(window.project.damage_speed_kmh, saved["damage_speed_kmh"])
+
+        panel.txt_vehicle_mass.setText("1800,5")
+        self.assertEqual(panel.btn_compute.text(), "Calcular EES")
+        with patch.object(window.calc, "compute_crash3") as energy:
+            panel.btn_compute.click()
+        energy.assert_not_called()
+        self.assertEqual(window.project.total_energy_j, saved["total_energy_j"])
+        self.assertEqual(window.project.vehicle_mass_kg, 1800.5)
+        self.assertFalse(window._summary_group.isHidden())
+
+        window.workflow_step_labels["calculation"].click()
+        panel.txt_alpha_deg.setText("2")
+        self.assertEqual(panel.btn_compute.text(), "Calcular energia e EES")
+        window._set_language_and_refresh("en")
+        self.assertEqual(panel.btn_compute.text(), "Calculate energy and EES")
+        with (
+            patch.object(window.calc, "compute_crash3", wraps=window.calc.compute_crash3) as energy,
+            patch.object(window.calc, "compute_damage_speed", wraps=window.calc.compute_damage_speed) as ees,
+        ):
+            panel.btn_compute.click()
+        energy.assert_called_once()
+        ees.assert_called_once_with(1800.5)
+        self.assertFalse(window._summary_group.isHidden())
+        self.assertEqual(panel.btn_compute.text(), "View result")
+
+        window.workflow_step_labels["calculation"].click()
+        panel.txt_vehicle_mass.setText("  ")
+        self.assertEqual(panel.btn_compute.text(), "Calculate energy")
+        with patch.object(window.calc, "compute_damage_speed") as ees:
+            panel.btn_compute.click()
+        ees.assert_not_called()
+        self.assertGreater(window._total_energy, 0)
+        self.assertIsNone(window._damage_speed_kmh)
+        self.assertFalse(panel.isHidden())
+
+    def test_contextual_calculation_rejects_invalid_inputs_and_failed_results(self) -> None:
+        window = self._window()
+        window.workflow.set_stage(window.Stage.DONE)
+        panel = window.calc_panel
+        panel.txt_A.setText("100000")
+        panel.txt_B.setText("1000000")
+        with patch.object(QMessageBox, "warning") as warning:
+            for invalid in ("NaN", "inf", "-inf", "0", "-1", "invalid"):
+                panel.txt_vehicle_mass.setText(invalid)
+                with (
+                    patch.object(window.calc, "compute_crash3") as energy,
+                    patch.object(window.calc, "compute_damage_speed") as ees,
+                ):
+                    panel.btn_compute.click()
+                energy.assert_not_called()
+                ees.assert_not_called()
+            self.assertEqual(warning.call_count, 6)
+
+        panel.txt_vehicle_mass.setText("1800")
+        for field, invalid, valid in (
+            (panel.txt_A, "NaN", "100000"),
+            (panel.txt_B, "inf", "1000000"),
+            (panel.txt_alpha_deg, "NaN", "0"),
+            (panel.txt_alpha_deg, "89", "0"),
+        ):
+            field.setText(invalid)
+            with (
+                patch.object(QMessageBox, "warning") as warning,
+                patch.object(window.calc, "compute_crash3") as energy,
+                patch.object(window.calc, "compute_damage_speed") as ees,
+            ):
+                panel.btn_compute.click()
+            warning.assert_called_once()
+            energy.assert_not_called()
+            ees.assert_not_called()
+            field.setText(valid)
+
+        with (
+            patch.object(QMessageBox, "warning") as warning,
+            patch.object(window.calc, "compute_crash3", return_value={"total_energy_j": float("inf")}),
+            patch.object(window.calc, "compute_damage_speed") as ees,
+        ):
+            panel.btn_compute.click()
+        warning.assert_called_once()
+        ees.assert_not_called()
+        self.assertIsNone(window._total_energy)
+
+        with (
+            patch.object(QMessageBox, "warning") as warning,
+            patch.object(window.calc, "compute_crash3", return_value={"total_energy_j": 1000.0}),
+            patch.object(window.calc, "compute_damage_speed",
+                         return_value={"speed_mps": float("nan"), "speed_kmh": float("nan")}),
+        ):
+            panel.btn_compute.click()
+        warning.assert_called_once()
+        self.assertEqual(window.project.total_energy_j, 1000.0)
+        self.assertIsNone(window.project.damage_speed_kmh)
+        self.assertEqual(window._current_workflow_step(), "calculation")
+        self.assertEqual(panel.btn_compute.text(), "Calcular EES")
+
     def test_calculation_layout_keeps_sources_and_actions_available(self) -> None:
         window = self._window()
         source = COMPASS / "crash3vision_reference_project.json"
@@ -89,6 +274,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(window.project.ab_source_type, "manual")
         panel.txt_A.setText("170000")
         panel.txt_B.setText("1800000")
+        panel.txt_vehicle_mass.clear()
         panel.btn_compute.click()
         self.assertGreater(window._total_energy, 0)
 
@@ -144,7 +330,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         profile.assert_called_once()
         panel.txt_vehicle_mass.setText("1800")
         self.assertGreater(window._total_energy, 0)
-        panel.btn_compute_speed.click()
+        panel.btn_compute.click()
         self.assertGreater(window._damage_speed_kmh, 0)
         self.assertEqual(window._current_workflow_step(), "result")
 
@@ -390,6 +576,10 @@ class RigidRegionAlignmentTests(unittest.TestCase):
                 window.io.load_project()
             calculate.assert_not_called()
             self.assertEqual(window._current_workflow_step(), "result")
+            window.workflow_step_labels["calculation"].click()
+            self.assertEqual(window.calc_panel.btn_compute.text(), "Ver resultado")
+            window.calc_panel.btn_compute.click()
+            self.assertIsNone(window._viewed_step)
             self.assertEqual(window.lbl_result_ees_mps.text(), f"{data['damage_speed_kmh'] / 3.6:.2f} m/s")
             self.assertIsNone(window._damage_speed_mps)
             self.assertIsNone(window.project.damage_speed_mps)
@@ -687,6 +877,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         window.workflow.finish_marking()
         self.assertEqual(steps["calculation"].property("progressStatus"), "current")
         self.assertEqual(steps["result"].property("progressStatus"), "future")
+        window.calc_panel.txt_vehicle_mass.clear()
         window.calc_panel.btn_compute.click()
         self.assertEqual(steps["calculation"].property("progressStatus"), "current")
         self.assertEqual(steps["result"].property("progressStatus"), "future")
@@ -694,7 +885,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         QApplication.processEvents()
         scrollbar = window._controls_scroll.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
-        window.calc_panel.btn_compute_speed.click()
+        window.calc_panel.txt_vehicle_mass.setText("1800")
+        window.calc_panel.btn_compute.click()
         QApplication.processEvents()
         self.assertEqual(steps["calculation"].property("progressStatus"), "complete")
         self.assertEqual(steps["result"].property("progressStatus"), "complete")
