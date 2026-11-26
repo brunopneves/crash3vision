@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtCore import QLocale
 from app.i18n import tr, get_language
-from app.core.number_format import parse_float, format_float
+from app.core.number_format import format_display_number, format_float, parse_float
 from app.core.nhtsa_ab_calc import compute_ab_from_report
 from app.core.nhtsa_ab_library import build_record, upsert_record, DEFAULT_LIBRARY_PATH
 
@@ -425,8 +425,8 @@ class NhtsaAbDialog(QDialog):
         rebound_speed_mps = max(0.0, velocity_change_mps - impact_speed_mps)
         damage_speed_mps = max(0.0, impact_speed_mps**2 - rebound_speed_mps**2) ** 0.5
 
-        self.lbl_rebound_speed.setText(format_float(rebound_speed_mps * 3.6, 6))
-        self.lbl_damage_speed.setText(format_float(damage_speed_mps * 3.6, 6))
+        self.lbl_rebound_speed.setText(format_display_number(rebound_speed_mps * 3.6, 6))
+        self.lbl_damage_speed.setText(format_display_number(damage_speed_mps * 3.6, 6))
 
     def _to_float(self, value: object, default: float = 0.0) -> float:
         return parse_float(value, default=default)
@@ -513,13 +513,13 @@ class NhtsaAbDialog(QDialog):
             rebound_speed_mps = self._to_float(result["rebound_speed_mps"])
             damage_speed_mps = self._to_float(result["damage_speed_mps"])
 
-            self.lbl_area.setText(format_float(crush_area_m2, 6))
-            self.lbl_cmean.setText(format_float(c_mean_m, 6))
-            self.lbl_b1.setText(format_float(b1_per_s, 6))
-            self.lbl_A.setText(format_float(A_n_per_m, 6))
-            self.lbl_B.setText(format_float(B_n_per_m2, 6))
-            self.lbl_rebound_speed.setText(format_float(rebound_speed_mps * 3.6, 6))
-            self.lbl_damage_speed.setText(format_float(damage_speed_mps * 3.6, 6))
+            self.lbl_area.setText(format_display_number(crush_area_m2, 6))
+            self.lbl_cmean.setText(format_display_number(c_mean_m, 6))
+            self.lbl_b1.setText(format_display_number(b1_per_s, 6))
+            self.lbl_A.setText(format_display_number(A_n_per_m, 6))
+            self.lbl_B.setText(format_display_number(B_n_per_m2, 6))
+            self.lbl_rebound_speed.setText(format_display_number(rebound_speed_mps * 3.6, 6))
+            self.lbl_damage_speed.setText(format_display_number(damage_speed_mps * 3.6, 6))
 
             self._last_result = result
             self.btn_apply.setEnabled(True)
@@ -660,15 +660,15 @@ class NhtsaAbDialog(QDialog):
         self._update_test_label()
 
         if data.get("crush_area_m2") is not None:
-            self.lbl_area.setText(format_float(data["crush_area_m2"], 6))
+            self.lbl_area.setText(format_display_number(parse_float(data["crush_area_m2"]), 6))
         if data.get("c_mean_m") is not None:
-            self.lbl_cmean.setText(format_float(data["c_mean_m"], 6))
+            self.lbl_cmean.setText(format_display_number(parse_float(data["c_mean_m"]), 6))
         if data.get("b1_per_s") is not None:
-            self.lbl_b1.setText(format_float(data["b1_per_s"], 6))
+            self.lbl_b1.setText(format_display_number(parse_float(data["b1_per_s"]), 6))
         if data.get("A_n_per_m") is not None:
-            self.lbl_A.setText(format_float(data["A_n_per_m"], 6))
+            self.lbl_A.setText(format_display_number(parse_float(data["A_n_per_m"]), 6))
         if data.get("B_n_per_m2") is not None:
-            self.lbl_B.setText(format_float(data["B_n_per_m2"], 6))
+            self.lbl_B.setText(format_display_number(parse_float(data["B_n_per_m2"]), 6))
 
         speed_basis = data.get("speed_basis")
         if speed_basis == "damage":
@@ -678,12 +678,12 @@ class NhtsaAbDialog(QDialog):
 
         if data.get("rebound_speed_mps") is not None:
             self.lbl_rebound_speed.setText(
-                format_float(self._mps_to_kmh(data["rebound_speed_mps"]), 6)
+                format_display_number(self._mps_to_kmh(data["rebound_speed_mps"]), 6)
             )
 
         if data.get("damage_speed_mps") is not None:
             self.lbl_damage_speed.setText(
-                format_float(self._mps_to_kmh(data["damage_speed_mps"]), 6)
+                format_display_number(self._mps_to_kmh(data["damage_speed_mps"]), 6)
             )
         else:
             self._update_derived_speeds()

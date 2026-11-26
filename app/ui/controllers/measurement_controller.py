@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QSignalBlocker
 from PySide6.QtWidgets import QMessageBox
 
+from app.core.number_format import format_display_number
 from app.i18n import tr
 
 if TYPE_CHECKING:
@@ -58,7 +59,7 @@ class MeasurementController:
             QMessageBox.warning(
                 self.host,
                 tr("group.calibration"),
-                tr("measurement.warning.unusual_scale", value=f"{m_per_px:.6f}"),
+                tr("measurement.warning.unusual_scale", value=format_display_number(m_per_px, 6)),
             )
 
         self.refresh_w_labels()
@@ -93,36 +94,36 @@ class MeasurementController:
             self.host._w_m = None
             self.host._delta_w_px = None
             self.host._delta_w_m = None
-            self.host.lbl_w.setText(tr("label.w_default"))
-            self.host.lbl_delta_w.setText(tr("label.delta_w_default"))
+        else:
+            m_per_px = self.host._m_per_px
+            w_total_px = float(self.host._w_px)
+            self.host._w_m = w_total_px * m_per_px if m_per_px is not None else None
+            delta_w_px = w_total_px / (self.SLICE_COUNT - 1)
+            self.host._delta_w_px = delta_w_px
+            self.host._delta_w_m = delta_w_px * m_per_px if m_per_px is not None else None
+        self.refresh_w_display()
+
+    def refresh_w_display(self) -> None:
+        host = self.host
+        if host._w_px is None:
+            host.lbl_w.setText(tr("label.w_default"))
+            host.lbl_delta_w.setText(tr("label.delta_w_default"))
             return
 
-        m_per_px = self.host._m_per_px
-
-        w_total_px = float(self.host._w_px)
-        w_m = (w_total_px * m_per_px) if m_per_px is not None else None
-        self.host._w_m = w_m
-
-        self.host.lbl_w.setText(
-            tr("measurement.w_value_full", m=f"{w_m:.3f}")
-            if w_m is not None
-            else tr("measurement.w_value_px_only", px=f"{w_total_px:.2f}")
+        host.lbl_w.setText(
+            tr("measurement.w_value_full", m=format_display_number(host._w_m, 3))
+            if host._w_m is not None
+            else tr("measurement.w_value_px_only", px=format_display_number(host._w_px))
         )
-
-        delta_w_px = w_total_px / (self.SLICE_COUNT - 1)
-        self.host._delta_w_px = delta_w_px
-
-        delta_w_m = (delta_w_px * m_per_px) if m_per_px is not None else None
-        self.host._delta_w_m = delta_w_m
-
-        self.host.lbl_delta_w.setText(
+        px_text = format_display_number(host._delta_w_px)
+        host.lbl_delta_w.setText(
             tr(
                 "measurement.delta_w_value_full",
-                px=f"{delta_w_px:.2f}",
-                m=f"{delta_w_m:.3f}",
+                px=px_text,
+                m=format_display_number(host._delta_w_m, 3),
             )
-            if delta_w_m is not None
-            else tr("measurement.delta_w_value_px_only", px=f"{delta_w_px:.2f}")
+            if host._delta_w_m is not None
+            else tr("measurement.delta_w_value_px_only", px=px_text)
         )
 
     # ---------------- Marking: Ci ----------------
@@ -145,4 +146,4 @@ class MeasurementController:
     def update_ci_values_label(self) -> None:
         for index, label in self.host.ci_value_labels.items():
             value = self.host._ci_m.get(index)
-            label.setText(f"{value:.3f}" if value is not None else "—")
+            label.setText(format_display_number(value, 3))

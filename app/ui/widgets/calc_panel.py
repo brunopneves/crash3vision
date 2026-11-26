@@ -6,7 +6,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtGui import QAction
 
 from PySide6.QtWidgets import (
@@ -34,7 +34,7 @@ from app.core.nhtsa_ab_library import (
     save_record_file,
 )
 from app.i18n import tr
-from app.core.number_format import parse_float, format_float
+from app.core.number_format import format_display_number, parse_float
 from app.ui.widgets.crush_profile_dialog import CrushProfileDialog
 from app.ui.widgets.nhtsa_ab_dialog import NhtsaAbDialog
 
@@ -139,7 +139,7 @@ class CalcPanel(QGroupBox):
         self.txt_B = QLineEdit()
         self.txt_B.setPlaceholderText("856265")
         self.lbl_alpha = QLabel(tr("calc.alpha_deg"))
-        self.txt_alpha_deg = QLineEdit("0.0")
+        self.txt_alpha_deg = QLineEdit(format_display_number(0.0))
         self.lbl_vehicle_mass = QLabel(tr("calc.vehicle_mass"))
         self.txt_vehicle_mass = QLineEdit()
         self.txt_vehicle_mass.setPlaceholderText("1700")
@@ -277,7 +277,7 @@ class CalcPanel(QGroupBox):
             self.lbl_energy.setText(
                 tr(
                     "calc.total_energy_value",
-                    value=f"{self.main._total_energy:.2f}",
+                    value=format_display_number(self.main._total_energy),
                     unit=self.ENERGY_UNIT,
                 )
             )
@@ -291,7 +291,7 @@ class CalcPanel(QGroupBox):
             self.lbl_speed.setText(
                 tr(
                     "calc.damage_speed_value",
-                    value=f"{self.main._damage_speed_kmh:.2f}",
+                    value=format_display_number(self.main._damage_speed_kmh),
                     unit=self.SPEED_UNIT_KMH,
                 )
             )
@@ -307,6 +307,22 @@ class CalcPanel(QGroupBox):
         self._refresh_ab_source_ui()
         self.btn_show_profile.setText(tr("calc.show_crush_profile"))
         self._refresh_details_visibility()
+
+    def retranslate_numeric_fields(self, previous_language: str) -> None:
+        project = self.main.project
+        for field, value in (
+            (self.txt_A, project.crash3_A),
+            (self.txt_B, project.crash3_B),
+            (self.txt_alpha_deg, project.crash3_alpha_deg or 0.0),
+            (self.txt_vehicle_mass, self.main._vehicle_mass_kg),
+        ):
+            # Keep unfinished and manually entered text as-is if it differs from
+            # the representation used to populate the field.
+            if value is not None and field.text() == format_display_number(
+                value, language=previous_language
+            ):
+                with QSignalBlocker(field):
+                    field.setText(format_display_number(value))
 
     def _refresh_details_visibility(self) -> None:
         expanded = self.btn_toggle_details.isChecked()
@@ -383,8 +399,8 @@ class CalcPanel(QGroupBox):
             )
             return
 
-        self.txt_A.setText(f"{params['A']:.2f}")
-        self.txt_B.setText(f"{params['B']:.2f}")
+        self.txt_A.setText(format_display_number(params["A"]))
+        self.txt_B.setText(format_display_number(params["B"]))
         self.txt_A.setReadOnly(True)
         self.txt_B.setReadOnly(True)
 
@@ -438,7 +454,7 @@ class CalcPanel(QGroupBox):
 
             test_speed = rec.get("test_speed_mps")
             try:
-                speed_label = f"{float(test_speed):.3f} m/s"
+                speed_label = f"{format_display_number(float(test_speed), 3)} m/s"
             except (TypeError, ValueError):
                 speed_label = missing_value
 
@@ -514,8 +530,8 @@ class CalcPanel(QGroupBox):
         A_n_per_m = self._to_float(rec.get("A_n_per_m"))
         B_n_per_m2 = self._to_float(rec.get("B_n_per_m2"))
 
-        self.txt_A.setText(format_float(A_n_per_m, 2))
-        self.txt_B.setText(format_float(B_n_per_m2, 2))
+        self.txt_A.setText(format_display_number(A_n_per_m, 2))
+        self.txt_B.setText(format_display_number(B_n_per_m2, 2))
 
         self.main.project.crash3_A = A_n_per_m
         self.main.project.crash3_B = B_n_per_m2
@@ -571,7 +587,7 @@ class CalcPanel(QGroupBox):
 
         mass_kg = rec.get("vehicle_mass_kg")
         if mass_kg is not None:
-            self.txt_vehicle_mass.setText(format_float(float(mass_kg), 2))
+            self.txt_vehicle_mass.setText(format_display_number(float(mass_kg), 2))
 
         self._refresh_ab_source_ui()
         self._on_compute()
@@ -610,8 +626,8 @@ class CalcPanel(QGroupBox):
         A_n_per_m = self._to_float(a_val)
         B_n_per_m2 = self._to_float(b_val)
 
-        self.txt_A.setText(format_float(A_n_per_m, 2))
-        self.txt_B.setText(format_float(B_n_per_m2, 2))
+        self.txt_A.setText(format_display_number(A_n_per_m, 2))
+        self.txt_B.setText(format_display_number(B_n_per_m2, 2))
         self.txt_A.setReadOnly(True)
         self.txt_B.setReadOnly(True)
 
@@ -669,7 +685,7 @@ class CalcPanel(QGroupBox):
 
         mass_kg = rec.get("vehicle_mass_kg")
         if mass_kg is not None:
-            self.txt_vehicle_mass.setText(format_float(float(mass_kg), 2))
+            self.txt_vehicle_mass.setText(format_display_number(float(mass_kg), 2))
 
         self._refresh_ab_source_ui()
         self._on_compute()
@@ -826,7 +842,7 @@ class CalcPanel(QGroupBox):
         self.lbl_energy.setText(
             tr(
                 "calc.total_energy_value",
-                value=f"{energy_j:.2f}",
+                value=format_display_number(energy_j),
                 unit=self.ENERGY_UNIT,
             )
         )
@@ -885,7 +901,7 @@ class CalcPanel(QGroupBox):
         self.lbl_speed.setText(
             tr(
                 "calc.damage_speed_value",
-                value=f"{speed_kmh:.2f}",
+                value=format_display_number(speed_kmh),
                 unit=self.SPEED_UNIT_KMH,
             )
         )
@@ -951,8 +967,8 @@ class CalcPanel(QGroupBox):
         A_n_per_m = self._to_float(result["A_n_per_m"])
         B_n_per_m2 = self._to_float(result["B_n_per_m2"])
 
-        self.txt_A.setText(format_float(A_n_per_m, 2))
-        self.txt_B.setText(format_float(B_n_per_m2, 2))
+        self.txt_A.setText(format_display_number(A_n_per_m, 2))
+        self.txt_B.setText(format_display_number(B_n_per_m2, 2))
 
         self.main.project.crash3_A = A_n_per_m
         self.main.project.crash3_B = B_n_per_m2
@@ -1023,8 +1039,8 @@ class CalcPanel(QGroupBox):
         A_n_per_m = self._to_float(result["A_n_per_m"])
         B_n_per_m2 = self._to_float(result["B_n_per_m2"])
 
-        self.txt_A.setText(format_float(A_n_per_m, 2))
-        self.txt_B.setText(format_float(B_n_per_m2, 2))
+        self.txt_A.setText(format_display_number(A_n_per_m, 2))
+        self.txt_B.setText(format_display_number(B_n_per_m2, 2))
 
         self.main.project.crash3_A = A_n_per_m
         self.main.project.crash3_B = B_n_per_m2
@@ -1140,7 +1156,7 @@ class CalcPanel(QGroupBox):
 
         def add_number(label_key: str, value: float | None, decimals: int = 3) -> None:
             if value is not None and math.isfinite(value):
-                add(label_key, format_float(value, decimals))
+                add(label_key, format_display_number(value, decimals))
 
         for key in ("test_agency", "test_number", "report_number"):
             add(f"nhtsa.field.{key}", snap.get(key))
@@ -1200,7 +1216,7 @@ class CalcPanel(QGroupBox):
         if isinstance(c_values, (tuple, list)):
             values = [number(raw) for raw in c_values[:6]]
             points = [
-                f"C{index}={format_float(value, 3)}"
+                f"C{index}={format_display_number(value, 3)}"
                 for index, value in enumerate(values, 1) if value is not None
             ]
             # The library may represent missing crush measurements as six zeroes.

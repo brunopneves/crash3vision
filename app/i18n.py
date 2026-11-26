@@ -257,8 +257,8 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "progress.return_current": {"en": "Return to current step", "pt": "Voltar à etapa atual"},
     "progress.transform": {
-        "en": "{image}: X {x:.2f}, Y {y:.2f}, rotation {rotation:.2f}°, scale {scale:.4f}",
-        "pt": "{image}: X {x:.2f}, Y {y:.2f}, rotação {rotation:.2f}°, escala {scale:.4f}",
+        "en": "{image}: X {x} · Y {y} · rotation {rotation}° · scale {scale}",
+        "pt": "{image}: X {x} · Y {y} · rotação {rotation}° · escala {scale}",
     },
     "progress.status.current": {"en": "Current", "pt": "Atual"},
     "progress.status.future": {"en": "Upcoming", "pt": "Futura"},

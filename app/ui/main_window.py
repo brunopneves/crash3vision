@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 
 import cv2
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSignalBlocker, QSize, Qt
 from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -60,6 +60,7 @@ from app.ui.styles import (
 )
 from app.ui.widgets.calc_panel import CalcPanel
 from app.report import generate_report
+from app.core.number_format import format_display_number
 from app.i18n import tr, set_language, get_language
 
 
@@ -973,7 +974,10 @@ class MainWindow(QMainWindow):
 
     # ---------------- Language ----------------
     def _set_language_and_refresh(self, lang: str) -> None:
+        previous_language = get_language()
         set_language(lang)
+        self.calc_panel.retranslate_numeric_fields(previous_language)
+        self._retranslate_calibration_distance(previous_language)
         self._retranslate_ui()
         self._refresh_summary()
 
@@ -1055,12 +1059,8 @@ class MainWindow(QMainWindow):
         self.chk_measure_ci_mode.setText(tr("check.measure_ci_mode"))
         self._update_ci_label()
         self.btn_finish_marking.setText(tr("button.finish_marking"))
-        if self._w_px is None:
-            self.lbl_w.setText(tr("label.w_default"))
-
-        if self._delta_w_px is None:
-            self.lbl_delta_w.setText(tr("label.delta_w_default"))
-
+        self.meas.refresh_w_display()
+        self.meas.update_ci_values_label()
         self.calc_panel.retranslate_ui()
 
     # ---------------- File operations ----------------
@@ -1188,8 +1188,10 @@ class MainWindow(QMainWindow):
                 lines.append(tr(
                     "progress.transform",
                     image=tr(f"combo.{name}"),
-                    x=values["x"], y=values["y"],
-                    rotation=values["rotation_deg"], scale=values["scale"],
+                    x=format_display_number(values["x"]),
+                    y=format_display_number(values["y"]),
+                    rotation=format_display_number(values["rotation_deg"]),
+                    scale=format_display_number(values["scale"], 4),
                 ))
         self.lbl_alignment_consultation.setText("\n".join(lines))
 
@@ -2128,6 +2130,14 @@ class MainWindow(QMainWindow):
         self.txt_real_m.setPlaceholderText(tr("calibration.distance_example"))
         self.lbl_calibration_scale_hint.setText(tr("calibration.preview_hint"))
 
+    def _retranslate_calibration_distance(self, previous_language: str) -> None:
+        if self._calibration_px is None or self._m_per_px is None:
+            return
+        real_m = self._calibration_px * self._m_per_px
+        if self.txt_real_m.text() == format_display_number(real_m, None, language=previous_language):
+            with QSignalBlocker(self.txt_real_m):
+                self.txt_real_m.setText(format_display_number(real_m, None))
+
     def _on_calibration_mode_toggled(self, checked: bool) -> None:
         if checked:
             self.canvas.clear_calibration()
@@ -2151,7 +2161,7 @@ class MainWindow(QMainWindow):
         ))
         set_style_property(self.lbl_calibration_points_status, "complete", has_points)
         px_value = (
-            f"{self._calibration_px:.2f} px"
+            f"{format_display_number(self._calibration_px)} px"
             if has_points and self._calibration_px is not None else "—"
         )
         self.lbl_px_distance.setText(tr("calibration.distance_measured", value=px_value))
@@ -2159,9 +2169,12 @@ class MainWindow(QMainWindow):
         editing = self.stage == Stage.CALIBRATION and self._viewed_step is None
         if editing:
             candidate, _ = self.meas.calibration_candidate()
-            scale = f"{candidate:.6g}" if candidate is not None else None
+            scale = (
+                format_display_number(candidate, 6, significant_digits=True)
+                if candidate is not None else None
+            )
         elif self._m_per_px is not None:
-            scale = f"{self._m_per_px:.6f}"
+            scale = format_display_number(self._m_per_px, 6)
         else:
             scale = None
         applied = not editing and scale is not None
@@ -2447,7 +2460,7 @@ class MainWindow(QMainWindow):
         self.lbl_result_measurements_heading.setText(tr("progress.measurement"))
         self.lbl_result_context_heading.setText(tr("result.context_title"))
         self.lbl_result_ees_kmh.setText(
-            tr("result.ees_kmh", value=f"{self._damage_speed_kmh:.2f}")
+            tr("result.ees_kmh", value=format_display_number(self._damage_speed_kmh))
             if self._damage_speed_kmh is not None else "—"
         )
         ees_mps = self._damage_speed_mps
@@ -2459,29 +2472,29 @@ class MainWindow(QMainWindow):
                 else None
             )
         self.lbl_result_ees_mps.setText(
-            tr("result.ees_mps", value=f"{ees_mps:.2f}") if ees_mps is not None else "—"
+            tr("result.ees_mps", value=format_display_number(ees_mps)) if ees_mps is not None else "—"
         )
         self.lbl_result_energy.setText(
-            tr("result.energy_j", value=f"{self._total_energy:.2f}")
+            tr("result.energy_j", value=format_display_number(self._total_energy))
             if self._total_energy is not None else "—"
         )
         measurements = [
             tr("summary.scale_not_set")
             if self._m_per_px is None
-            else tr("summary.scale_value", value=f"{self._m_per_px:.6f}")
+            else tr("summary.scale_value", value=format_display_number(self._m_per_px, 6))
         ]
 
         if self._w_px is None:
             measurements.append(tr("summary.w_not_set"))
         else:
             if self._m_per_px is None:
-                measurements.append(tr("summary.w_value_px_only", px=f"{self._w_px:.2f}"))
+                measurements.append(tr("summary.w_value_px_only", px=format_display_number(self._w_px)))
             else:
                 measurements.append(
                     tr(
                         "summary.w_value_full",
-                        px=f"{self._w_px:.2f}",
-                        m=f"{(self._w_px * self._m_per_px):.2f}",
+                        px=format_display_number(self._w_px),
+                        m=format_display_number(self._w_px * self._m_per_px),
                     )
                 )
 
@@ -2500,7 +2513,7 @@ class MainWindow(QMainWindow):
         context.append(
             tr("summary.vehicle_mass_default")
             if self._vehicle_mass_kg is None
-            else tr("summary.vehicle_mass_value", value=f"{self._vehicle_mass_kg:.2f}")
+            else tr("summary.vehicle_mass_value", value=format_display_number(self._vehicle_mass_kg))
         )
 
         self.lbl_result_context.setText("\n".join(context))

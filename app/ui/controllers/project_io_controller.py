@@ -10,6 +10,7 @@ from PySide6.QtCore import QSignalBlocker
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 
+from app.core.number_format import format_display_number
 from app.core.project import Project, UnsupportedCrash3UnitsError
 from app.i18n import tr
 
@@ -111,7 +112,7 @@ class ProjectIOController:
             self.host.calc_panel.cmb_class.blockSignals(False)
             self.host.calc_panel.txt_A.setReadOnly(False)
             self.host.calc_panel.txt_B.setReadOnly(False)
-            self.host.calc_panel.txt_alpha_deg.setText("0.0")
+            self.host.calc_panel.txt_alpha_deg.setText(format_display_number(0.0))
             self.host.calc_panel._refresh_ab_source_ui()
 
         self.host.workflow.apply_stage_gating()
@@ -237,7 +238,7 @@ class ProjectIOController:
         if self.host._m_per_px is not None:
             self.host.canvas.apply_scale(self.host._m_per_px)
             self.host.lbl_m_per_px.setText(
-                tr("measurement.scale_value", value=f"{self.host._m_per_px:.6f}")
+                tr("measurement.scale_value", value=format_display_number(self.host._m_per_px, 6))
             )
         else:
             self.host.lbl_m_per_px.setText(tr("label.scale_m_per_px"))
@@ -255,13 +256,13 @@ class ProjectIOController:
             self.host.lbl_px_distance.setText(
                 tr(
                     "measurement.measured_distance_value",
-                    value=f"{self.host._calibration_px:.2f}",
+                    value=format_display_number(self.host._calibration_px),
                 )
             )
 
             if self.host._m_per_px is not None:
                 real_m = self.host._calibration_px * self.host._m_per_px
-                self.host.txt_real_m.setText(str(real_m))
+                self.host.txt_real_m.setText(format_display_number(real_m, None))
             else:
                 self.host.txt_real_m.setText("")
         else:
@@ -379,7 +380,7 @@ class ProjectIOController:
                 self.host.calc_panel.lbl_energy.setText(
                     tr(
                         "calc.total_energy_value",
-                        value=f"{self.host._total_energy:.2f}",
+                        value=format_display_number(self.host._total_energy),
                         unit="J",
                     )
                 )
@@ -389,13 +390,13 @@ class ProjectIOController:
                 self.host.calc_panel.txt_A.setText(
                     ""
                     if self.host.project.crash3_A is None
-                    else f"{self.host.project.crash3_A:.2f}"
+                    else format_display_number(self.host.project.crash3_A)
                 )
             with QSignalBlocker(self.host.calc_panel.txt_B):
                 self.host.calc_panel.txt_B.setText(
                     ""
                     if self.host.project.crash3_B is None
-                    else f"{self.host.project.crash3_B:.2f}"
+                    else format_display_number(self.host.project.crash3_B)
                 )
 
             ab_type = self.host.project.ab_source_type
@@ -419,14 +420,14 @@ class ProjectIOController:
             alpha_deg = self.host.project.crash3_alpha_deg
             with QSignalBlocker(self.host.calc_panel.txt_alpha_deg):
                 self.host.calc_panel.txt_alpha_deg.setText(
-                    f"{0.0 if alpha_deg is None else alpha_deg:.2f}"
+                    format_display_number(0.0 if alpha_deg is None else alpha_deg)
                 )
 
             with QSignalBlocker(self.host.calc_panel.txt_vehicle_mass):
                 self.host.calc_panel.txt_vehicle_mass.setText(
                     ""
                     if self.host._vehicle_mass_kg is None
-                    else f"{self.host._vehicle_mass_kg:.2f}"
+                    else format_display_number(self.host._vehicle_mass_kg)
                 )
 
             if self.host._damage_speed_kmh is None:
@@ -435,7 +436,7 @@ class ProjectIOController:
                 self.host.calc_panel.lbl_speed.setText(
                     tr(
                         "calc.damage_speed_value",
-                        value=f"{self.host._damage_speed_kmh:.2f}",
+                        value=format_display_number(self.host._damage_speed_kmh),
                         unit="km/h",
                     )
                 )

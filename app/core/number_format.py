@@ -50,3 +50,21 @@ def format_float(
         text = text.replace(".", ",")
 
     return f"{text}{suffix}"
+
+
+def format_display_number(
+    value: float | int | None,
+    decimals: int | None = 2,
+    *,
+    language: str | None = None,
+    significant_digits: bool = False,
+    default: str = "—",
+) -> str:
+    """Format a UI value. Pass None for decimals to keep its ungrouped representation."""
+    if value is None:
+        return default
+    style = "g" if significant_digits else "f"
+    text = str(value) if decimals is None else f"{value:,.{decimals}{style}}"
+    if (language or get_language()) == "pt":
+        return text.translate(str.maketrans(",.", ".,"))
+    return text

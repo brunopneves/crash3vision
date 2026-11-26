@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QApplication, QBoxLayout, QDialog, QFileDialog, QGraphicsView, QInputDialog, QMessageBox,
 )
 
+from app.core.number_format import format_display_number
 from app.core.project import Project
 from app.i18n import tr
 from app.core.rigid_region_alignment import (
@@ -108,7 +109,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
 
         panel.txt_vehicle_mass.setText("1800")
         window._set_language_and_refresh("en")
-        self.assertIn("Test mass (kg): 1815.00", panel.lbl_ab_details.text())
+        self.assertIn("Test mass (kg): 1,815.00", panel.lbl_ab_details.text())
         self.assertIn("Rigid Frontal Barrier", panel.lbl_ab_details.text())
         project.ab_source_snapshot = None
         project.ab_source_reference = None
@@ -183,7 +184,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertFalse(panel.isHidden())
         self.assertTrue(window._summary_group.isHidden())
         self.assertEqual(window.lbl_result_ees_kmh.text(), "—")
-        self.assertEqual(window.lbl_result_energy.text(), f"{window._total_energy:.2f} J")
+        self.assertEqual(window.lbl_result_energy.text(), f"{format_display_number(window._total_energy)} J")
 
     def test_contextual_calculation_rejects_invalid_inputs_and_failed_results(self) -> None:
         window = self._window()
@@ -382,9 +383,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         ))
         self.assertIn("5 intervalos", window.lbl_slice_status.text())
         self.assertIn("W/5", window.lbl_slice_status.text())
-        self.assertEqual(window.lbl_w.text(), f"W: {window._w_m:.3f} m")
-        self.assertIn(f"{window._w_px / 5:.2f} px", window.lbl_delta_w.text())
-        self.assertIn(f"{window._w_m / 5:.3f} m", window.lbl_delta_w.text())
+        self.assertEqual(window.lbl_w.text(), f"W: {format_display_number(window._w_m, 3)} m")
+        self.assertIn(f"{format_display_number(window._w_px / 5)} px", window.lbl_delta_w.text())
+        self.assertIn(f"{format_display_number(window._w_m / 5, 3)} m", window.lbl_delta_w.text())
 
         window.btn_toggle_marking_references.click()
         window.spn_bumper_offset.setValue(0.1)
@@ -407,7 +408,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             for y in (center.y() - 40, center.y() + 40):
                 QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=QPoint(x, y))
             self.assertEqual(window._current_ci_index, min(index + 1, 6))
-            self.assertEqual(window.ci_value_labels[index].text(), f"{window._ci_m[index]:.3f}")
+            self.assertEqual(window.ci_value_labels[index].text(), format_display_number(window._ci_m[index], 3))
             if count < 6:
                 self.assertEqual(window.lbl_ci_progress.text(), f"{count} de 6 medidos")
         self.assertEqual(window.stage, window.Stage.MARKING)
@@ -662,12 +663,58 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             self.assertEqual(window.calc_panel.btn_compute.text(), "Ver resultado")
             window.calc_panel.btn_compute.click()
             self.assertIsNone(window._viewed_step)
-            self.assertEqual(window.lbl_result_ees_mps.text(), f"{data['damage_speed_kmh'] / 3.6:.2f} m/s")
+            self.assertEqual(
+                window.lbl_result_ees_mps.text(),
+                f"{format_display_number(data['damage_speed_kmh'] / 3.6)} m/s",
+            )
             self.assertIsNone(window._damage_speed_mps)
             self.assertIsNone(window.project.damage_speed_mps)
             self.assertEqual(path.read_text(encoding="utf-8"), original)
         window.workflow.invalidate_speed()
         self.assertEqual(window.lbl_result_ees_mps.text(), "—")
+
+    def test_numeric_display_follows_language_without_changing_project_values(self) -> None:
+        window = self._window()
+        source = COMPASS / "crash3vision_reference_project.json"
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(str(source), "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        panel = window.calc_panel
+        before = window.project.to_dict()
+        calibration_distance = float(window.txt_real_m.text().replace(",", "."))
+        self.assertEqual(window.lbl_result_energy.text(), "218.416,49 J")
+        self.assertEqual(window.lbl_result_ees_kmh.text(), "55,85 km/h")
+        self.assertEqual(window.lbl_w.text(), "W: 1,223 m")
+        self.assertIn("0,245 m", window.lbl_delta_w.text())
+        self.assertEqual(window.ci_value_labels[1].text(), "0,293")
+        self.assertEqual(panel.txt_A.text(), "179.048,00")
+        self.assertEqual(panel.txt_B.text(), "1.876.071,00")
+        self.assertEqual(panel.txt_vehicle_mass.text(), "1.815,00")
+        self.assertIn("1.815,00 kg", window.lbl_result_context.text())
+
+        window._set_language_and_refresh("en")
+        self.assertEqual(window.lbl_result_energy.text(), "218,416.49 J")
+        self.assertEqual(window.lbl_result_ees_mps.text(), "15.51 m/s")
+        self.assertEqual(window.lbl_w.text(), "W: 1.223 m")
+        self.assertIn("0.245 m", window.lbl_delta_w.text())
+        self.assertEqual(window.ci_value_labels[1].text(), "0.293")
+        self.assertEqual(panel.txt_A.text(), "179,048.00")
+        self.assertEqual(panel.txt_B.text(), "1,876,071.00")
+        self.assertEqual(panel.txt_vehicle_mass.text(), "1,815.00")
+        self.assertEqual(panel.txt_alpha_deg.text(), "0.00")
+        self.assertEqual(float(window.txt_real_m.text()), calibration_distance)
+        self.assertEqual(window.project.to_dict(), before)
+
+        window.workflow_step_labels["calculation"].click()
+        panel.txt_vehicle_mass.setText("1.815,12345")
+        panel.txt_alpha_deg.setText("0,")
+        window._set_language_and_refresh("pt")
+        self.assertEqual(panel.txt_vehicle_mass.text(), "1.815,12345")
+        self.assertEqual(panel.txt_alpha_deg.text(), "0,")
+        self.assertEqual(window.project.vehicle_mass_kg, 1815.12345)
+        self.assertEqual(panel._parse_mass(), 1815.12345)
 
     def test_result_cards_preserve_file_menu_exports(self) -> None:
         window = self._window()
@@ -687,7 +734,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             window._set_language_and_refresh(language)
             QApplication.processEvents()
             self.assertEqual(window.lbl_result_ees_heading.text(), heading)
-            self.assertEqual(window.lbl_result_energy.text(), f"{window.project.total_energy_j:.2f} J")
+            self.assertEqual(
+                window.lbl_result_energy.text(), f"{format_display_number(window.project.total_energy_j)} J"
+            )
             self.assertIn("6/6", window.lbl_summary.text())
             self.assertIn(" kg", window.lbl_result_context.text())
             self.assertEqual(window._controls_scroll.horizontalScrollBar().maximum(), 0)
@@ -1137,9 +1186,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertTrue(steps["result"].property("progressCurrent"))
         self.assertFalse(steps["calculation"].property("progressCurrent"))
         self.assertEqual(scrollbar.value(), 0)
-        self.assertEqual(window.lbl_result_ees_kmh.text(), f"{window._damage_speed_kmh:.2f} km/h")
-        self.assertEqual(window.lbl_result_ees_mps.text(), f"{window._damage_speed_mps:.2f} m/s")
-        self.assertEqual(window.lbl_result_energy.text(), f"{window._total_energy:.2f} J")
+        self.assertEqual(window.lbl_result_ees_kmh.text(), f"{format_display_number(window._damage_speed_kmh)} km/h")
+        self.assertEqual(window.lbl_result_ees_mps.text(), f"{format_display_number(window._damage_speed_mps)} m/s")
+        self.assertEqual(window.lbl_result_energy.text(), f"{format_display_number(window._total_energy)} J")
         viewport = window._controls_scroll.viewport()
         for label in (window.lbl_result_ees_kmh, window.lbl_result_ees_mps, window.lbl_result_energy):
             self.assertTrue(label.isVisible())
