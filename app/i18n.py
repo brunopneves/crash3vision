@@ -1104,6 +1104,18 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Cannot load project: unrecognized crash3_units marker {units}. The current project has not been changed.",
         "pt": "Não foi possível carregar o projeto: marcador crash3_units não reconhecido {units}. O projeto atual não foi alterado.",
     },
+    "project.save.failed": {
+        "en": "Could not save the project: {error}",
+        "pt": "Não foi possível salvar o projeto: {error}",
+    },
+    "project.load.failed": {
+        "en": "Could not open the project: {error}",
+        "pt": "Não foi possível abrir o projeto: {error}",
+    },
+    "project.load.invalid_structure": {
+        "en": "The JSON root must be an object.",
+        "pt": "O JSON deve conter um objeto na raiz.",
+    },
     "project.load.images_failed": {
         "en": "Cannot load project: failed to read image {error}. The current project has not been changed.",
         "pt": "Não foi possível carregar o projeto: falha ao ler a imagem {error}. O projeto atual não foi alterado.",

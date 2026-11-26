@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from contextlib import suppress
 import json
 import math
 import os
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSignalBlocker
@@ -135,11 +137,10 @@ class ProjectIOController:
             return
 
         self.host._sync_ui_to_project()
-        self.host.project.name = Path(path).stem
-        self.host._update_window_title()
-
-        project_dir = Path(path).parent
+        destination = Path(path)
+        project_dir = destination.parent
         project_data = self.host.project.to_dict()
+        project_data["name"] = destination.stem
         project_data["ref_path"] = _image_path_for_project(
             self.host.project.ref_path, project_dir
         )
@@ -147,10 +148,31 @@ class ProjectIOController:
             self.host.project.dam_path, project_dir
         )
 
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(project_data, f, ensure_ascii=False, indent=2)
+        temporary_path = None
+        try:
+            with NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=project_dir, suffix=".tmp", delete=False
+            ) as stream:
+                temporary_path = Path(stream.name)
+                json.dump(project_data, stream, ensure_ascii=False, indent=2)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary_path, destination)
+            temporary_path = None
+        except (OSError, ValueError, TypeError) as error:
+            QMessageBox.critical(
+                self.host, tr("project.save.dialog_title"),
+                tr("project.save.failed", error=error),
+            )
+            return
+        finally:
+            if temporary_path is not None:
+                with suppress(OSError):
+                    temporary_path.unlink(missing_ok=True)
 
+        self.host.project.name = destination.stem
         self.host._current_project_path = path
+        self.host._update_window_title()
         self.host._refresh_summary()
         QMessageBox.information(
             self.host,
@@ -168,24 +190,29 @@ class ProjectIOController:
         if not path:
             return
 
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        project_dir = Path(path).parent
-        data["ref_path"] = _resolve_project_image_path(
-            data.get("ref_path"), project_dir
-        )
-        data["dam_path"] = _resolve_project_image_path(
-            data.get("dam_path"), project_dir
-        )
-
         try:
+            with open(path, "r", encoding="utf-8") as stream:
+                data = json.load(stream)
+            if not isinstance(data, dict):
+                raise ValueError(tr("project.load.invalid_structure"))
+            project_dir = Path(path).parent
+            for key in ("ref_path", "dam_path"):
+                data[key] = _resolve_project_image_path(data.get(key), project_dir)
             project = Project.from_dict(data)
+            opacity_percent = int(project.opacity * 100)
+            ci_px = {int(k.replace("C", "")): v for k, v in (project.c_px or {}).items()}
+            ci_m = {int(k.replace("C", "")): v for k, v in (project.c_m or {}).items()}
         except UnsupportedCrash3UnitsError as e:
             QMessageBox.warning(
                 self.host,
                 tr("project.load.dialog_title"),
                 tr("project.load.unsupported_crash3_units", units=repr(e.units)),
+            )
+            return
+        except (OSError, ValueError, TypeError, AttributeError, KeyError, OverflowError) as error:
+            QMessageBox.warning(
+                self.host, tr("project.load.dialog_title"),
+                tr("project.load.failed", error=error),
             )
             return
 
@@ -230,7 +257,7 @@ class ProjectIOController:
         )
 
         self.host.opacity_slider.blockSignals(True)
-        self.host.opacity_slider.setValue(int(self.host.project.opacity * 100))
+        self.host.opacity_slider.setValue(opacity_percent)
         self.host.opacity_slider.blockSignals(False)
         self.host._refresh_opacity_percentage()
 
@@ -288,15 +315,8 @@ class ProjectIOController:
         self.host._ci_px.clear()
         self.host._ci_m.clear()
 
-        if self.host.project.c_px:
-            for k, v in self.host.project.c_px.items():
-                idx = int(k.replace("C", ""))
-                self.host._ci_px[idx] = float(v)
-
-        if self.host.project.c_m:
-            for k, v in self.host.project.c_m.items():
-                idx = int(k.replace("C", ""))
-                self.host._ci_m[idx] = float(v)
+        self.host._ci_px.update(ci_px)
+        self.host._ci_m.update(ci_m)
 
         self.host._current_ci_index = 1
         if hasattr(self.host, "_sync_ci_radio_buttons"):
@@ -550,8 +570,11 @@ class ProjectIOController:
             return
 
         try:
+            pixmap = QPixmap(path)
+            if pixmap.isNull():
+                raise ValueError(tr("project.load.images_failed", error=path))
             self.host.workflow.invalidate_from_alignment(target_stage=self.host.Stage.LOAD)
-            self.host.canvas.load_reference(path)
+            self.host.canvas.load_reference(pixmap)
             self.host.project.ref_path = path
             self.host._refresh_summary()
 
@@ -571,8 +594,11 @@ class ProjectIOController:
             return
 
         try:
+            pixmap = QPixmap(path)
+            if pixmap.isNull():
+                raise ValueError(tr("project.load.images_failed", error=path))
             self.host.workflow.invalidate_from_alignment(target_stage=self.host.Stage.LOAD)
-            self.host.canvas.load_deformed(path)
+            self.host.canvas.load_deformed(pixmap)
             self.host.canvas.set_deformed_opacity(
                 self.host.opacity_slider.value() / 100.0
             )

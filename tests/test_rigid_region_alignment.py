@@ -58,6 +58,69 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    def test_failed_image_replacement_and_project_open_preserve_current_data(self) -> None:
+        window = self._window()
+        source = COMPASS / "crash3vision_reference_project.json"
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(str(source), "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        project = window.project
+        before = project.to_dict()
+        overlay = window.canvas.get_overlay_state()
+        with tempfile.TemporaryDirectory() as tmp:
+            corrupt = Path(tmp) / "invalid.png"
+            corrupt.write_bytes(b"not an image")
+            for load in (window.io.load_ref, window.io.load_dam):
+                with (
+                    patch.object(window.io, "pick_image_file", return_value=str(corrupt)),
+                    patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes),
+                    patch.object(QMessageBox, "critical") as error,
+                ):
+                    load()
+                error.assert_called_once()
+                self.assertEqual(project.to_dict(), before)
+                self.assertEqual(window.canvas.get_overlay_state(), overlay)
+                self.assertEqual(window._current_workflow_step(), "result")
+
+            invalid = Path(tmp) / "invalid.json"
+            for content in ("{", "[]", '{"c_m":{"invalid":0.1}}', None):
+                if content is None:
+                    invalid.unlink()
+                else:
+                    invalid.write_text(content, encoding="utf-8")
+                with (
+                    patch.object(QFileDialog, "getOpenFileName", return_value=(str(invalid), "")),
+                    patch.object(QMessageBox, "warning") as error,
+                ):
+                    window.io.load_project()
+                error.assert_called_once()
+                self.assertIs(window.project, project)
+                self.assertEqual(project.to_dict(), before)
+                self.assertEqual(window.canvas.get_overlay_state(), overlay)
+                self.assertEqual(window._current_project_path, str(source))
+
+    def test_failed_atomic_save_keeps_existing_file_name_and_path(self) -> None:
+        window = self._window()
+        before = window.project.name, window._current_project_path, window.windowTitle()
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp) / "existing.json"
+            destination.write_bytes(b"original content")
+            for operation in ("json.dump", "os.replace"):
+                with (
+                    patch.object(QFileDialog, "getSaveFileName", return_value=(str(destination), "")),
+                    patch(f"app.ui.controllers.project_io_controller.{operation}", side_effect=OSError("simulated failure")),
+                    patch.object(QMessageBox, "critical") as error,
+                ):
+                    window.io.save_project()
+                error.assert_called_once()
+                self.assertEqual(destination.read_bytes(), b"original content")
+                self.assertEqual(list(Path(tmp).iterdir()), [destination])
+                self.assertEqual(
+                    (window.project.name, window._current_project_path, window.windowTitle()), before
+                )
+
     def test_ab_details_show_only_applicable_source_metadata(self) -> None:
         window = self._window()
         panel = window.calc_panel
@@ -2257,6 +2320,26 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertNotEqual(window.canvas.get_deformed_transform(), baseline)
         self.assertEqual(window.project.dam_transform.to_dict(), baseline)
 
+        with tempfile.TemporaryDirectory() as tmp:
+            saved = Path(tmp) / "pending.json"
+            with (
+                patch.object(QFileDialog, "getSaveFileName", return_value=(str(saved), "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                window.io.save_project()
+            self.assertNotEqual(window.canvas.get_deformed_transform(), baseline)
+            window.btn_rigid_cancel.click()
+            self.assertEqual(window.project.dam_transform.to_dict(), baseline)
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(saved), "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                window.io.load_project()
+            self.assertEqual(window.canvas.get_deformed_transform(), baseline)
+
+        with patch("app.ui.main_window.estimate_rigid_region_alignment", return_value=success):
+            window._on_start_rigid_region_alignment()
+            self._select_three_reference_points(window)
         window._on_try_another_rigid_region()
         self.assertEqual(window.canvas.get_deformed_transform(), baseline)
         self.assertFalse(window._rigid_preview_active)

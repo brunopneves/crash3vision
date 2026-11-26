@@ -12,7 +12,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import cv2
 import numpy as np
 from PySide6.QtCore import QPointF
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from app.core.auto_alignment import (
     AlignmentHypothesis,
@@ -486,7 +486,21 @@ class AutoAlignmentTests(unittest.TestCase):
         )
 
         self.assertNotEqual(window.canvas.get_deformed_transform(), baseline)
-        window._on_cancel_alignment_preview()
+        with tempfile.TemporaryDirectory() as tmp:
+            saved = Path(tmp) / "pending.json"
+            with (
+                patch.object(QFileDialog, "getSaveFileName", return_value=(str(saved), "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                window.io.save_project()
+            self.assertNotEqual(window.canvas.get_deformed_transform(), baseline)
+            window._on_cancel_alignment_preview()
+            self.assertEqual(window.canvas.get_deformed_transform(), baseline)
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(saved), "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                window.io.load_project()
 
         self.assertEqual(window.canvas.get_deformed_transform(), baseline)
         self.assertEqual(window.project.dam_transform.to_dict(), baseline)

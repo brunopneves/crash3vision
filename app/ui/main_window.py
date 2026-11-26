@@ -1839,9 +1839,10 @@ class MainWindow(QMainWindow):
             self._auto_preview_baseline_dam_transform
             if self._auto_preview_active
             else None
-        ) or self.canvas.get_deformed_transform()
+        ) or self._rigid_baseline_dam_transform or self.canvas.get_deformed_transform()
+        reference = self._rigid_baseline_ref_transform or self.canvas.get_reference_transform()
         for target, values in (
-            (self.project.ref_transform, self.canvas.get_reference_transform()),
+            (self.project.ref_transform, reference),
             (self.project.dam_transform, deformed),
         ):
             target.x = values["x"]
