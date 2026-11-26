@@ -207,6 +207,12 @@ STRINGS: dict[str, dict[str, str]] = {
     "progress.skipped": {"en": "skipped", "pt": "pulado"},
     "progress.status.complete": {"en": "Complete", "pt": "Concluída"},
     "progress.status.passed": {"en": "Stage passed", "pt": "Etapa superada"},
+    "progress.viewing": {"en": "Viewing · read-only", "pt": "Em consulta · somente leitura"},
+    "progress.return_current": {"en": "Return to current step", "pt": "Voltar à etapa atual"},
+    "progress.transform": {
+        "en": "{image}: X {x:.2f}, Y {y:.2f}, rotation {rotation:.2f}°, scale {scale:.4f}",
+        "pt": "{image}: X {x:.2f}, Y {y:.2f}, rotação {rotation:.2f}°, escala {scale:.4f}",
+    },
     "progress.status.current": {"en": "Current", "pt": "Atual"},
     "progress.status.future": {"en": "Upcoming", "pt": "Futura"},
     "alignment.status.choose_method": {

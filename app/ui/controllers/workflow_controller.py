@@ -18,6 +18,7 @@ class WorkflowController:
     def set_stage(self, stage: "Stage") -> None:
         if self.host.stage != stage:
             self.reset_canvas_tools()
+            self.host._viewed_step = None
         self.host.stage = stage
         self.apply_stage_gating()
         self.host._refresh_summary()
@@ -57,6 +58,7 @@ class WorkflowController:
 
     def sync_stage_after_load(self) -> None:
         stage = self.determine_stage_from_project()
+        self.host._viewed_step = None
         self.host._current_ci_index = 1
         self.reset_canvas_tools()
         self.host._sync_ci_radio_buttons()
@@ -71,21 +73,30 @@ class WorkflowController:
         host = self.host
         Stage = host.Stage
         stage = host.stage
+        viewed = host._viewed_step
+        consulting = viewed is not None
+        panel = viewed or host._current_workflow_step()
         host._refresh_image_controls()
         host._update_finish_alignment_availability()
-        host.canvas_view_bar.setEnabled(host.canvas.has_both_images())
+        host.canvas_view_bar.setEnabled(host.canvas.has_both_images() and not consulting)
+        host.btn_return_to_current_step.setVisible(consulting)
+        host.btn_load_ref.setEnabled(not consulting)
+        host.btn_load_dam.setEnabled(not consulting)
+        for shortcut in host._alignment_shortcuts:
+            shortcut.setEnabled(not consulting)
 
-        for group, group_stage in (
-            (host.align_group, Stage.ALIGNMENT),
-            (host.fine_adjust_group, Stage.ALIGNMENT),
-            (host.cal_group, Stage.CALIBRATION),
-            (host.mark_group, Stage.MARKING),
-            (host.calc_panel, Stage.DONE),
-            (host._summary_group, Stage.DONE),
+        for group, panels in (
+            (host.align_group, ("alignment",)),
+            (host.fine_adjust_group, ("alignment",)),
+            (host.cal_group, ("calibration",)),
+            (host.mark_group, ("measurement",)),
+            (host.calc_panel, ("calculation", "result")),
+            (host._summary_group, ("calculation", "result")),
         ):
-            active = stage == group_stage
-            group.setEnabled(active)
-            group.setVisible(active)
+            visible = panel in panels
+            group.setEnabled(visible and not consulting)
+            group.setVisible(visible)
+        host._refresh_alignment_consultation()
 
         restart_actions = (
             (host.btn_restart_alignment, stage in (Stage.CALIBRATION, Stage.MARKING, Stage.DONE)),

@@ -52,6 +52,66 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    def test_step_consultation_preserves_project_and_disables_tools(self) -> None:
+        window = self._window()
+        steps = window.workflow_step_labels
+        self.assertFalse(steps["calibration"].isEnabled())
+        steps["calibration"].click()
+        self.assertIsNone(window._viewed_step)
+        window.chk_alignment_mode.setChecked(True)
+        self.assertTrue(window.canvas.alignment_mode)
+        before = window.project.to_dict()
+        overlay = window.canvas.get_overlay_state()
+        steps["images"].click()
+        self.assertEqual(window.stage, window.Stage.ALIGNMENT)
+        self.assertEqual(window._viewed_step, "images")
+        self.assertTrue(window.align_group.isHidden())
+        self.assertFalse(window.btn_load_ref.isEnabled())
+        self.assertFalse(window.canvas.alignment_mode)
+        self.assertIsNone(window.canvas.ctrl.active_tool())
+        self.assertTrue(all(not shortcut.isEnabled() for shortcut in window._alignment_shortcuts))
+        self.assertEqual(window.project.to_dict(), before)
+        self.assertEqual(window.canvas.get_overlay_state(), overlay)
+        window.btn_return_to_current_step.click()
+        self.assertIsNone(window._viewed_step)
+        self.assertTrue(window.align_group.isEnabled())
+        self.assertTrue(all(shortcut.isEnabled() for shortcut in window._alignment_shortcuts))
+
+    def test_result_consultation_and_project_reload_follow_real_progress(self) -> None:
+        window = self._window()
+        steps = window.workflow_step_labels
+        steps["images"].click()
+        path = str(COMPASS / "crash3vision_reference_project.json")
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(path, "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        self.assertIsNone(window._viewed_step)
+        self.assertEqual(window._current_workflow_step(), "result")
+        before = window.project.to_dict()
+        overlay = window.canvas.get_overlay_state()
+        for step, group in (
+            ("alignment", window.align_group),
+            ("calibration", window.cal_group),
+            ("measurement", window.mark_group),
+            ("calculation", window.calc_panel),
+        ):
+            steps[step].click()
+            self.assertEqual(window._viewed_step, step)
+            self.assertFalse(group.isHidden())
+            self.assertFalse(group.isEnabled())
+            self.assertIn("#245b96", steps["result"].styleSheet())
+            self.assertNotIn("#245b96", steps[step].styleSheet())
+            self.assertEqual(window.stage, window.Stage.DONE)
+            self.assertEqual(window.project.to_dict(), before)
+            self.assertEqual(window.canvas.get_overlay_state(), overlay)
+        steps["result"].click()
+        self.assertIsNone(window._viewed_step)
+        window.workflow.invalidate_speed()
+        self.assertFalse(steps["result"].isEnabled())
+        self.assertEqual(window._current_workflow_step(), "calculation")
+
     def test_reference_only_stays_in_images_until_deformed_is_loaded(self) -> None:
         window = MainWindow()
         self.addCleanup(window.close)
@@ -916,6 +976,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         )
         self.assertTrue(window._rigid_preview_active)
         self.assertTrue(window.btn_finish_alignment.isHidden())
+        self.assertFalse(window.workflow_step_labels["images"].isEnabled())
+        window._view_workflow_step("images")
+        self.assertIsNone(window._viewed_step)
         window._on_finish_alignment()
         self.assertEqual(window.stage, window.Stage.ALIGNMENT)
         self.assertTrue(window._rigid_preview_active)

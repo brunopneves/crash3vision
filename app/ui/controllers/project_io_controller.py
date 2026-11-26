@@ -58,6 +58,7 @@ class ProjectIOController:
         self.host._update_window_title()
         self.host._current_project_path = None
         self.host.stage = self.host.Stage.LOAD  # type: ignore[attr-defined]
+        self.host._viewed_step = None
 
         self.host._calibration_px = None
         self.host._m_per_px = None

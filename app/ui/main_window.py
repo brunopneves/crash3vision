@@ -111,6 +111,7 @@ class MainWindow(QMainWindow):
         self._update_window_title()
 
         self.stage: Stage = Stage.LOAD
+        self._viewed_step: str | None = None
 
         self._calibration_px: float | None = None
         self._m_per_px: float | None = None
@@ -258,30 +259,52 @@ class MainWindow(QMainWindow):
         layout.setSpacing(4)
         self.workflow_step_labels = {}
         for step in ("images", "alignment", "calibration", "measurement", "calculation", "result"):
-            label = QLabel()
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label = QPushButton()
+            label.clicked.connect(lambda checked=False, target=step: self._view_workflow_step(target))
             label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             self.workflow_step_labels[step] = label
             layout.addWidget(label, 1)
         toolbar.addWidget(strip)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-    def _refresh_workflow_progress(self) -> None:
-        steps = tuple(self.workflow_step_labels)
-        current = {
-            Stage.LOAD: 0,
-            Stage.ALIGNMENT: 1,
-            Stage.CALIBRATION: 2,
-            Stage.MARKING: 3,
-            Stage.DONE: 4,
-        }[self.stage]
-        result_ready = (
+    def _current_workflow_step(self) -> str:
+        if (
             self.stage == Stage.DONE
             and self._total_energy is not None
             and self._damage_speed_kmh is not None
-        )
-        if result_ready:
-            current = steps.index("result")
+        ):
+            return "result"
+        return {
+            Stage.LOAD: "images",
+            Stage.ALIGNMENT: "alignment",
+            Stage.CALIBRATION: "calibration",
+            Stage.MARKING: "measurement",
+            Stage.DONE: "calculation",
+        }[self.stage]
+
+    def _workflow_navigation_blocked(self) -> bool:
+        return self._auto_preview_active or self._rigid_baseline_ref_transform is not None
+
+    def _view_workflow_step(self, step: str) -> None:
+        steps = tuple(self.workflow_step_labels)
+        current = self._current_workflow_step()
+        if self._workflow_navigation_blocked() or steps.index(step) > steps.index(current):
+            return
+        viewed = None if step == current else step
+        if viewed != self._viewed_step:
+            self.workflow.reset_canvas_tools()
+            self._viewed_step = viewed
+            self.workflow.apply_stage_gating()
+            self._refresh_workflow_progress()
+
+    def _return_to_current_step(self) -> None:
+        self._view_workflow_step(self._current_workflow_step())
+
+    def _refresh_workflow_progress(self) -> None:
+        steps = tuple(self.workflow_step_labels)
+        current = steps.index(self._current_workflow_step())
+        result_ready = steps[current] == "result"
+        blocked = self._workflow_navigation_blocked()
 
         highlight = "background-color: #245b96; color: white; font-weight: bold;"
         for index, (step, label) in enumerate(self.workflow_step_labels.items()):
@@ -302,10 +325,16 @@ class MainWindow(QMainWindow):
             else:
                 status, text, style = "future", title, "color: #808080;"
             label.setProperty("progressStatus", status)
+            viewing = step == self._viewed_step
+            if viewing:
+                style += "border: 1px solid #67727a; font-weight: bold;"
+                text = f"▸ {text}"
             label.setText(text)
-            label.setToolTip(f"{text} — {tr(f'progress.status.{status}')}")
+            description = tr("progress.viewing") if viewing else tr(f"progress.status.{status}")
+            label.setToolTip(f"{text} — {description}")
             label.setAccessibleName(label.toolTip())
-            label.setStyleSheet(f"QLabel {{ {style} padding: 3px; border-radius: 3px; }}")
+            label.setEnabled(index <= current and not blocked)
+            label.setStyleSheet(f"QPushButton {{ border: 1px solid transparent; {style} padding: 3px; border-radius: 3px; }}")
 
     def _build_canvas_area(self) -> None:
         central = QWidget()
@@ -341,6 +370,10 @@ class MainWindow(QMainWindow):
 
         dock_widget = QWidget()
         dock_layout = QVBoxLayout(dock_widget)
+        self.btn_return_to_current_step = QPushButton(tr("progress.return_current"))
+        self.btn_return_to_current_step.clicked.connect(self._return_to_current_step)
+        self.btn_return_to_current_step.hide()
+        dock_layout.addWidget(self.btn_return_to_current_step)
 
         # --- Load images ---
         self.load_group = QGroupBox(tr("group.load_images"))
@@ -376,6 +409,10 @@ class MainWindow(QMainWindow):
         # --- Alignment group ---
         self.align_group = QGroupBox(tr("group.alignment"))
         align_layout = QVBoxLayout(self.align_group)
+        self.lbl_alignment_consultation = QLabel()
+        self.lbl_alignment_consultation.setWordWrap(True)
+        self.lbl_alignment_consultation.hide()
+        align_layout.addWidget(self.lbl_alignment_consultation)
 
         self.chk_alignment_mode = QCheckBox(tr("check.alignment_mode"))
         self.chk_alignment_mode.setToolTip(tr("check.alignment_mode_hint"))
@@ -766,6 +803,8 @@ class MainWindow(QMainWindow):
         self._build_menu()
 
         self._controls_dock.setWindowTitle(tr("dock.controls"))
+        self.btn_return_to_current_step.setText(tr("progress.return_current"))
+        self._refresh_alignment_consultation()
 
         self._refresh_image_controls()
         self.btn_load_ref.setText(tr("button.load_ref"))
@@ -942,6 +981,26 @@ class MainWindow(QMainWindow):
     def _on_alignment_mode_toggled(self, checked: bool) -> None:
         self.canvas.set_alignment_mode(checked)
 
+    def _refresh_alignment_consultation(self) -> None:
+        viewing = self._viewed_step == "alignment"
+        self.lbl_alignment_consultation.setVisible(viewing)
+        if not viewing:
+            return
+        lines = []
+        for item, name, transform in (
+            (self.canvas.ctrl.ref_item, "reference", self.canvas.get_reference_transform),
+            (self.canvas.ctrl.dam_item, "deformed", self.canvas.get_deformed_transform),
+        ):
+            if item is not None:
+                values = transform()
+                lines.append(tr(
+                    "progress.transform",
+                    image=tr(f"combo.{name}"),
+                    x=values["x"], y=values["y"],
+                    rotation=values["rotation_deg"], scale=values["scale"],
+                ))
+        self.lbl_alignment_consultation.setText("\n".join(lines))
+
     def _on_lock_alignment_toggled(self, checked: bool) -> None:
         self.canvas.set_alignment_locked(checked)
 
@@ -1019,6 +1078,7 @@ class MainWindow(QMainWindow):
             any(not button.isHidden() for button in buttons)
         )
         self._update_finish_alignment_availability()
+        self._refresh_workflow_progress()
 
     def _on_alignment_state_changed(self) -> None:
         if self._rigid_internal_transform_change:
@@ -1797,6 +1857,11 @@ class MainWindow(QMainWindow):
             self.project.c_points = None
 
     def _refresh_summary(self) -> None:
+        if self._viewed_step is not None:
+            steps = tuple(self.workflow_step_labels)
+            if steps.index(self._viewed_step) >= steps.index(self._current_workflow_step()):
+                self._viewed_step = None
+                self.workflow.apply_stage_gating()
         self._refresh_workflow_progress()
         stage_key = f"stage.{self.stage.value}"
 
@@ -1908,3 +1973,7 @@ class MainWindow(QMainWindow):
 
         self.sc_scale_minus.activated.connect(self._on_scale_minus)
         self.sc_scale_plus.activated.connect(self._on_scale_plus)
+        self._alignment_shortcuts = (
+            self.sc_nudge_up, self.sc_nudge_down, self.sc_nudge_left, self.sc_nudge_right,
+            self.sc_rotate_minus, self.sc_rotate_plus, self.sc_scale_minus, self.sc_scale_plus,
+        )
