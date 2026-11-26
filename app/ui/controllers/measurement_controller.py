@@ -143,11 +143,6 @@ class MeasurementController:
         self.host._refresh_summary()
 
     def update_ci_values_label(self) -> None:
-        parts = []
-        for i in range(1, 7):
-            parts.append(
-                f"C{i}={self.host._ci_m[i]:.3f}" if i in self.host._ci_m else f"C{i}=-"
-            )
-        self.host.lbl_ci_values.setText(
-            tr("measurement.c_values_prefix") + "  " + "  ".join(parts)
-        )
+        for index, label in self.host.ci_value_labels.items():
+            value = self.host._ci_m.get(index)
+            label.setText(f"{value:.3f}" if value is not None else "—")

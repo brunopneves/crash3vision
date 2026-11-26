@@ -7,7 +7,7 @@ from pathlib import Path
 
 import cv2
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QShortcut, QKeySequence
+from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -237,15 +237,6 @@ class MainWindow(QMainWindow):
             + ACTION_STYLES
             + WORKFLOW_PANEL_STYLES
         )
-
-        bold = QFont()
-        bold.setBold(True)
-        for lbl in (
-            self.lbl_w,
-            self.lbl_delta_w,
-            self.lbl_ci_values,
-        ):
-            lbl.setFont(bold)
 
     def _build_workflow_progress(self) -> None:
         toolbar = QToolBar(self)
@@ -732,37 +723,61 @@ class MainWindow(QMainWindow):
         dock_layout.addWidget(self.cal_group)
 
         # --- Marking group ---
-        self.mark_group = QGroupBox(tr("group.marking"))
+        self.mark_group = QGroupBox()
+        self.mark_group.setObjectName("measurementPanel")
         mark_layout = QVBoxLayout(self.mark_group)
-        mark_layout.setContentsMargins(1, 10, 1, 10)
+        mark_layout.setContentsMargins(0, 0, 0, 0)
+        mark_layout.setSpacing(10)
+        self.lbl_marking_title = QLabel(tr("progress.measurement"))
+        self.lbl_marking_title.setObjectName("measurementTitle")
+        self.mark_group.setAccessibleName(self.lbl_marking_title.text())
+        mark_layout.addWidget(self.lbl_marking_title)
 
         self.lbl_marking_orientation = QLabel(tr("label.marking_orientation"))
+        self.lbl_marking_orientation.setObjectName("measurementOrientation")
         self.lbl_marking_orientation.setWordWrap(True)
         mark_layout.addWidget(self.lbl_marking_orientation)
 
         self.mark_width_group = QGroupBox()
+        self.mark_width_group.setProperty("measurementCard", True)
         width_layout = QVBoxLayout(self.mark_width_group)
+        width_layout.setContentsMargins(12, 11, 12, 11)
+        width_layout.setSpacing(7)
+        self.lbl_width_heading = QLabel(tr("marking.width"))
+        self.lbl_width_heading.setProperty("measurementHeading", True)
+        self.lbl_width_heading.setWordWrap(True)
+        width_layout.addWidget(self.lbl_width_heading)
         self.chk_set_w_mode = QPushButton(tr("marking.mark_width"))
-        self.chk_set_w_mode.setProperty("uiRole", "secondary")
+        self.chk_set_w_mode.setProperty("uiRole", "primary")
+        self.chk_set_w_mode.setProperty("panelAction", True)
         self.chk_set_w_mode.setCheckable(True)
-        width_layout.addWidget(self.chk_set_w_mode)
         self.lbl_w = QLabel(tr("label.w_default"))
+        self.lbl_w.setObjectName("measurementWidthValue")
         self.lbl_w.setWordWrap(True)
         width_layout.addWidget(self.lbl_w)
         self.lbl_slice_status = QLabel()
+        self.lbl_slice_status.setProperty("measurementStatus", True)
         self.lbl_slice_status.setWordWrap(True)
         width_layout.addWidget(self.lbl_slice_status)
         self.lbl_delta_w = QLabel(tr("label.delta_w_default"))
         self.lbl_delta_w.setWordWrap(True)
         width_layout.addWidget(self.lbl_delta_w)
+        self.lbl_width_capture = QLabel(tr("marking.width_capture"))
+        self.lbl_width_capture.setWordWrap(True)
+        width_layout.addWidget(self.lbl_width_capture)
+        width_layout.addWidget(self.chk_set_w_mode)
         mark_layout.addWidget(self.mark_width_group)
 
         self.btn_toggle_marking_references = QToolButton()
+        self.btn_toggle_marking_references.setObjectName("measurementReferencesDisclosure")
         self._style_disclosure(self.btn_toggle_marking_references)
+        self.btn_toggle_marking_references.setProperty("panelDisclosure", True)
         self.btn_toggle_marking_references.toggled.connect(self._on_marking_references_toggled)
-        self.marking_references = QWidget()
+        self.marking_references = QFrame()
+        self.marking_references.setProperty("measurementCard", True)
         references_layout = QVBoxLayout(self.marking_references)
-        references_layout.setContentsMargins(0, 0, 0, 0)
+        references_layout.setContentsMargins(12, 11, 12, 11)
+        references_layout.setSpacing(7)
         self.chk_set_guide_mode = QCheckBox(tr("check.set_guide_mode"))
         self.chk_set_guide_mode.setToolTip(tr("marking.guide_hint"))
         references_layout.addWidget(self.chk_set_guide_mode)
@@ -780,8 +795,18 @@ class MainWindow(QMainWindow):
         references_layout.addWidget(self.spn_bumper_offset)
 
         self.mark_ci_group = QGroupBox()
+        self.mark_ci_group.setProperty("measurementCard", True)
         ci_layout = QVBoxLayout(self.mark_ci_group)
-        ci_layout.setContentsMargins(7, 10, 7, 10)
+        ci_layout.setContentsMargins(12, 11, 12, 11)
+        ci_layout.setSpacing(7)
+        self.lbl_ci_heading = QLabel(tr("marking.crush"))
+        self.lbl_ci_heading.setProperty("measurementHeading", True)
+        self.lbl_ci_heading.setWordWrap(True)
+        ci_layout.addWidget(self.lbl_ci_heading)
+        self.lbl_ci_progress = QLabel()
+        self.lbl_ci_progress.setProperty("measurementStatus", True)
+        self.lbl_ci_progress.setWordWrap(True)
+        ci_layout.addWidget(self.lbl_ci_progress)
         self.chk_measure_ci_mode = QCheckBox(tr("check.measure_ci_mode"))
         ci_layout.addWidget(self.chk_measure_ci_mode)
         self.lbl_ci_instruction = QLabel()
@@ -791,12 +816,13 @@ class MainWindow(QMainWindow):
         self.lbl_ci_index = QLabel(tr("label.current_ci", idx=1))
         ci_layout.addWidget(self.lbl_ci_index)
 
-        self.ci_select_box = QGroupBox(tr("group.select_c"))
-        ci_select_layout = QVBoxLayout(self.ci_select_box)
-        ci_select_layout.setContentsMargins(4, 10, 4, 10)
-
-        ci_row_1 = QHBoxLayout()
-        ci_row_2 = QHBoxLayout()
+        self.ci_select_box = QGroupBox()
+        self.ci_select_box.setObjectName("measurementCiGrid")
+        self.ci_select_box.setAccessibleName(tr("group.select_c"))
+        ci_select_layout = QGridLayout(self.ci_select_box)
+        ci_select_layout.setContentsMargins(0, 0, 0, 0)
+        ci_select_layout.setHorizontalSpacing(8)
+        ci_select_layout.setVerticalSpacing(3)
 
         self.rb_c1 = QRadioButton("C1")
         self.rb_c2 = QRadioButton("C2")
@@ -807,22 +833,23 @@ class MainWindow(QMainWindow):
 
         self.rb_c1.setChecked(True)
 
-        ci_row_1.addWidget(self.rb_c1)
-        ci_row_1.addWidget(self.rb_c2)
-        ci_row_1.addWidget(self.rb_c3)
+        self.ci_value_labels = {}
+        for index, radio in enumerate(
+            (self.rb_c1, self.rb_c2, self.rb_c3, self.rb_c4, self.rb_c5, self.rb_c6), 1
+        ):
+            row, column = divmod(index - 1, 3)
+            ci_select_layout.setColumnStretch(column, 1)
+            ci_select_layout.addWidget(radio, row * 2, column)
+            value = QLabel("—")
+            value.setProperty("measurementCiValue", True)
+            value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ci_select_layout.addWidget(value, row * 2 + 1, column)
+            self.ci_value_labels[index] = value
 
-        ci_row_2.addWidget(self.rb_c4)
-        ci_row_2.addWidget(self.rb_c5)
-        ci_row_2.addWidget(self.rb_c6)
-
-        ci_select_layout.addLayout(ci_row_1)
-        ci_select_layout.addLayout(ci_row_2)
-
-        ci_layout.addWidget(self.ci_select_box)
-
-        self.lbl_ci_values = QLabel(tr("label.c_values_default"))
+        self.lbl_ci_values = QLabel(tr("measurement.c_values_prefix"))
         self.lbl_ci_values.setWordWrap(True)
         ci_layout.addWidget(self.lbl_ci_values)
+        ci_layout.addWidget(self.ci_select_box)
         mark_layout.addWidget(self.mark_ci_group)
         mark_layout.addWidget(self.btn_toggle_marking_references)
         mark_layout.addWidget(self.marking_references)
@@ -1024,8 +1051,11 @@ class MainWindow(QMainWindow):
         self._translate_calibration_panel()
         self.btn_confirm_calibration.setText(tr("button.confirm_calibration"))
 
-        self.mark_group.setTitle(tr("group.marking"))
-        self.ci_select_box.setTitle(tr("group.select_c"))
+        self.lbl_marking_title.setText(tr("progress.measurement"))
+        self.mark_group.setAccessibleName(self.lbl_marking_title.text())
+        self.ci_select_box.setAccessibleName(tr("group.select_c"))
+        self.lbl_ci_values.setText(tr("measurement.c_values_prefix"))
+        self.lbl_width_capture.setText(tr("marking.width_capture"))
         self.lbl_marking_orientation.setText(tr("label.marking_orientation"))
         self.chk_set_w_mode.setText(tr("marking.mark_width"))
         self.chk_set_guide_mode.setText(tr("check.set_guide_mode"))
@@ -1034,10 +1064,6 @@ class MainWindow(QMainWindow):
         self.chk_measure_ci_mode.setText(tr("check.measure_ci_mode"))
         self._update_ci_label()
         self.btn_finish_marking.setText(tr("button.finish_marking"))
-        if not self._ci_m:
-            self.lbl_ci_values.setText(tr("label.c_values_default"))
-
-
         self._summary_group.setTitle(tr("group.summary"))
 
         if self._w_px is None:
@@ -2200,28 +2226,38 @@ class MainWindow(QMainWindow):
     def _refresh_marking_panel(self) -> None:
         overlay = self.canvas.get_overlay_state()
         has_width = self._w_px is not None
-        if self.canvas.set_w_mode:
+        capturing = self.canvas.set_w_mode
+        if capturing:
             action = "marking.cancel_width"
         else:
             action = "marking.remark_width" if has_width else "marking.mark_width"
         self.chk_set_w_mode.setText(tr(action))
+        set_style_property(
+            self.chk_set_w_mode, "uiRole", "secondary" if has_width or capturing else "primary"
+        )
+        self.lbl_width_capture.setVisible(capturing)
         positions = len(self.canvas.slice_x)
         measured = sum(i in self._ci_m for i in range(1, 7))
-        self.mark_width_group.setTitle(tr("marking.width") + (" ✓" if positions == 6 else ""))
-        self.mark_ci_group.setTitle(tr("marking.crush"))
+        self.lbl_width_heading.setText(tr("marking.width"))
+        self.lbl_ci_heading.setText(tr("marking.crush"))
         self.chk_measure_ci_mode.setEnabled(positions == 6)
         self.chk_set_guide_mode.setEnabled(positions == 6)
         missing = tr("marking.remark_for_positions" if has_width else "marking.no_slices")
         self.lbl_slice_status.setText(
-            tr("marking.slice_count", count=positions, intervals=positions - 1)
+            f"✓ {tr('marking.slice_count', count=positions, intervals=positions - 1)}"
             if positions == 6 else missing
         )
-        instruction = tr("marking.ci_instruction") if positions == 6 else missing
+        set_style_property(self.lbl_slice_status, "complete", positions == 6)
+        self.lbl_ci_progress.setText(
+            f"✓ {tr('marking.ci_complete')}" if measured == 6
+            else tr("marking.ci_progress", count=measured)
+        )
+        set_style_property(self.lbl_ci_progress, "complete", measured == 6)
+        instruction = tr("marking.ci_instruction")
         if self.canvas.measure_ci_mode and positions == 6 and measured < 6:
             instruction = tr("marking.ci_mark_current", idx=self._current_ci_index)
-        if measured == 6:
-            instruction = f"✓ {tr('marking.ci_complete')}\n{instruction}"
         self.lbl_ci_instruction.setText(instruction)
+        self.lbl_ci_instruction.setVisible(positions == 6)
         title = tr("marking.references")
         flags = []
         if overlay.get("guide_y") is not None:

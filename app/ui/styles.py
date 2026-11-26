@@ -55,23 +55,25 @@ QPushButton[uiRole]:disabled, QToolButton[uiRole="disclosure"]:disabled {
 """
 
 WORKFLOW_PANEL_STYLES = """
-QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle {
+QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle {
     color: #172f50;
     font-size: 23px;
     font-weight: bold;
 }
-QLabel#imageCardDescription, QFrame#alignmentCard QLabel, QLabel#alignmentShortcuts {
+QLabel#imageCardDescription, QFrame#alignmentCard QLabel, QLabel#alignmentShortcuts,
+QLabel#measurementOrientation, QGroupBox[measurementCard="true"] QLabel {
     color: #44566c;
     font-size: 13px;
 }
 QFrame#imageLoadCard, QFrame#alignmentCard, QGroupBox#alignmentManualCard,
-QFrame[calibrationCard="true"] {
+QFrame[calibrationCard="true"], QGroupBox[measurementCard="true"], QFrame[measurementCard="true"] {
     background: #f8faff;
     border: 1px solid #d6dfe9;
     border-radius: 9px;
 }
 QLabel#imageCardTitle, QLabel#alignmentMethodLabel, QLabel#alignmentTargetLabel,
-QLabel#alignmentStatusTitle, QFrame[calibrationCard="true"] QLabel[calibrationHeading="true"] {
+QLabel#alignmentStatusTitle, QFrame[calibrationCard="true"] QLabel[calibrationHeading="true"],
+QGroupBox[measurementCard="true"] QLabel[measurementHeading="true"] {
     color: #192f4c;
     font-size: 14px;
     font-weight: bold;
@@ -109,8 +111,12 @@ QToolButton[panelDisclosure="true"]:disabled {
     background: #f0f2f5;
     color: #566371;
 }
-QGroupBox#alignmentPanel, QGroupBox#calibrationPanel { border: none; }
-QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle { padding: 4px 8px; }
+QGroupBox#alignmentPanel, QGroupBox#calibrationPanel, QGroupBox#measurementPanel,
+QGroupBox#measurementCiGrid { border: none; }
+QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle {
+    padding: 4px 8px;
+}
+QLabel#measurementOrientation { padding: 0 8px; }
 QFrame#alignmentCard QRadioButton { font-size: 12px; spacing: 5px; }
 QToolButton#alignmentPrecisionDisclosure { font-size: 12px; }
 QLabel#alignmentStatusTitle[tone="success"] { color: #245c3e; }
@@ -167,6 +173,35 @@ QLineEdit#calibrationDistanceInput:disabled {
     color: #566371;
     border-color: #d0d7df;
 }
+QLabel#measurementWidthValue {
+    color: #172f50;
+    font-size: 23px;
+    font-weight: bold;
+}
+QLabel[measurementStatus="true"][complete="true"] {
+    color: #245c3e;
+    font-weight: bold;
+}
+QGroupBox#measurementCiGrid QRadioButton {
+    background: #edf1f6;
+    color: #23313f;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: 4px 6px;
+    font-size: 13px;
+    font-weight: bold;
+}
+QGroupBox#measurementCiGrid QRadioButton:hover { background: #e3eaf3; }
+QGroupBox#measurementCiGrid QRadioButton:checked {
+    background: #dceaf8;
+    color: #164673;
+    border-color: #6f95bc;
+}
+QGroupBox#measurementCiGrid QRadioButton:focus { border-color: #245b96; }
+QGroupBox#measurementCiGrid QRadioButton:disabled { color: #566371; }
+QLabel[measurementCiValue="true"] { color: #23313f; font-weight: bold; }
+QToolButton#measurementReferencesDisclosure { font-size: 12px; }
+QFrame[measurementCard="true"] QDoubleSpinBox { min-height: 24px; }
 """
 
 

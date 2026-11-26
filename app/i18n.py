@@ -403,13 +403,17 @@ STRINGS: dict[str, dict[str, str]] = {
     "marking.mark_width": {"en": "Mark W (two points)", "pt": "Marcar W (dois pontos)"},
     "marking.remark_width": {"en": "Mark W again", "pt": "Remarcar W"},
     "marking.cancel_width": {"en": "Cancel W capture", "pt": "Cancelar captura de W"},
+    "marking.width_capture": {
+        "en": "Click the two ends of the damage width.",
+        "pt": "Clique nos dois extremos da largura de dano.",
+    },
     "marking.remark_width_confirm": {
         "en": "Mark W again? Completing a new width will clear the slices, C1–C6, auxiliary references, energy and EES. Calibration will be kept.",
         "pt": "Remarcar W? Concluir uma nova largura apagará as fatias, C1–C6, as referências auxiliares, a energia e a EES. A calibração será preservada.",
     },
     "marking.slice_count": {
-        "en": "{count} positions · {intervals} intervals",
-        "pt": "{count} posições · {intervals} intervalos",
+        "en": "{count} positions · {intervals} intervals of W/5",
+        "pt": "{count} posições · {intervals} intervalos de W/5",
     },
     "marking.no_slices": {"en": "Mark W to generate C1–C6.", "pt": "Marque W para gerar C1–C6."},
     "marking.remark_for_positions": {
@@ -425,6 +429,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Marque C{idx} com dois cliques ou arraste um ponto existente.",
     },
     "marking.ci_complete": {"en": "C1–C6 measured.", "pt": "C1–C6 medidos."},
+    "marking.ci_progress": {"en": "{count} of 6 measured", "pt": "{count} de 6 medidos"},
     "marking.references": {"en": "Auxiliary references", "pt": "Referências auxiliares"},
     "marking.guide_configured": {"en": "✓ Guide", "pt": "✓ Guia"},
     "marking.offset_configured": {"en": "✓ Offset", "pt": "✓ Offset"},
@@ -433,20 +438,20 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Modo definir W (2 cliques: esquerda/direita)",
     },
     "label.w_default": {
-        "en": "W: - px | - m",
-        "pt": "W: - px | - m",
+        "en": "W: — m",
+        "pt": "W: — m",
     },
     "button.generate_slices": {
         "en": "Generate 6 slices",
         "pt": "Gerar 6 fatias",
     },
     "label.delta_w_default": {
-        "en": "Δw: - px | - m",
-        "pt": "Δw: - px | - m",
+        "en": "ΔW: — px · — m",
+        "pt": "ΔW: — px · — m",
     },
     "check.set_guide_mode": {
-        "en": "Place guide",
-        "pt": "Posicionar guia",
+        "en": "Perpendicular guide",
+        "pt": "Guia perpendicular",
     },
     "marking.guide_hint": {
         "en": "Click the canvas to place the perpendicular guide.",
@@ -875,12 +880,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "W: {px} px | - m",
     },
     "measurement.delta_w_value_full": {
-        "en": "Δw: {px} px | {m} m",
-        "pt": "Δw: {px} px | {m} m",
+        "en": "ΔW: {px} px · {m} m",
+        "pt": "ΔW: {px} px · {m} m",
     },
     "measurement.delta_w_value_px_only": {
-        "en": "Δw: {px} px | - m",
-        "pt": "Δw: {px} px | - m",
+        "en": "ΔW: {px} px · — m",
+        "pt": "ΔW: {px} px · — m",
     },
     "measurement.c_values_prefix": {
         "en": "C values (m):",

@@ -343,10 +343,14 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         QApplication.processEvents()
         self.assertFalse(window.chk_measure_ci_mode.isEnabled())
         self.assertTrue(window.marking_references.isHidden())
+        self.assertEqual(window.chk_set_w_mode.property("uiRole"), "primary")
+        self.assertEqual(window.lbl_ci_progress.text(), "0 de 6 medidos")
+        self.assertTrue(all(label.text() == "—" for label in window.ci_value_labels.values()))
 
         viewport = window.canvas.viewport()
         center = viewport.rect().center()
         window.chk_set_w_mode.click()
+        self.assertTrue(window.lbl_width_capture.isVisible())
         for point in (center + QPoint(150, 0), center - QPoint(150, 0)):
             QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=point)
         self.assertFalse(window.canvas.set_w_mode)
@@ -358,7 +362,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         width_overlay = window.canvas.get_overlay_state()
         QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=center)
         self.assertEqual(window.canvas.get_overlay_state(), width_overlay)
-        self.assertIn("✓", window.mark_width_group.title())
+        self.assertTrue(window.lbl_slice_status.property("complete"))
+        self.assertTrue(window.lbl_width_capture.isHidden())
         positions = window.canvas.slice_x
         self.assertEqual(len(positions), 6)
         self.assertTrue(all(
@@ -366,6 +371,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             for left, right in zip(positions, positions[1:])
         ))
         self.assertIn("5 intervalos", window.lbl_slice_status.text())
+        self.assertIn("W/5", window.lbl_slice_status.text())
         self.assertEqual(window.lbl_w.text(), f"W: {window._w_m:.3f} m")
         self.assertIn(f"{window._w_px / 5:.2f} px", window.lbl_delta_w.text())
         self.assertIn(f"{window._w_m / 5:.3f} m", window.lbl_delta_w.text())
@@ -384,13 +390,16 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(window.canvas.get_overlay_state(), guide_state)
 
         window.chk_measure_ci_mode.click()
-        for index in (4, 1, 2, 3, 5, 6):
+        for count, index in enumerate((4, 1, 2, 3, 5, 6), 1):
             getattr(window, f"rb_c{index}").click()
             self.assertEqual(window._current_ci_index, index)
             x = center.x() - 150 + (index - 1) * 60
             for y in (center.y() - 40, center.y() + 40):
                 QTest.mouseClick(viewport, Qt.MouseButton.LeftButton, pos=QPoint(x, y))
             self.assertEqual(window._current_ci_index, min(index + 1, 6))
+            self.assertEqual(window.ci_value_labels[index].text(), f"{window._ci_m[index]:.3f}")
+            if count < 6:
+                self.assertEqual(window.lbl_ci_progress.text(), f"{count} de 6 medidos")
         self.assertEqual(window.stage, window.Stage.MARKING)
         self.assertTrue(window.canvas.measure_ci_mode)
         corrected = window.canvas.c_points[3][1]
@@ -402,7 +411,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(window._current_ci_index, 3)
         self.assertEqual(window.canvas.c_points[3][1][0], corrected[0])
         self.assertNotEqual(window.canvas.c_points[3][1][1], corrected[1])
-        self.assertIn("✓ C1–C6 medidos", window.lbl_ci_instruction.text())
+        self.assertIn("✓ C1–C6 medidos", window.lbl_ci_progress.text())
         self.assertTrue(window.btn_finish_marking.isEnabled())
         complete = window.canvas.get_overlay_state()
         window.chk_measure_ci_mode.click()
@@ -416,6 +425,12 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertIn("5 intervals", window.lbl_slice_status.text())
         window.btn_finish_marking.click()
         self.assertEqual(window.stage, window.Stage.DONE)
+        values = [label.text() for label in window.ci_value_labels.values()]
+        window.workflow_step_labels["measurement"].click()
+        self.assertFalse(window.chk_set_w_mode.isEnabled())
+        self.assertFalse(window.rb_c3.isEnabled())
+        self.assertEqual([label.text() for label in window.ci_value_labels.values()], values)
+        self.assertEqual(window.canvas.get_overlay_state(), complete)
 
     def test_w_remarking_preserves_data_until_new_pair_is_complete(self) -> None:
         window = self._window()
