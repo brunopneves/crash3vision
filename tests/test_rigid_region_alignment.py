@@ -767,13 +767,20 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             self.assertEqual(window._viewed_step, step)
             self.assertFalse(group.isHidden())
             self.assertEqual(group.isEnabled(), step == "calculation")
-            self.assertIn("#245b96", steps["result"].styleSheet())
-            self.assertNotIn("#245b96", steps[step].styleSheet())
+            self.assertEqual(
+                [name for name, button in steps.items() if button.property("progressCurrent")],
+                ["result"],
+            )
+            self.assertEqual(
+                [name for name, button in steps.items() if button.property("progressViewed")],
+                [step],
+            )
             self.assertEqual(window.stage, window.Stage.DONE)
             self.assertEqual(window.project.to_dict(), before)
             self.assertEqual(window.canvas.get_overlay_state(), overlay)
         steps["result"].click()
         self.assertIsNone(window._viewed_step)
+        self.assertFalse(any(button.property("progressViewed") for button in steps.values()))
         self.assertTrue(window.calc_panel.isHidden())
         self.assertFalse(window._summary_group.isHidden())
         steps["calculation"].click()
@@ -1002,7 +1009,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         window.btn_finish_images.click()
         self.assertEqual(steps["images"].property("progressStatus"), "complete")
         self.assertEqual(steps["alignment"].property("progressStatus"), "current")
-        self.assertIn("opcional", steps["alignment"].text())
+        self.assertEqual(steps["alignment"].text(), "Alinhamento")
+        self.assertIn("opcional", steps["alignment"].accessibleName())
         self.assertEqual(window.btn_toggle_image_controls.text(), "▸ ✓ Veículo danificado")
         self.assertTrue(window.btn_load_ref.isHidden())
         self.assertTrue(window.btn_load_dam.isHidden())
@@ -1010,7 +1018,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertTrue(window.fine_adjust_group.isHidden())
         self.assertTrue(window.cal_group.isHidden())
         window.btn_finish_alignment.click()
-        self.assertIn("pulado", steps["alignment"].text())
+        self.assertIn("pulado", steps["alignment"].toolTip())
         self.assertEqual(steps["calibration"].property("progressStatus"), "current")
         self.assertTrue(window.align_group.isHidden())
         self.assertFalse(window.cal_group.isHidden())
@@ -1083,7 +1091,7 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         self.assertEqual(steps["alignment"].property("progressStatus"), "current")
         window.btn_finish_alignment.click()
         self.assertEqual(steps["alignment"].property("progressStatus"), "passed")
-        self.assertNotIn("pulado", steps["alignment"].text())
+        self.assertNotIn("pulado", steps["alignment"].toolTip())
 
     def test_workflow_progress_loads_results_and_tracks_invalidation(self) -> None:
         window = MainWindow()
@@ -1126,7 +1134,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         QApplication.processEvents()
         self.assertEqual(steps["calculation"].property("progressStatus"), "complete")
         self.assertEqual(steps["result"].property("progressStatus"), "complete")
-        self.assertIn("#245b96", steps["result"].styleSheet())
+        self.assertTrue(steps["result"].property("progressCurrent"))
+        self.assertFalse(steps["calculation"].property("progressCurrent"))
         self.assertEqual(scrollbar.value(), 0)
         self.assertEqual(window.lbl_result_ees_kmh.text(), f"{window._damage_speed_kmh:.2f} km/h")
         self.assertEqual(window.lbl_result_ees_mps.text(), f"{window._damage_speed_mps:.2f} m/s")

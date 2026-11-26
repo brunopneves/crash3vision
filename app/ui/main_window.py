@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 
 import cv2
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -55,7 +55,9 @@ from app.ui.controllers.project_io_controller import ProjectIOController
 from app.ui.controllers.measurement_controller import MeasurementController
 from app.ui.controllers.workflow_controller import WorkflowController
 from app.ui.controllers.calc_controller import CalcController
-from app.ui.styles import ACTION_STYLES, WORKFLOW_PANEL_STYLES, set_style_property
+from app.ui.styles import (
+    ACTION_STYLES, WORKFLOW_PANEL_STYLES, set_style_property, workflow_step_icon,
+)
 from app.ui.widgets.calc_panel import CalcPanel
 from app.report import generate_report
 from app.i18n import tr, set_language, get_language
@@ -240,17 +242,21 @@ class MainWindow(QMainWindow):
 
     def _build_workflow_progress(self) -> None:
         toolbar = QToolBar(self)
+        toolbar.setObjectName("workflowProgressBar")
         toolbar.setMovable(False)
         toolbar.setFloatable(False)
         toolbar.toggleViewAction().setVisible(False)
         strip = QWidget()
         strip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         layout = QHBoxLayout(strip)
+        self._workflow_progress_layout = layout
         layout.setContentsMargins(6, 3, 6, 3)
         layout.setSpacing(4)
         self.workflow_step_labels = {}
         for step in ("images", "alignment", "calibration", "measurement", "calculation", "result"):
             label = QPushButton()
+            label.setProperty("workflowStep", True)
+            label.setIconSize(QSize(16, 16))
             label.clicked.connect(lambda checked=False, target=step: self._view_workflow_step(target))
             label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             self.workflow_step_labels[step] = label
@@ -323,37 +329,41 @@ class MainWindow(QMainWindow):
         result_ready = steps[current] == "result"
         blocked = self._workflow_navigation_blocked()
 
-        highlight = "background-color: #245b96; color: white; font-weight: bold;"
         for index, (step, label) in enumerate(self.workflow_step_labels.items()):
             title = tr(f"progress.{step}")
+            context = []
             if step == "alignment":
                 if current <= index:
-                    title += f" · {tr('progress.optional')}"
+                    context.append(tr("progress.optional"))
                 elif not self.canvas.has_both_images():
-                    title += f" · {tr('progress.skipped')}"
+                    context.append(tr("progress.skipped"))
             if step == "alignment" and index < current:
-                status, text, style = "passed", f"→ {title}", "color: #808080;"
+                status = "passed"
             elif step == "result" and result_ready:
-                status, text, style = "complete", f"✓ {title}", highlight
+                status = "complete"
             elif index < current:
-                status, text, style = "complete", f"✓ {title}", "font-weight: bold;"
+                status = "complete"
             elif index == current:
-                status, text, style = "current", title, highlight
+                status = "current"
             else:
-                status, text, style = "future", title, "color: #808080;"
-            label.setProperty("progressStatus", status)
+                status = "future"
+            active = index == current
             viewing = step == self._viewed_step
+            set_style_property(label, "progressStatus", status)
+            set_style_property(label, "progressCurrent", active)
+            set_style_property(label, "progressViewed", viewing)
+            label.setIcon(workflow_step_icon(index + 1, status, active, label.devicePixelRatioF()))
+            label.setText(title)
+            self._workflow_progress_layout.setStretch(index, label.sizeHint().width())
+            context.append(tr(f"progress.status.{status}"))
+            if active and status == "complete":
+                context.append(tr("progress.status.current"))
             if viewing:
-                style += "border: 1px solid #67727a; font-weight: bold;"
-                text = f"▸ {text}"
-            label.setText(text)
-            description = tr(f"progress.status.{status}")
-            if viewing:
-                description = tr("progress.viewing_calculation" if step == "calculation" else "progress.viewing")
-            label.setToolTip(f"{text} — {description}")
+                viewing_key = "progress.viewing_calculation" if step == "calculation" else "progress.viewing"
+                context.append(tr(viewing_key))
+            label.setToolTip(f"{title} — {' · '.join(context)}")
             label.setAccessibleName(label.toolTip())
             label.setEnabled(index <= current and not blocked)
-            label.setStyleSheet(f"QPushButton {{ border: 1px solid transparent; {style} padding: 3px; border-radius: 3px; }}")
 
     def _build_canvas_area(self) -> None:
         central = QWidget()

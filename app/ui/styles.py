@@ -1,3 +1,9 @@
+from functools import lru_cache
+
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
+
+
 ACTION_STYLES = """
 QPushButton[uiRole], QToolButton[uiRole="disclosure"] {
     background: #f1f4f8;
@@ -55,6 +61,38 @@ QPushButton[uiRole]:disabled, QToolButton[uiRole="disclosure"]:disabled {
 """
 
 WORKFLOW_PANEL_STYLES = """
+QToolBar#workflowProgressBar {
+    background: #f6f8fb;
+    border: none;
+    border-bottom: 1px solid #d6dfe9;
+}
+QPushButton[workflowStep="true"] {
+    background: transparent;
+    color: #44566c;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 5px;
+    min-height: 21px;
+    font-size: 12px;
+    font-weight: bold;
+}
+QPushButton[workflowStep="true"][progressStatus="complete"] { background: #edf1f6; }
+QPushButton[workflowStep="true"][progressStatus="passed"] { background: #f0f3f7; }
+QPushButton[workflowStep="true"][progressStatus="future"] { color: #57677b; }
+QPushButton[workflowStep="true"]:enabled:hover { background: #e3eaf3; }
+QPushButton[workflowStep="true"]:enabled:pressed { background: #d9e4f1; }
+QPushButton[workflowStep="true"][progressViewed="true"] {
+    color: #245b96;
+    border-color: #245b96;
+}
+QPushButton[workflowStep="true"]:focus { border-color: #173f6b; }
+QPushButton[workflowStep="true"][progressCurrent="true"] {
+    background: #245b96;
+    color: #ffffff;
+}
+QPushButton[workflowStep="true"][progressCurrent="true"]:enabled:hover { background: #1c4f86; }
+QPushButton[workflowStep="true"][progressCurrent="true"]:enabled:pressed { background: #153d69; }
+QPushButton[workflowStep="true"][progressCurrent="true"]:focus { border-color: #a9d3ff; }
 QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle,
 QLabel#calculationTitle, QLabel#resultTitle {
     color: #172f50;
@@ -248,6 +286,49 @@ QLabel#resultEnergyValue {
     font-weight: bold;
 }
 """
+
+
+@lru_cache(maxsize=64)
+def workflow_step_icon(number: int, status: str, active: bool, pixel_ratio: float) -> QIcon:
+    edge = 16
+    pixmap = QPixmap(round(edge * pixel_ratio), round(edge * pixel_ratio))
+    pixmap.setDevicePixelRatio(pixel_ratio)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    circle = QRectF(1, 1, 14, 14)
+    if active:
+        painter.setPen(QColor("#a9d3ff"))
+        painter.setBrush(QColor("#3e72a8"))
+        foreground = QColor("#ffffff")
+    elif status == "complete":
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#e0efe6"))
+        foreground = QColor("#245c3e")
+    else:
+        painter.setPen(QColor("#a3afbf"))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        foreground = QColor("#57677b")
+    painter.drawEllipse(circle)
+    painter.setPen(QPen(foreground, 1.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+    if status == "complete":
+        check = QPainterPath()
+        check.moveTo(4.5, 8)
+        check.lineTo(7, 10.5)
+        check.lineTo(11.5, 5.5)
+        painter.drawPath(check)
+    elif status == "passed":
+        painter.drawLine(5, 8, 11, 8)
+    else:
+        font = painter.font()
+        font.setPixelSize(10)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(circle, Qt.AlignmentFlag.AlignCenter, str(number))
+    painter.end()
+    icon = QIcon(pixmap)
+    icon.addPixmap(pixmap, QIcon.Mode.Disabled)
+    return icon
 
 
 def set_style_property(widget, name: str, value) -> None:
