@@ -118,11 +118,17 @@ The generic `stiffness_library.json` contains illustrative values only and is no
 
 ## 9. Deformation energy
 
-The software implements the CRASH3-derived deformation-energy expression used in the associated research:
+The CRASH3-derived deformation-energy expression implemented in [`app/core/crash3.py`](../app/core/crash3.py) is:
 
-```text
-E = (W/5) × [ (A/2) × Σkᵢ·Cᵢ + (B/6) × Σkᵢ·Cᵢ² + 5G ] × (1 + tan²α)
-```
+$$
+\begin{aligned}
+E &= \frac{W}{5}\left[\frac{A}{2}L + \frac{B}{6}Q + 5G\right]\left(1 + \tan^2\alpha\right), \\
+L &= C_1 + 2C_2 + 2C_3 + 2C_4 + 2C_5 + C_6, \\
+Q &= C_1^2 + 2C_2^2 + 2C_3^2 + 2C_4^2 + 2C_5^2 + C_6^2 \\
+  &\quad {}+ C_1C_2 + C_2C_3 + C_3C_4 + C_4C_5 + C_5C_6, \\
+G &= \frac{A^2}{2B}.
+\end{aligned}
+$$
 
 Where:
 
@@ -132,7 +138,8 @@ Where:
 - **A** and **B** are structural stiffness coefficients;
 - **G = A²/(2B)** is the residual energy term;
 - **α** is the impact angle;
-- **kᵢ** are the weighting coefficients used in the integration scheme.
+- **L** is the weighted linear crush term;
+- **Q** is the weighted quadratic crush term, including the five products of adjacent crush depths.
 
 The software uses SI units for the calculation workflow.
 
@@ -142,9 +149,9 @@ The software uses SI units for the calculation workflow.
 
 After deformation energy is estimated, EES is calculated from:
 
-```text
-EES = √(2E / m)
-```
+$$
+\mathrm{EES} = \sqrt{\frac{2E}{m}}.
+$$
 
 Where:
 

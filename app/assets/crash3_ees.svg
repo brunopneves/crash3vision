@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="164" height="77" viewBox="0 0 132 62">
+  <title>Energy equivalent speed</title>
+  <desc>EES = √(2E / m).</desc>
+  <g fill="#173f6b" font-family="Cambria Math" font-size="20">
+    <text x="3" y="35">EES =</text>
+    <text x="102" y="25" text-anchor="middle">2E</text>
+    <text x="102" y="51" text-anchor="middle">m</text>
+  </g>
+  <path d="M62 35l7 -3 8 24 9 -49h41 M88 32h28"
+        fill="none" stroke="#173f6b" stroke-width="1.35"/>
+</svg>

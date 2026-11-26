@@ -74,7 +74,9 @@ STRINGS: dict[str, dict[str, str]] = {
               <li><b>Measurement.</b> With the vehicle front facing upward, mark the two ends
               of the structural damage width W. The app creates six positions. For C1–C6,
               work from left to right and mark the original structural contour, then the
-              damaged contour at each position.</li>
+              damaged contour at each position. With only the damaged vehicle image, the
+              examiner establishes the original structural position using the available
+              references.</li>
               <li><b>Calculation.</b> Check the source of A/B and the impact angle α.
               Calculate deformation energy. Enter the vehicle mass in kg to also estimate EES.</li>
               <li><b>Result.</b> Review EES and energy. Use the File menu to save the project
@@ -96,7 +98,9 @@ STRINGS: dict[str, dict[str, str]] = {
               <li><b>Medição.</b> Com a dianteira voltada para cima, marque as duas extremidades
               da largura de dano estrutural W. O aplicativo gera seis posições. Marque C1–C6
               da esquerda para a direita. Em cada posição, marque o contorno estrutural
-              original e depois o contorno danificado.</li>
+              original e depois o contorno danificado. Com apenas a imagem do veículo
+              danificado, cabe ao examinador estabelecer a posição estrutural original com
+              base nas referências disponíveis.</li>
               <li><b>Cálculo.</b> Confira a origem de A/B e o ângulo de impacto α. Calcule a energia
               de deformação. Informe a massa do veículo em kg para estimar também a EES.</li>
               <li><b>Resultado.</b> Confira a EES e a energia. No menu Arquivo, salve o projeto ou
@@ -112,11 +116,18 @@ STRINGS: dict[str, dict[str, str]] = {
             width, with five equal intervals of W/5. These distances are used in metres.</p>
             <h2>Coefficients and deformation energy</h2>
             <p><b>A</b> (N/m) and <b>B</b> (N/m²) describe structural stiffness. The CRASH3-derived
-            calculation uses them with the damage width, the measured crush profile and an impact
+            formulation uses them with the damage width, the measured crush profile and an impact
             angle correction to estimate deformation energy in joules. The generic classes
             contain illustrative values. Verify the coefficient source for technical work.</p>
+            {energy_equation}
+            {energy_terms}
+            <p align="center" style="color: #44566c; font-size: 12px;">
+            (1) Estimated deformation energy E, in joules.</p>
             <h2>Energy equivalent speed (EES)</h2>
-            <p><b>EES = √(2E / m)</b>, where E is the estimated deformation energy and m is the
+            {ees_equation}
+            <p align="center" style="color: #44566c; font-size: 12px;">
+            (2) Energy equivalent speed, in metres per second.</p>
+            <p>E is the estimated deformation energy and m is the
             vehicle mass. EES is the speed associated with that energy and mass. It does not
             necessarily equal the actual impact speed and cannot establish it on its own.</p>
             <h2>Limitations</h2>
@@ -132,13 +143,20 @@ STRINGS: dict[str, dict[str, str]] = {
             ao longo dessa largura, com cinco intervalos iguais de W/5. Essas distâncias são
             usadas em metros.</p>
             <h2>Coeficientes e energia de deformação</h2>
-            <p><b>A</b> (N/m) e <b>B</b> (N/m²) descrevem a rigidez estrutural. O cálculo derivado
+            <p><b>A</b> (N/m) e <b>B</b> (N/m²) descrevem a rigidez estrutural. A formulação derivada
             do CRASH3 usa esses coeficientes, a largura do dano, o perfil de deformação e uma
             correção pelo ângulo de impacto para estimar a energia de deformação em joules.
             As classes genéricas contêm valores ilustrativos. Verifique a fonte dos coeficientes
             para uso técnico.</p>
+            {energy_equation}
+            {energy_terms}
+            <p align="center" style="color: #44566c; font-size: 12px;">
+            (1) Energia de deformação estimada E, em joules.</p>
             <h2>Velocidade equivalente de energia (EES)</h2>
-            <p><b>EES = √(2E / m)</b>, em que E é a energia de deformação estimada e m é a massa
+            {ees_equation}
+            <p align="center" style="color: #44566c; font-size: 12px;">
+            (2) Velocidade equivalente de energia, em metros por segundo.</p>
+            <p>E é a energia de deformação estimada e m é a massa
             do veículo. A EES é a velocidade associada a essa energia e massa. Ela não corresponde
             necessariamente à velocidade real de impacto e, sozinha, não permite determiná-la.</p>
             <h2>Limitações</h2>
@@ -190,7 +208,7 @@ STRINGS: dict[str, dict[str, str]] = {
             <p>Experimental research software for semi-assisted measurement of structural
             vehicle deformation from images and estimation of deformation energy and EES.</p>
             <p><b>Author</b> Bruno P. Neves<br>
-            <b>License</b> PolyForm Noncommercial License 1.0.0</p>
+            <b>License</b> <a href="{license_url}">PolyForm Noncommercial License 1.0.0</a></p>
             <p><a href="{repository_url}">GitHub · brunopneves/crash3vision</a></p>
         """,
         "pt": """
@@ -198,7 +216,7 @@ STRINGS: dict[str, dict[str, str]] = {
             <p>Software experimental de pesquisa para medição semiassistida de deformações
             estruturais veiculares por imagens e estimativa da energia de deformação e da EES.</p>
             <p><b>Autor</b> Bruno P. Neves<br>
-            <b>Licença</b> PolyForm Noncommercial License 1.0.0</p>
+            <b>Licença</b> <a href="{license_url}">PolyForm Noncommercial License 1.0.0</a></p>
             <p><a href="{repository_url}">GitHub · brunopneves/crash3vision</a></p>
         """,
     },
