@@ -7,7 +7,7 @@ from pathlib import Path
 
 import cv2
 from PySide6.QtCore import QSignalBlocker, QSize, Qt
-from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtGui import QActionGroup, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -59,6 +59,7 @@ from app.ui.styles import (
     ACTION_STYLES, WORKFLOW_PANEL_STYLES, set_style_property, workflow_step_icon,
 )
 from app.ui.widgets.calc_panel import CalcPanel
+from app.ui.widgets.help_dialog import HelpDialog
 from app.report import generate_report
 from app.core.number_format import format_display_number
 from app.i18n import tr, set_language, get_language
@@ -189,57 +190,74 @@ class MainWindow(QMainWindow):
 
     # ---------------- UI builders ----------------
     def _build_menu(self) -> None:
-        m = self.menuBar()
-        file_menu = m.addMenu(tr("menu.file"))
-
-        act_new = file_menu.addAction(tr("menu.new"))
-        act_save = file_menu.addAction(tr("menu.save_project"))
-        act_load = file_menu.addAction(tr("menu.load_project"))
+        menu_bar = self.menuBar()
+        file_menu = menu_bar.addMenu("")
+        language_menu = menu_bar.addMenu("")
+        help_menu = menu_bar.addMenu("")
+        self._menu_actions = {
+            "menu.file": file_menu.menuAction(),
+            "menu.language": language_menu.menuAction(),
+            "menu.help": help_menu.menuAction(),
+        }
+        for key, handler, shortcut in (
+            ("menu.new", self._on_new_project, QKeySequence.StandardKey.New),
+            ("menu.load_project", self._on_load_project, QKeySequence.StandardKey.Open),
+            ("menu.save_project", self._on_save_project, QKeySequence.StandardKey.Save),
+        ):
+            action = file_menu.addAction("", handler)
+            action.setShortcuts(shortcut)
+            self._menu_actions[key] = action
         file_menu.addSeparator()
-        act_export = file_menu.addAction(tr("menu.export_overlay"))
-        act_export_current_view = file_menu.addAction(tr("menu.export_current_view"))
-        act_export_report = file_menu.addAction(tr("menu.export_report"))
+        for key, handler in (
+            ("menu.export_overlay", self._on_export_png),
+            ("menu.export_current_view", self._on_export_current_view_png),
+            ("menu.export_report", self._on_export_report),
+        ):
+            self._menu_actions[key] = file_menu.addAction("", handler)
 
-        lang_menu = m.addMenu(tr("menu.language"))
-        act_lang_en = lang_menu.addAction(tr("menu.language.english"))
-        act_lang_pt = lang_menu.addAction(tr("menu.language.portuguese"))
+        self._language_actions = {}
+        languages = QActionGroup(language_menu)
+        for code, key in (("en", "menu.language.english"), ("pt", "menu.language.portuguese")):
+            action = language_menu.addAction("")
+            action.setCheckable(True)
+            languages.addAction(action)
+            action.triggered.connect(lambda checked, lang=code: self._set_language_and_refresh(lang))
+            self._language_actions[code] = action
+            self._menu_actions[key] = action
 
-        act_new.triggered.connect(self._on_new_project)
-        act_save.triggered.connect(self._on_save_project)
-        act_load.triggered.connect(self._on_load_project)
-        act_export.triggered.connect(self._on_export_png)
-        act_export_current_view.triggered.connect(self._on_export_current_view_png)
-        act_export_report.triggered.connect(self._on_export_report)
+        for topic in ("guide", "methodology", "shortcuts", "about"):
+            if topic == "about":
+                help_menu.addSeparator()
+            key = f"help.{topic}.title"
+            action = help_menu.addAction("")
+            action.triggered.connect(lambda checked, article=topic: self._show_help(article))
+            self._menu_actions[key] = action
+        self._retranslate_menus()
 
-        act_lang_en.triggered.connect(lambda: self._set_language_and_refresh("en"))
-        act_lang_pt.triggered.connect(lambda: self._set_language_and_refresh("pt"))
+    def _retranslate_menus(self) -> None:
+        for key, action in self._menu_actions.items():
+            action.setText(tr(key))
+        self._language_actions[get_language()].setChecked(True)
+
+    def _show_help(self, topic: str) -> None:
+        project_shortcuts = {}
+        if topic == "shortcuts":
+            project_shortcuts = {
+                name: self._menu_actions[key].shortcut().toString(QKeySequence.SequenceFormat.NativeText)
+                for name, key in (
+                    ("new", "menu.new"),
+                    ("open", "menu.load_project"),
+                    ("save", "menu.save_project"),
+                )
+            }
+        dialog = HelpDialog(topic, self, project_shortcuts)
+        try:
+            dialog.exec()
+        finally:
+            dialog.deleteLater()
 
     def _apply_styles(self) -> None:
-        self.setStyleSheet(
-            """
-            QMenuBar::item {
-                padding: 4px 10px;
-                margin: 2px;
-                border: 1px solid rgba(255,255,255,40);
-                border-radius: 4px;
-            }
-            QMenuBar::item:selected {
-                background: rgba(255,255,255,30);
-            }
-            QMenu {
-                padding: 6px;
-            }
-            QMenu::item {
-                padding: 6px 18px;
-                border-radius: 4px;
-            }
-            QMenu::item:selected {
-                background: rgba(255,255,255,30);
-            }
-            """
-            + ACTION_STYLES
-            + WORKFLOW_PANEL_STYLES
-        )
+        self.setStyleSheet(ACTION_STYLES + WORKFLOW_PANEL_STYLES)
 
     def _build_workflow_progress(self) -> None:
         toolbar = QToolBar(self)
@@ -983,8 +1001,7 @@ class MainWindow(QMainWindow):
 
     def _retranslate_ui(self) -> None:
         self._update_window_title()
-        self.menuBar().clear()
-        self._build_menu()
+        self._retranslate_menus()
 
         self._controls_dock.setWindowTitle(tr("dock.controls"))
         self.btn_return_to_current_step.setText(tr("progress.return_current"))

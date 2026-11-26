@@ -18,8 +18,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Arquivo",
     },
     "menu.new": {
-        "en": "New",
-        "pt": "Novo",
+        "en": "New project...",
+        "pt": "Novo projeto...",
     },
     "menu.save_project": {
         "en": "Save project (.json)",
@@ -47,11 +47,160 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "menu.language.english": {
         "en": "English",
-        "pt": "Inglês",
+        "pt": "English",
     },
     "menu.language.portuguese": {
-        "en": "Português",
-        "pt": "Português",
+        "en": "Português (Brasil)",
+        "pt": "Português (Brasil)",
+    },
+    "menu.help": {"en": "Help", "pt": "Ajuda"},
+    "help.close": {"en": "Close", "pt": "Fechar"},
+    "help.guide.title": {"en": "How to use", "pt": "Como usar"},
+    "help.methodology.title": {"en": "CRASH3 methodology", "pt": "Metodologia CRASH3"},
+    "help.shortcuts.title": {"en": "Shortcuts and tools", "pt": "Atalhos e ferramentas"},
+    "help.about.title": {"en": "About CRASH3Vision", "pt": "Sobre o CRASH3Vision"},
+    "help.guide.body": {
+        "en": """
+            <ol>
+              <li><b>Images.</b> The damaged vehicle image is required. A reference image is optional
+              and helps compare the original and damaged contours. Then continue to Alignment.</li>
+              <li><b>Alignment.</b> Orient both images with the vehicle front facing upward
+              and inspect the overlay using opacity.
+              Try automatic alignment, select three points on a preserved rigid region,
+              or adjust manually. Review any preview before accepting it. With one image,
+              or when alignment is unnecessary, continue to Calibration.</li>
+              <li><b>Calibration.</b> Mark two points with a known distance in the plane of measurement,
+              enter the distance in metres, and check the scale before continuing.</li>
+              <li><b>Measurement.</b> With the vehicle front facing upward, mark the two ends
+              of the structural damage width W. The app creates six positions. For C1–C6,
+              work from left to right and mark the original structural contour, then the
+              damaged contour at each position.</li>
+              <li><b>Calculation.</b> Check the source of A/B and the impact angle α.
+              Calculate deformation energy. Enter the vehicle mass in kg to also estimate EES.</li>
+              <li><b>Result.</b> Review EES and energy. Use the File menu to save the project
+              or export an annotated image, the current view, or the text report.</li>
+            </ol>
+        """,
+        "pt": """
+            <ol>
+              <li><b>Imagens.</b> Carregue a imagem do veículo danificado, que é obrigatória.
+              A imagem de referência é opcional e ajuda a comparar os contornos original e
+              danificado. Depois, avance para Alinhamento.</li>
+              <li><b>Alinhamento.</b> Oriente as duas imagens com a dianteira voltada para cima
+              e use a opacidade para conferir a sobreposição.
+              Tente o alinhamento automático, marque três pontos numa região rígida preservada
+              ou faça o ajuste manual. Confira a prévia quando houver, antes de aceitá-la.
+              Com uma imagem ou quando o alinhamento for dispensável, avance para Calibração.</li>
+              <li><b>Calibração.</b> Marque dois pontos com uma distância conhecida no plano
+              da medição, informe a distância em metros e confira a escala antes de continuar.</li>
+              <li><b>Medição.</b> Com a dianteira voltada para cima, marque as duas extremidades
+              da largura de dano estrutural W. O aplicativo gera seis posições. Marque C1–C6
+              da esquerda para a direita. Em cada posição, marque o contorno estrutural
+              original e depois o contorno danificado.</li>
+              <li><b>Cálculo.</b> Confira a origem de A/B e o ângulo de impacto α. Calcule a energia
+              de deformação. Informe a massa do veículo em kg para estimar também a EES.</li>
+              <li><b>Resultado.</b> Confira a EES e a energia. No menu Arquivo, salve o projeto ou
+              exporte a imagem anotada, a visualização atual ou o relatório de texto.</li>
+            </ol>
+        """,
+    },
+    "help.methodology.body": {
+        "en": """
+            <h2>Structural measurements</h2>
+            <p><b>W</b> is the width of the structural damage region selected by the examiner.
+            <b>C1–C6</b> are permanent crush depths measured at six positions across that
+            width, with five equal intervals of W/5. These distances are used in metres.</p>
+            <h2>Coefficients and deformation energy</h2>
+            <p><b>A</b> (N/m) and <b>B</b> (N/m²) describe structural stiffness. The CRASH3-derived
+            calculation uses them with the damage width, the measured crush profile and an impact
+            angle correction to estimate deformation energy in joules. The generic classes
+            contain illustrative values. Verify the coefficient source for technical work.</p>
+            <h2>Energy equivalent speed (EES)</h2>
+            <p><b>EES = √(2E / m)</b>, where E is the estimated deformation energy and m is the
+            vehicle mass. EES is the speed associated with that energy and mass. It does not
+            necessarily equal the actual impact speed and cannot establish it on its own.</p>
+            <h2>Limitations</h2>
+            <p>Calibration, perspective, image resolution and contrast, hidden structures,
+            landmark selection, and coefficient suitability affect the estimate. The workflow
+            is semi-assisted and was evaluated on a small sample concentrated on frontal impacts.</p>
+            <p><a href="{methodology_url}">Read the project's methodology</a></p>
+        """,
+        "pt": """
+            <h2>Medições estruturais</h2>
+            <p><b>W</b> é a largura da região de dano estrutural selecionada pelo examinador.
+            <b>C1–C6</b> são as profundidades de deformação permanente medidas em seis posições
+            ao longo dessa largura, com cinco intervalos iguais de W/5. Essas distâncias são
+            usadas em metros.</p>
+            <h2>Coeficientes e energia de deformação</h2>
+            <p><b>A</b> (N/m) e <b>B</b> (N/m²) descrevem a rigidez estrutural. O cálculo derivado
+            do CRASH3 usa esses coeficientes, a largura do dano, o perfil de deformação e uma
+            correção pelo ângulo de impacto para estimar a energia de deformação em joules.
+            As classes genéricas contêm valores ilustrativos. Verifique a fonte dos coeficientes
+            para uso técnico.</p>
+            <h2>Velocidade equivalente de energia (EES)</h2>
+            <p><b>EES = √(2E / m)</b>, em que E é a energia de deformação estimada e m é a massa
+            do veículo. A EES é a velocidade associada a essa energia e massa. Ela não corresponde
+            necessariamente à velocidade real de impacto e, sozinha, não permite determiná-la.</p>
+            <h2>Limitações</h2>
+            <p>Calibração, perspectiva, resolução e contraste das imagens, estruturas ocultas,
+            seleção de pontos e adequação dos coeficientes influenciam a estimativa.
+            O procedimento é semiassistido e a validação usou uma amostra pequena, concentrada
+            em impactos frontais.</p>
+            <p><a href="{methodology_url}">Ler a metodologia do projeto</a></p>
+        """,
+    },
+    "help.shortcuts.body": {
+        "en": """
+            <h2>Project and navigation</h2>
+            <p><b>{new}</b> New project · <b>{open}</b> Open project · <b>{save}</b> Save project.</p>
+            <p>Click an available step in the top bar. Use Return to current step to leave
+            a previous step. On the canvas, use the mouse wheel to zoom and drag to pan
+            when an editing tool is not active.</p>
+            <h2>Manual alignment</h2>
+            <p>With the image unlocked, the <b>arrow keys</b> move the selected image one scene pixel.
+            <b>Q / E</b> decrease or increase rotation and <b>Z / X</b> decrease or increase
+            scale by the configured step. Turn on Drag image to reposition it with the mouse.</p>
+            <h2>Calibration and measurement</h2>
+            <p>Use the on-screen controls to activate two-point marking for calibration or W.
+            Select C1–C6 using the radio buttons. In C measurement mode, click near an existing
+            endpoint to select it and drag vertically to adjust it. The perpendicular guide
+            and crossmember offset are under Auxiliary references.</p>
+        """,
+        "pt": """
+            <h2>Projeto e navegação</h2>
+            <p><b>{new}</b> Novo projeto · <b>{open}</b> Abrir projeto · <b>{save}</b> Salvar projeto.</p>
+            <p>Clique numa etapa disponível na barra superior. Use Voltar à etapa atual para
+            sair de uma etapa anterior. No canvas, use a roda do mouse para zoom e arraste
+            para deslocar a visualização quando não houver uma ferramenta de edição ativa.</p>
+            <h2>Ajuste manual do alinhamento</h2>
+            <p>Com a imagem destravada, as <b>setas</b> deslocam a imagem selecionada em um pixel na cena.
+            <b>Q / E</b> diminuem ou aumentam a rotação e <b>Z / X</b> diminuem ou aumentam
+            a escala pelo incremento configurado. Ative Arrastar imagem para reposicioná-la
+            com o mouse.</p>
+            <h2>Calibração e medição</h2>
+            <p>Use os controles da etapa para ativar a marcação de dois pontos da calibração
+            ou de W. Selecione C1–C6 pelos botões de seleção. No modo de medição C, clique
+            perto de um ponto existente para selecioná-lo e arraste verticalmente para ajustá-lo.
+            A guia perpendicular e o offset da travessa ficam em Referências auxiliares.</p>
+        """,
+    },
+    "help.about.body": {
+        "en": """
+            <p><b>CRASH3Vision {version}</b></p>
+            <p>Experimental research software for semi-assisted measurement of structural
+            vehicle deformation from images and estimation of deformation energy and EES.</p>
+            <p><b>Author</b> Bruno P. Neves<br>
+            <b>License</b> PolyForm Noncommercial License 1.0.0</p>
+            <p><a href="{repository_url}">GitHub · brunopneves/crash3vision</a></p>
+        """,
+        "pt": """
+            <p><b>CRASH3Vision {version}</b></p>
+            <p>Software experimental de pesquisa para medição semiassistida de deformações
+            estruturais veiculares por imagens e estimativa da energia de deformação e da EES.</p>
+            <p><b>Autor</b> Bruno P. Neves<br>
+            <b>Licença</b> PolyForm Noncommercial License 1.0.0</p>
+            <p><a href="{repository_url}">GitHub · brunopneves/crash3vision</a></p>
+        """,
     },
     "dock.controls": {
         "en": "Controls",

@@ -5,6 +5,12 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 
 
 ACTION_STYLES = """
+QGroupBox#calculationPanel QMenu { padding: 6px; }
+QGroupBox#calculationPanel QMenu::item {
+    padding: 6px 18px;
+    border-radius: 4px;
+}
+QGroupBox#calculationPanel QMenu::item:selected { background: rgba(255,255,255,30); }
 QPushButton[uiRole], QToolButton[uiRole="disclosure"] {
     background: #f1f4f8;
     color: #23313f;
@@ -61,6 +67,13 @@ QPushButton[uiRole]:disabled, QToolButton[uiRole="disclosure"]:disabled {
 """
 
 WORKFLOW_PANEL_STYLES = """
+QDialog#helpDialog { background: #f6f8fb; }
+QTextBrowser#helpArticle {
+    background: #ffffff;
+    border: 1px solid #d6dfe9;
+    border-radius: 7px;
+}
+QTextBrowser#helpArticle:focus { border-color: #8eafd1; }
 QToolBar#workflowProgressBar {
     background: #f6f8fb;
     border: none;
@@ -144,7 +157,7 @@ QSlider#opacitySlider::handle:horizontal {
 QSlider#opacitySlider::handle:horizontal:hover { background: #1c4f86; }
 QSlider#opacitySlider::handle:horizontal:disabled { background: #8493a5; }
 QLabel#imagesTitle, QLabel#alignmentTitle, QLabel#calibrationTitle, QLabel#measurementTitle,
-QLabel#calculationTitle, QLabel#resultTitle {
+QLabel#calculationTitle, QLabel#resultTitle, QLabel#helpTitle {
     color: #172f50;
     font-size: 23px;
     font-weight: bold;
