@@ -1611,9 +1611,16 @@ class RigidRegionAlignmentTests(unittest.TestCase):
                 self.assertTrue(path.is_file())
             self.assertFalse(QImage(str(annotated)).isNull())
             self.assertEqual(QImage(str(current_view)).size(), window.canvas.viewport().grab().size())
-            text = report.read_text(encoding="utf-8")
-            self.assertIn(f"EES (km/h): {window.project.damage_speed_kmh:.2f}", text)
-            self.assertIn(f"{window.project.total_energy_j:.2f}", text)
+            lines = report.read_text(encoding="utf-8").splitlines()
+            for label, expected in (
+                ("- EES (km/h)", window.project.damage_speed_kmh),
+                ("- EES (m/s)", window.project.damage_speed_mps),
+                (tr("report.total_energy_deformation_j"), window.project.total_energy_j),
+            ):
+                prefix = f"{label}: "
+                values = [line.removeprefix(prefix) for line in lines if line.startswith(prefix)]
+                self.assertEqual(len(values), 1, label)
+                self.assertEqual(float(values[0]), expected, label)
 
     def test_png_export_reports_only_committed_files_and_preserves_project(self) -> None:
         window = self._window()
