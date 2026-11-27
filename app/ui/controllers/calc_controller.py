@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from app.core.crash3 import compute_ees, compute_energy
+from app.core.project import Project
 
 
 class CalcController:
@@ -17,9 +20,11 @@ class CalcController:
         self.main = main_window
 
     def compute_crash3(
-        self, A_n_per_m: float, B_n_per_m2: float, alpha_deg: float = 0.0
+        self, A_n_per_m: float, B_n_per_m2: float, alpha_deg: float = 0.0,
+        *, project: Project | None = None,
     ):
-        project = self.main.project
+        if project is None:
+            project = self.main.project
 
         if project.c_m is None:
             raise ValueError("C measurements missing.")
@@ -98,7 +103,12 @@ class CalcController:
     def build_damage_profile_data(
         self, A_n_per_m: float, B_n_per_m2: float, alpha_deg: float = 0.0
     ):
-        result = self.compute_crash3(A_n_per_m, B_n_per_m2, alpha_deg)
+        project = replace(
+            self.main.project,
+            w_m=self.main._w_m,
+            c_m={f"C{i}": value for i, value in self.main._ci_m.items()},
+        )
+        result = self.compute_crash3(A_n_per_m, B_n_per_m2, alpha_deg, project=project)
 
         return {
             "formula": "extended",

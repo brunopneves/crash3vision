@@ -230,6 +230,14 @@ class CalcPanel(QGroupBox):
                 lambda text, attribute=attribute: self._on_parameter_changed(attribute, text)
             )
 
+    def _set_coefficients(self, a: float, b: float) -> None:
+        self.main.project.crash3_A = a
+        self.main.project.crash3_B = b
+        with QSignalBlocker(self.txt_A), QSignalBlocker(self.txt_B):
+            self.txt_A.setText(format_display_number(a))
+            self.txt_B.setText(format_display_number(b))
+        self.main.workflow.invalidate_energy()
+
     def _on_parameter_changed(self, attribute: str, text: str) -> None:
         try:
             value = parse_float(text)
@@ -399,8 +407,7 @@ class CalcPanel(QGroupBox):
             )
             return
 
-        self.txt_A.setText(format_display_number(params["A"]))
-        self.txt_B.setText(format_display_number(params["B"]))
+        self._set_coefficients(params["A"], params["B"])
         self.txt_A.setReadOnly(True)
         self.txt_B.setReadOnly(True)
 
@@ -530,11 +537,7 @@ class CalcPanel(QGroupBox):
         A_n_per_m = self._to_float(rec.get("A_n_per_m"))
         B_n_per_m2 = self._to_float(rec.get("B_n_per_m2"))
 
-        self.txt_A.setText(format_display_number(A_n_per_m, 2))
-        self.txt_B.setText(format_display_number(B_n_per_m2, 2))
-
-        self.main.project.crash3_A = A_n_per_m
-        self.main.project.crash3_B = B_n_per_m2
+        self._set_coefficients(A_n_per_m, B_n_per_m2)
 
         self.main.project.ab_source_type = "nhtsa_library"
         self.main.project.ab_source_ref = rec.get("id")
@@ -587,7 +590,11 @@ class CalcPanel(QGroupBox):
 
         mass_kg = rec.get("vehicle_mass_kg")
         if mass_kg is not None:
-            self.txt_vehicle_mass.setText(format_display_number(float(mass_kg), 2))
+            mass = float(mass_kg)
+            with QSignalBlocker(self.txt_vehicle_mass):
+                self.txt_vehicle_mass.setText(format_display_number(mass))
+            self.main._vehicle_mass_kg = self.main.project.vehicle_mass_kg = mass
+            self.main.workflow.invalidate_speed()
 
         self._refresh_ab_source_ui()
         self._on_compute()
@@ -626,13 +633,9 @@ class CalcPanel(QGroupBox):
         A_n_per_m = self._to_float(a_val)
         B_n_per_m2 = self._to_float(b_val)
 
-        self.txt_A.setText(format_display_number(A_n_per_m, 2))
-        self.txt_B.setText(format_display_number(B_n_per_m2, 2))
+        self._set_coefficients(A_n_per_m, B_n_per_m2)
         self.txt_A.setReadOnly(True)
         self.txt_B.setReadOnly(True)
-
-        self.main.project.crash3_A = A_n_per_m
-        self.main.project.crash3_B = B_n_per_m2
 
         self.main.project.ab_source_type = "nhtsa_file"
         self.main.project.ab_source_ref = rec.get("id")
@@ -685,7 +688,11 @@ class CalcPanel(QGroupBox):
 
         mass_kg = rec.get("vehicle_mass_kg")
         if mass_kg is not None:
-            self.txt_vehicle_mass.setText(format_display_number(float(mass_kg), 2))
+            mass = float(mass_kg)
+            with QSignalBlocker(self.txt_vehicle_mass):
+                self.txt_vehicle_mass.setText(format_display_number(mass))
+            self.main._vehicle_mass_kg = self.main.project.vehicle_mass_kg = mass
+            self.main.workflow.invalidate_speed()
 
         self._refresh_ab_source_ui()
         self._on_compute()
@@ -782,11 +789,8 @@ class CalcPanel(QGroupBox):
         self.btn_compute.setText(tr(key))
 
     def _parse_mass(self) -> float:
-        try:
-            mass_kg = parse_float(self.txt_vehicle_mass.text())
-        except ValueError as error:
-            raise ValueError(tr("calc.error.invalid_vehicle_mass")) from error
-        if not math.isfinite(mass_kg) or mass_kg <= 0:
+        mass_kg = self.main._vehicle_mass_kg
+        if mass_kg is None or not math.isfinite(mass_kg) or mass_kg <= 0:
             raise ValueError(tr("calc.error.invalid_vehicle_mass"))
         return mass_kg
 
@@ -928,13 +932,6 @@ class CalcPanel(QGroupBox):
             )
             return
 
-        self.main.project.crash3_A = A
-        self.main.project.crash3_B = B
-        self.main.project.crash3_alpha_deg = alpha_deg
-        self.main.project.crash3_units = "SI_N_per_m"
-
-        self.main._sync_ui_to_project()
-
         try:
             data = self.main.calc.build_damage_profile_data(A, B, alpha_deg)
         except Exception as e:
@@ -967,11 +964,7 @@ class CalcPanel(QGroupBox):
         A_n_per_m = self._to_float(result["A_n_per_m"])
         B_n_per_m2 = self._to_float(result["B_n_per_m2"])
 
-        self.txt_A.setText(format_display_number(A_n_per_m, 2))
-        self.txt_B.setText(format_display_number(B_n_per_m2, 2))
-
-        self.main.project.crash3_A = A_n_per_m
-        self.main.project.crash3_B = B_n_per_m2
+        self._set_coefficients(A_n_per_m, B_n_per_m2)
 
         label = data["test_label"] or data["report_number"] or "NHTSA report"
 
@@ -1039,11 +1032,7 @@ class CalcPanel(QGroupBox):
         A_n_per_m = self._to_float(result["A_n_per_m"])
         B_n_per_m2 = self._to_float(result["B_n_per_m2"])
 
-        self.txt_A.setText(format_display_number(A_n_per_m, 2))
-        self.txt_B.setText(format_display_number(B_n_per_m2, 2))
-
-        self.main.project.crash3_A = A_n_per_m
-        self.main.project.crash3_B = B_n_per_m2
+        self._set_coefficients(A_n_per_m, B_n_per_m2)
 
         label = data["test_label"] or data["report_number"] or "NHTSA report"
 
@@ -1226,11 +1215,9 @@ class CalcPanel(QGroupBox):
         return lines
 
     def _parse_ab_alpha(self):
-        try:
-            A = parse_float(self.txt_A.text())
-            B = parse_float(self.txt_B.text())
-            alpha_deg = parse_float(self.txt_alpha_deg.text())
-        except ValueError:
+        project = self.main.project
+        A, B, alpha_deg = project.crash3_A, project.crash3_B, project.crash3_alpha_deg
+        if A is None or B is None or alpha_deg is None:
             raise ValueError(tr("calc.error.invalid_ab_alpha"))
 
         if not math.isfinite(A) or A <= 0:

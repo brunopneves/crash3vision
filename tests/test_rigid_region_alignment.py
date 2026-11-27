@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QApplication, QBoxLayout, QDialog, QFileDialog, QGraphicsView, QInputDialog, QMessageBox,
 )
 
+from app.core.crash3 import compute_energy, compute_ees
 from app.core.number_format import format_display_number
 from app.core.project import Project
 from app.i18n import tr
@@ -357,6 +358,16 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         with patch.object(QInputDialog, "getItem", side_effect=select_compass):
             panel.act_load_ab_library.trigger()
         self.assertEqual(window.project.ab_source_type, "nhtsa_library")
+        snapshot = window.project.ab_source_snapshot
+        self.assertEqual(window.project.crash3_A, snapshot["A_n_per_m"])
+        self.assertEqual(window.project.crash3_B, snapshot["B_n_per_m2"])
+        self.assertEqual(
+            window.project.total_energy_j,
+            compute_energy(
+                window._w_m, *(window._ci_m[i] for i in range(1, 7)),
+                snapshot["A_n_per_m"], snapshot["B_n_per_m2"], window.project.crash3_alpha_deg,
+            ),
+        )
         self.assertTrue(panel.lbl_ab_details.wordWrap())
         self.assertIn("M20240300", panel.lbl_ab_details.text())
         with tempfile.TemporaryDirectory() as tmp:
@@ -407,6 +418,61 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         panel.btn_compute.click()
         self.assertGreater(window._damage_speed_kmh, 0)
         self.assertEqual(window._current_workflow_step(), "result")
+
+    def test_calculation_and_profile_preserve_full_precision_after_reload(self) -> None:
+        window = self._window()
+        source = COMPASS / "crash3vision_reference_project.json"
+        data = json.loads(source.read_text(encoding="utf-8"))
+        for key in ("ref_path", "dam_path"):
+            data[key] = str(source.parent / data[key])
+        a, b, angle, mass = 0.0149, 0.0149, 0.0049, 1815.123456
+        data.update(
+            crash3_A=a, crash3_B=b, crash3_alpha_deg=angle, vehicle_mass_kg=mass,
+            total_energy_j=None, damage_speed_kmh=None, damage_speed_mps=None,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            original = Path(tmp) / "original.json"
+            saved = Path(tmp) / "saved.json"
+            original.write_text(json.dumps(data), encoding="utf-8")
+            for path in (original, saved):
+                with (
+                    patch.object(QFileDialog, "getOpenFileName", return_value=(str(path), "")),
+                    patch.object(QMessageBox, "information"),
+                ):
+                    window.io.load_project()
+                before = window.project.to_dict()
+                for language, shown in (("pt", "0,01"), ("en", "0.01")):
+                    window._set_language_and_refresh(language)
+                    self.assertEqual(window.calc_panel.txt_A.text(), shown)
+                self.assertEqual(window.project.to_dict(), before)
+                window.workflow_step_labels["calculation"].click()
+                with patch("app.ui.widgets.calc_panel.CrushProfileDialog.exec") as profile:
+                    window.calc_panel.btn_show_profile.click()
+                profile.assert_called_once()
+                self.assertEqual(window.project.to_dict(), before)
+                window.calc_panel.btn_compute.click()
+                expected = compute_energy(
+                    window._w_m, *(window._ci_m[i] for i in range(1, 7)), a, b, angle
+                )
+                self.assertEqual(window.project.total_energy_j, expected)
+                self.assertEqual(window.project.damage_speed_mps, compute_ees(expected, mass))
+                self.assertEqual(window.project.crash3_A, a)
+                self.assertEqual(window.project.crash3_B, b)
+                with (
+                    patch.object(QFileDialog, "getSaveFileName", return_value=(str(saved), "")),
+                    patch.object(QMessageBox, "information"),
+                ):
+                    window.io.save_project()
+            window.workflow_step_labels["calculation"].click()
+            window.calc_panel.txt_A.setText("0,016799")
+            window.calc_panel.txt_B.setText("0,017899")
+            self.assertEqual(window.project.crash3_A, 0.016799)
+            self.assertEqual(window.project.crash3_B, 0.017899)
+            window.calc_panel.btn_compute.click()
+            expected = compute_energy(
+                window._w_m, *(window._ci_m[i] for i in range(1, 7)), 0.016799, 0.017899, angle
+            )
+            self.assertEqual(window.project.total_energy_j, expected)
 
     def test_measurement_panel_tracks_steps_and_collapses_guide_safely(self) -> None:
         window = self._window()
