@@ -736,8 +736,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Defina W primeiro (2 cliques).",
     },
     "report.title": {
-        "en": "CRASH3-MVP - EXAM REPORT",
-        "pt": "CRASH3-MVP - RELATÓRIO DO EXAME",
+        "en": "CRASH3Vision — Technical calculation summary",
+        "pt": "CRASH3Vision — Resumo técnico de cálculo",
+    },
+    "report.app_version": {
+        "en": "Application version",
+        "pt": "Versão do aplicativo",
+    },
+    "report.number_notation": {
+        "en": "Numbers use a decimal point and omit thousands separators.",
+        "pt": "Os números usam ponto decimal e omitem separadores de milhares.",
     },
     "report.images": {
         "en": "IMAGES",
@@ -772,8 +780,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Projeto",
     },
     "report.datetime": {
-        "en": "Date/time",
-        "pt": "Data/hora",
+        "en": "Generated at",
+        "pt": "Data e hora de geração",
     },
     "report.scale_m_per_px": {
         "en": "Scale (m/px)",
@@ -788,8 +796,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Massa do veículo (kg)",
     },
     "report.damage_speed_mps": {
-        "en": "Damage speed (m/s)",
-        "pt": "Velocidade de dano (m/s)",
+        "en": "Damage speed of the source test (m/s)",
+        "pt": "Velocidade de dano do ensaio de origem (m/s)",
     },
     "report.damage_speed_kmh": {
         "en": "Damage speed (km/h)",
@@ -802,6 +810,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "report.crash3_params_extended": {
         "en": "CRASH3 PARAMETERS",
         "pt": "PARÂMETROS CRASH3",
+    },
+    "report.calculation_angle_deg": {
+        "en": "Calculation angle α (°)",
+        "pt": "Ângulo de cálculo α (°)",
     },
     "report.si_units_full": {
         "en": "Unit system: SI (N/m, N/m², m, s)",
@@ -832,8 +844,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Entrada manual",
     },
     "report.test_description": {
-        "en": "Test / reference description",
-        "pt": "Descrição do ensaio / referência",
+        "en": "SOURCE TEST FOR A/B",
+        "pt": "ENSAIO DE ORIGEM DOS COEFICIENTES A/B",
     },
     "report.test_type": {
         "en": "Test type",
@@ -853,7 +865,7 @@ STRINGS: dict[str, dict[str, str]] = {
     },
     "report.overlap_pct": {
         "en": "Overlap (%)",
-        "pt": "Overlap (%)",
+        "pt": "Sobreposição (%)",
     },
     "report.test_speed_mps": {
         "en": "Test speed (m/s)",
@@ -876,26 +888,22 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "METODOLOGIA",
     },
     "report.methodology.energy": {
-        "en": (
-            "Deformation energy was estimated using the CRASH3 model, "
-            "based on stiffness coefficients A and B and the measured "
-            "crush values (C1 to C6) extracted from the calibrated image."
-        ),
-        "pt": (
-            "A energia de deformação foi estimada utilizando o modelo CRASH3, "
-            "com base nos parâmetros de rigidez A e B e nas deformações medidas "
-            "(C1 a C6) extraídas da imagem calibrada."
-        ),
+        "en": "The CRASH3-derived formulation estimates deformation energy from W, C1–C6, stiffness coefficients A and B, and angle α.",
+        "pt": "A formulação derivada do CRASH3 estima a energia de deformação a partir de W, C1–C6, dos coeficientes A e B e do ângulo α.",
     },
     "report.methodology.speed": {
         "en": (
-            "Damage speed was obtained from the calculated energy and the "
-            "vehicle mass considered in the computation."
+            "Energy Equivalent Speed (EES) is the speed equivalent to the estimated deformation energy "
+            "for the mass used (EES = √(2E/m)). It does not necessarily equal the actual impact speed."
         ),
         "pt": (
-            "A velocidade de dano foi obtida a partir da energia calculada e da "
-            "massa do veículo considerada no cálculo."
+            "A Velocidade Equivalente de Energia (EES) é a velocidade equivalente à energia de deformação "
+            "estimada para a massa utilizada (EES = √(2E/m)). Ela não corresponde necessariamente à velocidade real de impacto."
         ),
+    },
+    "report.methodology.scope": {
+        "en": "This technical calculation summary does not, on its own, constitute a conclusive forensic report.",
+        "pt": "Este resumo técnico de cálculo não constitui, isoladamente, um laudo pericial conclusivo.",
     },
     "report.total_energy_deformation_j": {
         "en": "Total deformation energy (J)",
@@ -904,10 +912,6 @@ STRINGS: dict[str, dict[str, str]] = {
     "report.vehicle_mass_considered_kg": {
         "en": "Vehicle mass considered (kg)",
         "pt": "Massa do veículo considerada (kg)",
-    },
-    "report.damage_speed_estimated": {
-        "en": "Estimated damage speed",
-        "pt": "Velocidade de dano estimada",
     },
     "calc.group.title": {
         "en": "CRASH3 Calculation",
@@ -1936,9 +1940,25 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Speed basis for A/B",
         "pt": "Base de velocidade para A/B",
     },
-    "report.warning.incomplete": {
-        "en": "WARNING: Project incomplete — energy or speed not yet calculated.",
-        "pt": "ATENÇÃO: Projeto incompleto — energia ou velocidade ainda não calculadas.",
+    "report.ees.unavailable": {
+        "en": "EES unavailable. The project has no recorded speed.",
+        "pt": "EES indisponível. O projeto não tem velocidade gravada.",
+    },
+    "report.ees.mass_required": {
+        "en": "EES unavailable. Calculating it requires the vehicle mass.",
+        "pt": "EES indisponível. O cálculo requer a massa do veículo.",
+    },
+    "report.ees.mass_not_recorded": {
+        "en": "The project records an EES but does not document the mass used.",
+        "pt": "O projeto registra a EES, mas não documenta a massa utilizada.",
+    },
+    "report.ees.converted_from_kmh": {
+        "en": "converted from stored km/h",
+        "pt": "convertida do valor gravado em km/h",
+    },
+    "report.ees.converted_from_mps": {
+        "en": "converted from stored m/s",
+        "pt": "convertida do valor gravado em m/s",
     },
     "alignment.single_image.title": {
         "en": "Single image",

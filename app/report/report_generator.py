@@ -2,153 +2,151 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.core.number_format import parse_float
+from app.core.project import Project
 from app.i18n import tr
-from app.core.number_format import format_float
+from app.version import __version__
 
 
-def _fmt(
-    v,
-    decimals: int = 2,
-    suffix: str = "",
-) -> str:
-    return format_float(
-        value=v,
-        decimals=decimals,
-        suffix=suffix,
-    )
+def _number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    # A lone separator in historical numeric metadata is a decimal mark.
+    # Read it independently of the language used to generate the report.
+    language = "pt" if isinstance(value, str) and "," in value and "." not in value else "en"
+    try:
+        return parse_float(value, language=language)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
-def generate_report(project) -> str:
+def _fmt(value: float | None) -> str:
+    return "-" if value is None else repr(float(value))
+
+
+def _test_metadata(snapshot: object) -> list[str]:
+    if not isinstance(snapshot, dict):
+        return []
+    lines = []
+    for field, prefix in (
+        ("test_type", "nhtsa.test_type"),
+        ("test_configuration", "nhtsa.config"),
+        ("barrier_type", "nhtsa.barrier_type"),
+        ("impact_direction", "nhtsa.direction"),
+        ("speed_basis", "nhtsa.speed_basis"),
+        ("test_number", None),
+        ("report_number", None),
+    ):
+        value = snapshot.get(field)
+        if not isinstance(value, (str, int)) or isinstance(value, bool) or not str(value).strip():
+            continue
+        if prefix:
+            key = f"{prefix}.{value}"
+            translation = tr(key)
+            value = value if translation == key else translation
+        lines.append(f"{tr(f'report.{field}')}: {value}")
+    for field in (
+        "overlap_pct", "impact_angle_deg", "test_speed_mps", "impact_speed_mps",
+        "velocity_change_mps", "rebound_speed_mps", "damage_speed_mps", "speed_used_mps",
+    ):
+        value = _number(snapshot.get(field))
+        if value is not None:
+            lines.append(f"{tr(f'report.{field}')}: {_fmt(value)}")
+    return lines
+
+
+def _ees_lines(project: Project) -> list[str]:
+    mps = project.damage_speed_mps
+    kmh = project.damage_speed_kmh
+    if mps is None and kmh is None:
+        key = (
+            "report.ees.mass_required"
+            if project.total_energy_j is not None and project.vehicle_mass_kg is None
+            else "report.ees.unavailable"
+        )
+        return [tr(key)]
+
+    mps_note = kmh_note = ""
+    if mps is None:
+        mps = kmh / 3.6
+        mps_note = f" ({tr('report.ees.converted_from_kmh')})"
+    elif kmh is None:
+        kmh = _number(mps * 3.6)
+        if kmh is not None:
+            kmh_note = f" ({tr('report.ees.converted_from_mps')})"
+
+    lines = [f"- EES (m/s): {_fmt(mps)}{mps_note}"]
+    if kmh is not None:
+        lines.append(f"- EES (km/h): {_fmt(kmh)}{kmh_note}")
+    if project.vehicle_mass_kg is None:
+        lines.append(tr("report.ees.mass_not_recorded"))
+    return lines
+
+
+def generate_report(project: Project) -> str:
     c_m = project.c_m or {}
-    source_snapshot = project.ab_source_snapshot or {}
+    title = tr("report.title")
+    lines = [
+        title,
+        "=" * len(title),
+        f"{tr('report.app_version')}: {__version__}",
+        f"{tr('report.project')}: {project.name}",
+        f"{tr('report.datetime')}: {datetime.now().astimezone().isoformat(timespec='seconds')}",
+        tr("report.number_notation"),
+        "",
+        tr("report.images"),
+        f"{tr('report.reference')}: {project.ref_path or '-'}",
+        f"{tr('report.deformed')}: {project.dam_path or '-'}",
+        "",
+        tr("report.calibration"),
+        f"{tr('report.scale_m_per_px')}: {_fmt(project.m_per_px)}",
+        "",
+        tr("report.damage_markings"),
+        f"W (px): {_fmt(project.w_px)}",
+        f"W (m): {_fmt(project.w_m)}",
+        f"ΔW (px): {_fmt(project.delta_w_px)}",
+        f"ΔW (m): {_fmt(project.delta_w_m)}",
+    ]
+    if project.bumper_offset_m is not None:
+        lines.append(f"{tr('report.bumper_offset_m')}: {_fmt(project.bumper_offset_m)}")
+    lines.extend(f"C{i} (m): {_fmt(c_m.get(f'C{i}'))}" for i in range(1, 7))
+    lines.extend([
+        "",
+        tr("report.crash3_params_extended"),
+        f"A (N/m): {_fmt(project.crash3_A)}",
+        f"B (N/m²): {_fmt(project.crash3_B)}",
+        f"{tr('report.calculation_angle_deg')}: {_fmt(project.crash3_alpha_deg)}",
+        f"{tr('report.vehicle_mass_considered_kg')}: {_fmt(project.vehicle_mass_kg)}",
+        tr("report.si_units_full"),
+        "",
+        tr("report.ab_source_full"),
+    ])
+    source_type = project.ab_source_type
+    method = tr(f"report.method.{source_type}") if source_type in (
+        "nhtsa_report", "nhtsa_library", "nhtsa_file", "generic_class", "manual",
+    ) else "-"
+    lines.append(f"{tr('report.method')}: {method}")
+    for key, value in (
+        ("report.ab_source_label", project.ab_source_label),
+        ("report.ab_source_ref", project.ab_source_ref),
+        ("report.ab_source_reference", project.ab_source_reference),
+    ):
+        if value:
+            lines.append(f"{tr(key)}: {value}")
 
-    lines: list[str] = []
-    lines.append(tr("report.title"))
-    lines.append("=" * 40)
-    lines.append(f"{tr('report.project')}: {project.name}")
-    lines.append(
-        f"{tr('report.datetime')}: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
-    )
-    lines.append("")
+    metadata = _test_metadata(project.ab_source_snapshot)
+    if metadata:
+        lines.extend(["", tr("report.test_description"), *metadata])
 
-    if project.total_energy_j is None or project.damage_speed_kmh is None:
-        lines.append(f"⚠ {tr('report.warning.incomplete')}")
-        lines.append("")
-
-    lines.append(tr("report.images"))
-    lines.append(f"{tr('report.reference')}: {project.ref_path or '-'}")
-    lines.append(f"{tr('report.deformed')}: {project.dam_path or '-'}")
-    lines.append("")
-
-    lines.append(tr("report.calibration"))
-    lines.append(f"{tr('report.scale_m_per_px')}: {_fmt(project.m_per_px, 6)}")
-    lines.append("")
-
-    lines.append(tr("report.damage_markings"))
-    lines.append(f"W (px): {_fmt(project.w_px)}")
-    lines.append(f"W (m): {_fmt(project.w_m)}")
-    lines.append(f"Δw (px): {_fmt(project.delta_w_px)}")
-    lines.append(f"Δw (m): {_fmt(project.delta_w_m)}")
-    lines.append(f"{tr('report.bumper_offset_m')}: {_fmt(project.bumper_offset_m, 3)}")
-    for i in range(1, 7):
-        lines.append(f"C{i} (m): {_fmt(c_m.get(f'C{i}'))}")
-    lines.append("")
-
-    lines.append(tr("report.crash3_params_extended"))
-    lines.append(f"A (N/m): {_fmt(project.crash3_A)}")
-    lines.append(f"B (N/m²): {_fmt(project.crash3_B)}")
-    lines.append(f"Alpha (deg): {_fmt(project.crash3_alpha_deg)}")
-    lines.append(tr("report.si_units_full"))
-    lines.append("")
-
-    lines.append(tr("report.ab_source_full"))
-    if project.ab_source_type == "nhtsa_report":
-        method_text = tr("report.method.nhtsa_report")
-    elif project.ab_source_type == "nhtsa_library":
-        method_text = tr("report.method.nhtsa_library")
-    elif project.ab_source_type == "nhtsa_file":
-        method_text = tr("report.method.nhtsa_file")
-    elif project.ab_source_type == "generic_class":
-        method_text = tr("report.method.generic_class")
-    elif project.ab_source_type == "manual":
-        method_text = tr("report.method.manual")
-    else:
-        method_text = "-"
-
-    lines.append(f"{tr('report.method')}: {method_text}")
-    lines.append(f"{tr('report.ab_source_label')}: {project.ab_source_label or '-'}")
-    lines.append(f"{tr('report.ab_source_ref')}: {project.ab_source_ref or '-'}")
-    lines.append(
-        f"{tr('report.ab_source_reference')}: {project.ab_source_reference or '-'}"
-    )
-
-    if source_snapshot:
-        test_type = source_snapshot.get("test_type")
-        test_configuration = source_snapshot.get("test_configuration")
-        barrier_type = source_snapshot.get("barrier_type")
-        overlap_pct = source_snapshot.get("overlap_pct")
-        impact_direction = source_snapshot.get("impact_direction")
-        test_speed_mps = source_snapshot.get("test_speed_mps")
-        impact_speed_mps = source_snapshot.get("impact_speed_mps")
-        velocity_change_mps = source_snapshot.get("velocity_change_mps")
-        rebound_speed_mps = source_snapshot.get("rebound_speed_mps")
-        damage_speed_mps = source_snapshot.get("damage_speed_mps")
-        speed_used_mps = source_snapshot.get("speed_used_mps")
-        speed_basis = source_snapshot.get("speed_basis")
-        impact_angle_deg = source_snapshot.get("impact_angle_deg")
-        test_number = source_snapshot.get("test_number")
-        report_number = source_snapshot.get("report_number")
-
-        lines.append("")
-        lines.append(tr("report.test_description") + ":")
-        lines.append(f"{tr('report.test_type')}: {test_type or '-'}")
-        lines.append(f"{tr('report.test_configuration')}: {test_configuration or '-'}")
-        lines.append(f"{tr('report.barrier_type')}: {barrier_type or '-'}")
-        lines.append(f"{tr('report.impact_direction')}: {impact_direction or '-'}")
-        lines.append(
-            f"{tr('report.overlap_pct')}: "
-            f"{overlap_pct if overlap_pct is not None else '-'}"
-        )
-        lines.append(
-            f"{tr('report.test_speed_mps')}: {_fmt(test_speed_mps * 3.6 if test_speed_mps else None)} km/h"
-        )
-        lines.append(
-            f"{tr('report.impact_speed_mps')}: {_fmt(impact_speed_mps * 3.6 if impact_speed_mps else None)} km/h"
-        )
-        lines.append(
-            f"{tr('report.velocity_change_mps')}: {_fmt(velocity_change_mps * 3.6 if velocity_change_mps else None)} km/h"
-        )
-        lines.append(
-            f"{tr('report.rebound_speed_mps')}: {_fmt(rebound_speed_mps * 3.6 if rebound_speed_mps else None)} km/h"
-        )
-        lines.append(
-            f"{tr('report.damage_speed_mps')}: {_fmt(damage_speed_mps * 3.6 if damage_speed_mps else None)} km/h"
-        )
-        lines.append(
-            f"{tr('report.speed_used_mps')}: {_fmt(speed_used_mps * 3.6 if speed_used_mps else None)} km/h"
-        )
-        lines.append(f"{tr('report.speed_basis')}: {speed_basis or '-'}")
-        lines.append(f"{tr('report.impact_angle_deg')}: {_fmt(impact_angle_deg)}")
-        lines.append(f"{tr('report.test_number')}: {test_number or '-'}")
-        lines.append(f"{tr('report.report_number')}: {report_number or '-'}")
-
-    lines.append("")
-
-    lines.append(tr("report.methodology"))
-    lines.append(tr("report.methodology.energy"))
-    lines.append(tr("report.methodology.speed"))
-    lines.append("")
-
-    lines.append(tr("report.results"))
-    lines.append(
-        f"{tr('report.total_energy_deformation_j')}: {_fmt(project.total_energy_j)}"
-    )
-    lines.append(
-        f"{tr('report.vehicle_mass_considered_kg')}: "
-        f"{_fmt(project.vehicle_mass_kg)}"
-    )
-    lines.append(tr("report.damage_speed_estimated") + ":")
-    lines.append(f"- EES (m/s): {_fmt(project.damage_speed_mps)}")
-    lines.append(f"- EES (km/h): {_fmt(project.damage_speed_kmh)}")
-
+    lines.extend([
+        "",
+        tr("report.results"),
+        f"{tr('report.total_energy_deformation_j')}: {_fmt(project.total_energy_j)}",
+        *_ees_lines(project),
+        "",
+        tr("report.methodology"),
+        tr("report.methodology.energy"),
+        tr("report.methodology.speed"),
+        tr("report.methodology.scope"),
+    ])
     return "\n".join(lines) + "\n"

@@ -77,4 +77,5 @@ tests/__init__.py
 tests/test_auto_alignment.py
 tests/test_help_menu.py
 tests/test_number_format.py
+tests/test_report.py
 tests/test_rigid_region_alignment.py
