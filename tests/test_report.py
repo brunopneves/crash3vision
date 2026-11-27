@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.core.crash3 import compute_ees, compute_energy
-from app.core.project import Project
+from app.core.project import Point, Project
 from app.i18n import get_language, set_language, tr
 from app.report import generate_report
 from app.version import __version__
@@ -105,7 +105,7 @@ class ReportTests(unittest.TestCase):
         project.ab_source_snapshot = {
             "test_configuration": "rigid_frontal_barrier",
             "report_number": "M20240300",
-            "test_speed_mps": "15,639",
+            "test_speed_mps": "15,638",
             "impact_speed_mps": 15.639,
             "velocity_change_mps": "18.383",
             "rebound_speed_mps": 0,
@@ -123,7 +123,7 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(fields[tr("report.method")], tr("report.method.nhtsa_library"))
             self.assertEqual(fields[tr("report.report_number")], "M20240300")
             for key, expected in (
-                ("test_speed_mps", 15.639), ("impact_speed_mps", 15.639),
+                ("test_speed_mps", 15.638), ("impact_speed_mps", 15.639),
                 ("velocity_change_mps", 18.383), ("rebound_speed_mps", 0.0),
                 ("damage_speed_mps", 15.397),
             ):
@@ -136,6 +136,109 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(float(fields["- EES (km/h)"]), project.damage_speed_kmh)
         self.assertEqual(project.to_dict(), original)
         self.assertNotIn(tr("report.test_description"), generate_report(replace(project, ab_source_snapshot=[])))
+
+    def test_txt_reports_calibration_available_in_saved_project(self) -> None:
+        compass = _compass()
+        for language in ("pt", "en"):
+            set_language(language)
+            for reference in (compass.ref_path, None):
+                project = replace(compass, ref_path=reference)
+                original = deepcopy(project.to_dict())
+                report = generate_report(project)
+                fields = _fields(report)
+                p1, p2 = project.cal_p1, project.cal_p2
+                distance_px = math.hypot(p2.x - p1.x, p2.y - p1.y)
+                self.assertEqual(fields[tr("report.reference")], reference or "-")
+                self.assertEqual(float(fields[tr("report.calibration_distance_px")]), distance_px)
+                self.assertEqual(float(fields[tr("report.calibration_distance_m")]), distance_px * project.m_per_px)
+                self.assertEqual(fields[tr("report.calibration_point", index=1)], f"x={p1.x!r}, y={p1.y!r}")
+                self.assertEqual(fields[tr("report.calibration_point", index=2)], f"x={p2.x!r}, y={p2.y!r}")
+                self.assertEqual(project.to_dict(), original)
+
+            historical = Project.from_dict({"m_per_px": 0.00217})
+            partial = Project(cal_p1=Point(1.5, 2.0))
+            for project in (historical, partial):
+                fields = _fields(generate_report(project))
+                self.assertEqual(fields[tr("report.calibration_distance_px")], "-")
+                self.assertEqual(fields[tr("report.calibration_distance_m")], "-")
+                self.assertNotIn(tr("report.calibration_point", index=2), fields)
+            points_only = Project(cal_p1=Point(0, 0), cal_p2=Point(3, 4))
+            fields = _fields(generate_report(points_only))
+            self.assertEqual(fields[tr("report.calibration_distance_px")], "5.0")
+            self.assertEqual(fields[tr("report.calibration_distance_m")], "-")
+
+    def test_txt_keeps_test_provenance_separate_from_project_inputs(self) -> None:
+        library = json.loads((ROOT / "app/data/nhtsa_ab_library.json").read_text(encoding="utf-8"))
+        record = next(item for item in library["records"] if item["report_number"] == "M20240300")
+        project = replace(_compass(), vehicle_mass_kg=1900.123456789012)
+        project.damage_speed_mps = compute_ees(project.total_energy_j, project.vehicle_mass_kg)
+        project.damage_speed_kmh = project.damage_speed_mps * 3.6
+        snapshot = record | {"L_m": "1,192", "vehicle_mass_kg": "1815,0"}
+        report_snapshot = snapshot.copy()
+        report_snapshot["c_values_m"] = [str(value) for value in report_snapshot.pop("c_m").values()]
+        report_snapshot["b0_mps"] = report_snapshot.pop("b0")
+        for language in ("pt", "en"):
+            set_language(language)
+            for source in ("nhtsa_library", "nhtsa_file", "nhtsa_report"):
+                with self.subTest(language=language, source=source):
+                    case = replace(
+                        project, ab_source_type=source,
+                        ab_source_snapshot=snapshot if source == "nhtsa_file" else report_snapshot,
+                    )
+                    original = deepcopy(case.to_dict())
+                    report = generate_report(case)
+                    fields = _fields(report)
+                    self.assertEqual(fields[tr("report.method")], tr(f"report.method.{source}"))
+                    self.assertEqual(fields[tr("report.test_vehicle")], "Jeep Compass 2024")
+                    self.assertEqual(fields[tr("report.test_agency")], "NHTSA")
+                    self.assertEqual(fields[tr("report.report_number")], "M20240300")
+                    self.assertEqual(report.count("M20240300"), 1)
+                    self.assertEqual(float(fields[tr("calc.ab.test_mass")]), 1815.0)
+                    self.assertEqual(float(fields[tr("report.vehicle_mass_considered_kg")]), case.vehicle_mass_kg)
+                    self.assertEqual(float(fields[tr("report.test_width")]), 1.192)
+                    self.assertEqual(float(fields[tr("nhtsa.field.b0_mps")]), 3.35)
+                    self.assertEqual(
+                        fields[tr("report.test_crush")],
+                        "  ".join(f"{key}={value!r}" for key, value in record["c_m"].items()),
+                    )
+                    self.assertEqual(float(fields["C1 (m)"]), case.c_m["C1"])
+                    energy = _reference_energy(
+                        float(fields["W (m)"]), [float(fields[f"C{i} (m)"]) for i in range(1, 7)],
+                        float(fields["A (N/m)"]), float(fields["B (N/m²)"]),
+                        float(fields[tr("report.calculation_angle_deg")]),
+                    )
+                    self.assertTrue(math.isclose(energy, float(fields[tr("report.total_energy_deformation_j")]), rel_tol=1e-13))
+                    ees = math.sqrt(2 * energy / float(fields[tr("report.vehicle_mass_considered_kg")]))
+                    self.assertTrue(math.isclose(ees, float(fields["- EES (m/s)"]), rel_tol=1e-13))
+                    self.assertNotIn(tr("report.test_speed_mps"), fields)
+                    self.assertLess(report.index(tr("report.ab_source_full")), report.index(tr("report.test_description")))
+                    self.assertLess(report.index(tr("report.test_description")), report.index(tr("report.calculation_parameters")))
+                    self.assertEqual(case.to_dict(), original)
+
+            partial = Project(ab_source_snapshot={"c_m": {"C2": "0", "C5": "0,123"}})
+            fields = _fields(generate_report(partial))
+            self.assertEqual(fields[tr("report.test_crush")], "C1=-  C2=0.0  C3=-  C4=-  C5=0.123  C6=-")
+            self.assertNotIn(tr("calc.ab.test_mass"), fields)
+
+    def test_txt_identifies_generic_and_manual_sources_without_test_block(self) -> None:
+        for language in ("pt", "en"):
+            set_language(language)
+            generic = Project(
+                ab_source_type="generic_class", ab_source_label="Compact", ab_source_ref="Compact",
+                ab_source_snapshot={"class_name": "Compact", "source_reference": "Class document"},
+            )
+            report = generate_report(generic)
+            fields = _fields(report)
+            self.assertEqual(fields[tr("calc.generic_class")], "Compact")
+            self.assertEqual(fields[tr("report.ab_source_reference")], "Class document")
+            self.assertEqual(report.count("Compact"), 1)
+            self.assertIn(tr("report.generic_illustrative"), report)
+            self.assertNotIn(tr("report.test_description"), report)
+
+            report = generate_report(Project(ab_source_type="manual", ab_source_label="Manual entry"))
+            self.assertEqual(_fields(report)[tr("report.method")], tr("report.method.manual"))
+            self.assertNotIn(tr("report.ab_source_label"), _fields(report))
+            self.assertNotIn(tr("report.test_description"), report)
 
     def test_txt_distinguishes_legacy_conversion_from_energy_without_mass(self) -> None:
         compass = _compass()

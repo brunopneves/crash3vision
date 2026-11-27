@@ -744,8 +744,28 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Versão do aplicativo",
     },
     "report.number_notation": {
-        "en": "Numbers use a decimal point and omit thousands separators.",
-        "pt": "Os números usam ponto decimal e omitem separadores de milhares.",
+        "en": "Numbers use a decimal point with no thousands separators. A dash (-) marks unavailable data.",
+        "pt": "Os números usam ponto decimal sem separadores de milhares. Um traço (-) indica dado indisponível.",
+    },
+    "report.images_and_calibration": {
+        "en": "IMAGES AND CALIBRATION",
+        "pt": "IMAGENS E CALIBRAÇÃO",
+    },
+    "report.calibration_distance_px": {
+        "en": "Distance between calibration points (px)",
+        "pt": "Distância entre os pontos de calibração (px)",
+    },
+    "report.calibration_distance_m": {
+        "en": "Real distance reconstructed from points and saved scale (m)",
+        "pt": "Distância real reconstruída dos pontos e da escala gravada (m)",
+    },
+    "report.calibration_point": {
+        "en": "Calibration point {index} (scene px)",
+        "pt": "Ponto de calibração {index} (px da cena)",
+    },
+    "report.calculation_parameters": {
+        "en": "CALCULATION PARAMETERS",
+        "pt": "PARÂMETROS DO CÁLCULO",
     },
     "report.images": {
         "en": "IMAGES",
@@ -772,8 +792,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "PARÂMETROS CRASH3",
     },
     "report.results": {
-        "en": "RESULTS",
-        "pt": "RESULTADOS",
+        "en": "DEFORMATION ENERGY AND EES",
+        "pt": "ENERGIA DE DEFORMAÇÃO E EES",
     },
     "report.project": {
         "en": "Project",
@@ -820,8 +840,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Sistema de unidades: SI (N/m, N/m², m, s)",
     },
     "report.ab_source_full": {
-        "en": "RIGIDITY COEFFICIENT SOURCE (A/B)",
-        "pt": "ORIGEM DOS COEFICIENTES DE RIGIDEZ (A/B)",
+        "en": "STIFFNESS COEFFICIENTS (A/B) AND SOURCE",
+        "pt": "COEFICIENTES DE RIGIDEZ (A/B) E PROCEDÊNCIA",
     },
     "report.method": {
         "en": "Method",
@@ -847,6 +867,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "SOURCE TEST FOR A/B",
         "pt": "ENSAIO DE ORIGEM DOS COEFICIENTES A/B",
     },
+    "report.generic_illustrative": {
+        "en": "Generic-class coefficients are illustrative.",
+        "pt": "Os coeficientes de classes genéricas são ilustrativos.",
+    },
+    "report.test_vehicle": {"en": "Test vehicle", "pt": "Veículo do ensaio"},
+    "report.test_agency": {"en": "Test agency", "pt": "Órgão responsável pelo ensaio"},
+    "report.test_width": {"en": "Test crush profile width L (m)", "pt": "Largura L do perfil de deformação do ensaio (m)"},
+    "report.test_crush": {"en": "Test crush values for A/B (m)", "pt": "Deformações do ensaio usadas para A/B (m)"},
     "report.test_type": {
         "en": "Test type",
         "pt": "Tipo de teste",
@@ -884,8 +912,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Número do relatório",
     },
     "report.methodology": {
-        "en": "METHODOLOGY",
-        "pt": "METODOLOGIA",
+        "en": "METHODOLOGICAL NOTES AND LIMITATIONS",
+        "pt": "OBSERVAÇÕES METODOLÓGICAS E LIMITAÇÕES",
     },
     "report.methodology.energy": {
         "en": "The CRASH3-derived formulation estimates deformation energy from W, C1–C6, stiffness coefficients A and B, and angle α.",
