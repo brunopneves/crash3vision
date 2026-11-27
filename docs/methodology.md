@@ -33,17 +33,17 @@ Because six crush ordinates are defined across the damaged width, they delimit *
 
 ## 3. Image acquisition and calibration
 
-The method is intended for digital images with sufficient geometric quality to allow structural interpretation and measurement.
+Prefer high-resolution images taken from nearly directly above the vehicle (near-nadir), with minimal geometric distortion. Check that the structures used to identify the ends of W and the original and damaged contours at C1–C6 are visible or can be established from the available references. Assess the effective resolution in the measurement region, since that is where the examiner needs to distinguish the structural features.
 
-Calibration can use known references visible in the image, including:
+Calibrate with a known reference visible in the image and lying in the plane of measurement. Suitable references can include:
 
 - metric rulers or measuring scales;
 - known vehicle dimensions;
 - other reliable scene references with known dimensions.
 
-In the experimental study, aerial or near-nadir views were preferred because they reduce perspective effects and preserve a more suitable geometric relationship between the vehicle structure and the image plane.
+In the real-vehicle evaluation, images were acquired by drone at approximately 10 m above the ground. An approximate range of 8–12 m can serve as an operational reference for similar acquisitions. The evaluation did not establish or validate this range as a requirement. In the NHTSA phase, images were selected from overhead crash-test cameras with a similar perspective. Those images came from the test cameras rather than drones.
 
-Image quality remains an important limitation. Resolution, contrast, shadows, viewing angle and partial structural obstruction may affect the repeatability of the markings.
+Effective resolution in the measurement region, viewing perspective and proper calibration matter more than flight height alone. Contrast, shadows and partial structural obstruction may also affect the repeatability of the markings. Following these recommendations does not guarantee measurement accuracy.
 
 ---
 

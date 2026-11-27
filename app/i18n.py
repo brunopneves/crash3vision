@@ -110,7 +110,9 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": """
             <ol>
               <li><b>Images.</b> The damaged vehicle image is required. A reference image is optional
-              and helps compare the original and damaged contours. Then continue to Alignment.</li>
+              and helps compare the original and damaged contours. Prefer high-resolution photos taken
+              from nearly directly above, with minimal distortion and a clear view of the structures
+              used to measure W and C1–C6. Then continue to Alignment.</li>
               <li><b>Alignment.</b> Orient both images with the vehicle front facing upward
               and inspect the overlay using opacity.
               Try automatic alignment, select three points on a preserved rigid region,
@@ -134,7 +136,9 @@ STRINGS: dict[str, dict[str, str]] = {
             <ol>
               <li><b>Imagens.</b> Carregue a imagem do veículo danificado, que é obrigatória.
               A imagem de referência é opcional e ajuda a comparar os contornos original e
-              danificado. Depois, avance para Alinhamento.</li>
+              danificado. Prefira fotos de alta resolução, tiradas de cima, com a câmera quase na
+              vertical, pouca distorção e boa visibilidade das estruturas usadas para medir W e C1–C6.
+              Depois, avance para Alinhamento.</li>
               <li><b>Alinhamento.</b> Oriente as duas imagens com a dianteira voltada para cima
               e use a opacidade para conferir a sobreposição.
               Tente o alinhamento automático, marque três pontos numa região rígida preservada

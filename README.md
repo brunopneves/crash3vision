@@ -125,6 +125,8 @@ The workflow implemented in CRASH3Vision follows the general sequence:
 
 For marking consistency, the vehicle should be oriented with the front facing upward, with C1–C6 assigned from left to right.
 
+**Image acquisition.** Prefer high-resolution images taken from nearly directly above the vehicle (near-nadir), with minimal geometric distortion and a clear view of the structural features used to measure W and C1–C6. The real-vehicle evaluation used drone images acquired at about 10 m above the ground. The NHTSA evaluation used footage from overhead test cameras with a similar perspective. Effective resolution, perspective and proper calibration matter more than flight height alone. These recommendations do not guarantee measurement accuracy.
+
 Six crush ordinates define five intervals across the damaged width; therefore the interval width is **W/5**.
 
 The methodology can also use a structural offset associated with the bumper reinforcement or crossmember when appropriate.
@@ -159,19 +161,27 @@ For a more detailed description, see [Methodology](docs/methodology.md).
 
 ## Methodology and equations
 
-The EES is estimated from structural deformation energy using a CRASH3-derived formulation.
+The EES is estimated from structural deformation energy using the CRASH3-derived formulation implemented in [the calculation core](app/core/crash3.py).
 
-```text
-E = (W/5) × [ (A/2) × Σkᵢ·Cᵢ + (B/6) × Σkᵢ·Cᵢ² + 5G ] × (1 + tan²α)
-```
+$$
+\begin{aligned}
+E &= \frac{W}{5}\left[\frac{A}{2}L + \frac{B}{6}Q + 5G\right]\left(1 + \tan^2\alpha\right), \\
+L &= C_1 + 2C_2 + 2C_3 + 2C_4 + 2C_5 + C_6, \\
+Q &= C_1^2 + 2C_2^2 + 2C_3^2 + 2C_4^2 + 2C_5^2 + C_6^2 \\
+  &\quad {}+ C_1C_2 + C_2C_3 + C_3C_4 + C_4C_5 + C_5C_6, \\
+G &= \frac{A^2}{2B}.
+\end{aligned}
+$$
 
 Where:
 
+- `E` — deformation energy (J)
 - `C1..C6` — structural crush depths (m)
 - `A`, `B` — vehicle structural stiffness coefficients (N/m and N/m²)
 - `W` — damaged width (m)
-- `G = A²/(2B)` — residual energy term
-- `α` — impact angle (degrees)
+- `L`, `Q` — weighted linear and quadratic crush terms (m and m², respectively)
+- `G` — residual energy per unit width (J/m)
+- `α` — impact angle (entered in degrees and converted to radians for the tangent)
 
 EES is then obtained from:
 
