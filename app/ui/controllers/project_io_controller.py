@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtGui import QImageReader, QPixmap
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 
+from app.core.ab_provenance import regularize_ab_source
 from app.core.number_format import format_display_number
 from app.core.project import InvalidProjectDataError, Project, UnsupportedCrash3UnitsError
 from app.i18n import get_language, tr
@@ -249,6 +250,7 @@ class ProjectIOController:
             )
             return
 
+        ab_source_notice = regularize_ab_source(project)
         self.host.project = project
         self.host._update_window_title()
         self.host._current_project_path = path
@@ -405,10 +407,13 @@ class ProjectIOController:
             self.host.calc_panel.retranslate_ui()
 
         self.host.workflow.sync_stage_after_load()
+        message = tr("project.load.loaded", path=path)
+        if ab_source_notice is not None:
+            message += "\n\n" + tr(f"ab.history.load.{ab_source_notice}")
         QMessageBox.information(
             self.host,
             tr("project.load.dialog_title"),
-            tr("project.load.loaded", path=path),
+            message,
         )
 
     def export_png(self) -> None:

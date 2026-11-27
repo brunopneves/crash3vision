@@ -16,6 +16,7 @@ app/assets/crash3_energy_terms.svg
 app/assets/crash3_icon.ico
 app/assets/welcome.png
 app/core/__init__.py
+app/core/ab_provenance.py
 app/core/auto_alignment.py
 app/core/crash3.py
 app/core/image_io.py

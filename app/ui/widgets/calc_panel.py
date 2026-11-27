@@ -34,7 +34,11 @@ from app.core.nhtsa_ab_library import (
     save_record_file,
 )
 from app.i18n import tr
+from app.core.ab_provenance import (
+    LOCKED_AB_SOURCES, NHTSA_AB_SOURCES, ab_source_status, archive_ab_source, replace_ab_snapshot,
+)
 from app.core.number_format import format_display_number, parse_float, relocalize_decimal_input
+from app.report.report_generator import historical_ab_lines
 from app.ui.widgets.crush_profile_dialog import CrushProfileDialog
 from app.ui.widgets.nhtsa_ab_dialog import NhtsaAbDialog
 
@@ -57,8 +61,6 @@ class CalcPanel(QGroupBox):
 
     LIB_PATH = resource_path("app/data/stiffness_library.json")
     NHTSA_LIB_PATH = DEFAULT_LIBRARY_PATH
-    NHTSA_AB_SOURCES = ("nhtsa_library", "nhtsa_file", "nhtsa_report")
-    LOCKED_AB_SOURCES = (*NHTSA_AB_SOURCES, "generic_class")
 
     def __init__(self, main_window):
         super().__init__()
@@ -256,20 +258,6 @@ class CalcPanel(QGroupBox):
 
     def restore_parameter_fields(self) -> None:
         project = self.main.project
-        snapshot = project.ab_source_snapshot
-        if project.ab_source_type in self.LOCKED_AB_SOURCES and isinstance(snapshot, dict):
-            for attribute, key in (("crash3_A", "A_n_per_m"), ("crash3_B", "B_n_per_m2")):
-                recorded = snapshot.get(key)
-                if recorded is None:
-                    continue
-                try:
-                    recorded = parse_float(recorded)
-                except (ValueError, OverflowError):
-                    recorded = math.nan
-                if getattr(project, attribute) != recorded:
-                    # Older projects could contain edited values with an unchanged source.
-                    self._set_manual_ab_source()
-                    break
         for field, attribute in self._parameter_fields:
             value = getattr(project, attribute)
             with QSignalBlocker(field):
@@ -278,20 +266,24 @@ class CalcPanel(QGroupBox):
 
     def _set_manual_ab_source(self) -> None:
         project = self.main.project
+        status = ab_source_status(project)
+        if status in ("incomplete", "unverifiable", "mismatch"):
+            archive_ab_source(project, status)
+            return
         project.ab_source_type = "manual"
         project.ab_source_ref = None
         project.ab_source_label = "Manual entry"
         project.ab_source_reference = None
-        project.ab_source_snapshot = None
+        replace_ab_snapshot(project, None)
 
     def _update_manual_snapshot(self) -> None:
         project = self.main.project
         try:
             a, b, alpha = self._parse_ab_alpha()
         except ValueError:
-            project.ab_source_snapshot = None
+            replace_ab_snapshot(project, None)
         else:
-            project.ab_source_snapshot = {"A_n_per_m": a, "B_n_per_m2": b, "alpha_deg": alpha}
+            replace_ab_snapshot(project, {"A_n_per_m": a, "B_n_per_m2": b, "alpha_deg": alpha})
 
     def _on_parameter_changed(self, attribute: str, text: str) -> None:
         try:
@@ -300,7 +292,14 @@ class CalcPanel(QGroupBox):
             value = None
         if value is not None and not math.isfinite(value):
             value = None
-        setattr(self.main.project, attribute, value)
+        project = self.main.project
+        if (
+            attribute in ("crash3_A", "crash3_B")
+            and value != getattr(project, attribute)
+            and ab_source_status(project) in ("incomplete", "unverifiable")
+        ):
+            self._set_manual_ab_source()
+        setattr(project, attribute, value)
         if attribute == "vehicle_mass_kg":
             self.main._vehicle_mass_kg = value
             self.main.workflow.invalidate_speed()
@@ -439,13 +438,14 @@ class CalcPanel(QGroupBox):
 
         if not class_name:
             project = self.main.project
-            if project.ab_source_type == "generic_class":
+            reset_generic = project.ab_source_type == "generic_class" and ab_source_status(project) == "verified"
+            self._set_manual_ab_source()
+            if reset_generic:
                 project.crash3_A = project.crash3_B = None
                 with QSignalBlocker(self.txt_A), QSignalBlocker(self.txt_B):
                     self.txt_A.clear()
                     self.txt_B.clear()
                 self.main.workflow.invalidate_energy()
-            self._set_manual_ab_source()
             self._refresh_ab_source_ui()
             return
 
@@ -463,11 +463,11 @@ class CalcPanel(QGroupBox):
         self.main.project.ab_source_ref = class_name
         self.main.project.ab_source_label = class_name
         self.main.project.ab_source_reference = None
-        self.main.project.ab_source_snapshot = {
+        replace_ab_snapshot(self.main.project, {
             "class_name": class_name,
             "A_n_per_m": params["A"],
             "B_n_per_m2": params["B"],
-        }
+        })
 
         self._refresh_ab_source_ui()
 
@@ -602,7 +602,7 @@ class CalcPanel(QGroupBox):
             float(c_m.get("C6", 0.0)),
         ]
 
-        self.main.project.ab_source_snapshot = {
+        replace_ab_snapshot(self.main.project, {
             "id": rec.get("id"),
             "test_number": rec.get("test_number"),
             "report_number": rec.get("report_number"),
@@ -634,7 +634,7 @@ class CalcPanel(QGroupBox):
             "A_n_per_m": rec.get("A_n_per_m"),
             "B_n_per_m2": rec.get("B_n_per_m2"),
             "source_reference": rec.get("source_reference"),
-        }
+        })
 
         mass_kg = rec.get("vehicle_mass_kg")
         if mass_kg is not None:
@@ -697,7 +697,7 @@ class CalcPanel(QGroupBox):
             float(c_m.get("C6", 0.0)),
         ]
 
-        self.main.project.ab_source_snapshot = {
+        replace_ab_snapshot(self.main.project, {
             "id": rec.get("id"),
             "test_number": rec.get("test_number"),
             "report_number": rec.get("report_number"),
@@ -729,7 +729,7 @@ class CalcPanel(QGroupBox):
             "A_n_per_m": rec.get("A_n_per_m"),
             "B_n_per_m2": rec.get("B_n_per_m2"),
             "source_reference": rec.get("source_reference"),
-        }
+        })
 
         mass_kg = rec.get("vehicle_mass_kg")
         if mass_kg is not None:
@@ -905,7 +905,7 @@ class CalcPanel(QGroupBox):
         self.main.project.damage_speed_mps = None
         self.main.project.damage_speed_kmh = None
 
-        if self.main.project.ab_source_type not in self.LOCKED_AB_SOURCES:
+        if self.main.project.ab_source_type not in LOCKED_AB_SOURCES:
             self._set_manual_ab_source()
             self._update_manual_snapshot()
             self._refresh_ab_source_ui()
@@ -1006,7 +1006,7 @@ class CalcPanel(QGroupBox):
         self.main.project.ab_source_label = label
         self.main.project.ab_source_reference = data["report_number"]
 
-        self.main.project.ab_source_snapshot = {
+        replace_ab_snapshot(self.main.project, {
             "test_agency": data["test_agency"],
             "test_number": data["test_number"],
             "report_number": data["report_number"],
@@ -1036,7 +1036,7 @@ class CalcPanel(QGroupBox):
             "b1_per_s": result["b1_per_s"],
             "A_n_per_m": result["A_n_per_m"],
             "B_n_per_m2": result["B_n_per_m2"],
-        }
+        })
 
         self._refresh_ab_source_ui()
         self._on_compute()
@@ -1074,7 +1074,7 @@ class CalcPanel(QGroupBox):
         self.main.project.ab_source_label = label
         self.main.project.ab_source_reference = data["report_number"]
 
-        self.main.project.ab_source_snapshot = {
+        replace_ab_snapshot(self.main.project, {
             "test_agency": data["test_agency"],
             "test_number": data["test_number"],
             "report_number": data["report_number"],
@@ -1104,7 +1104,7 @@ class CalcPanel(QGroupBox):
             "b1_per_s": result["b1_per_s"],
             "A_n_per_m": result["A_n_per_m"],
             "B_n_per_m2": result["B_n_per_m2"],
-        }
+        })
 
         self._refresh_ab_source_ui()
         self._on_compute()
@@ -1125,11 +1125,12 @@ class CalcPanel(QGroupBox):
         snap = project.ab_source_snapshot
         snap = snap if isinstance(snap, dict) else {}
         source_type = project.ab_source_type
-        locked = source_type in self.LOCKED_AB_SOURCES
+        status = ab_source_status(project)
+        locked = status == "verified"
         self.txt_A.setReadOnly(locked)
         self.txt_B.setReadOnly(locked)
         index = self.cmb_class.findData(project.ab_source_ref) if source_type == "generic_class" else (
-            -1 if locked else 0
+            -1 if source_type in NHTSA_AB_SOURCES else 0
         )
         with QSignalBlocker(self.cmb_class):
             self.cmb_class.setCurrentIndex(index)
@@ -1161,7 +1162,7 @@ class CalcPanel(QGroupBox):
                 lines.append(f"{tr('calc.generic_class')}: {class_name}")
             if reference and reference != class_name:
                 lines.append(f"{tr('report.ab_source_reference')}: {reference}")
-        elif source_type in self.NHTSA_AB_SOURCES:
+        elif source_type in NHTSA_AB_SOURCES:
             vehicle = " ".join(
                 value for key in ("make", "model", "year")
                 if (value := self._metadata_text(snap.get(key)))
@@ -1169,9 +1170,19 @@ class CalcPanel(QGroupBox):
             label = vehicle or label
             lines = self._nhtsa_source_details(snap, label)
 
-        self.lbl_ab_source.setText(tr(source_key, label=f" | {label}" if label else ""))
+        source_text = tr(source_key, label=f" | {label}" if label else "")
+        tooltip = "\n".join(lines)
+        if status is not None and not locked:
+            source_text += "\n" + tr("ab.source.declared_unverified")
+        if history := historical_ab_lines(project, include_full_record=True):
+            source_text += "\n" + tr("ab.history.details_hint")
+            tooltip = "\n".join(filter(None, (tooltip, tr("ab.history.details_hint"))))
+            if lines:
+                lines.append("")
+            lines.extend(history)
+        self.lbl_ab_source.setText(source_text)
         details = "\n".join(lines)
-        self.lbl_ab_source.setToolTip(details)
+        self.lbl_ab_source.setToolTip(tooltip)
         self.lbl_ab_details.setText(details)
         self.lbl_ab_details.setVisible(bool(details))
 

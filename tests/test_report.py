@@ -8,6 +8,10 @@ from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
+from app.core.ab_provenance import (
+    HISTORICAL_AB_KEY, HISTORY_FORMAT, LEGACY_HISTORY_KEY, ab_source_status,
+    historical_ab_sources, regularize_ab_source, replace_ab_snapshot,
+)
 from app.core.crash3 import compute_ees, compute_energy
 from app.core.project import Point, Project
 from app.i18n import get_language, set_language, tr
@@ -41,6 +45,150 @@ def _fields(report: str) -> dict[str, str]:
 class ReportTests(unittest.TestCase):
     def setUp(self) -> None:
         self.addCleanup(set_language, get_language())
+
+    def test_ab_source_comparison_is_deterministic_and_ulp_bounded(self) -> None:
+        for language in ("pt", "en"):
+            set_language(language)
+            for recorded, effective, reason in (
+                (math.nextafter(179048.0, math.inf), 179048.0, None),
+                (179048.05781761295, 179048.0, "mismatch"),
+                ("0,0149", 0.0149, None),
+                ("179,048.05781761295", 179048.05781761295, None),
+                ("179.048,05781761295", 179048.05781761295, None),
+                ("1,234", 1.234, "unverifiable"),
+                ("1,234", 1234.0, "unverifiable"),
+                ("1.234", 1.234, "unverifiable"),
+                ("1,8,00.00", 1800.0, "unverifiable"),
+                (True, 1.0, "unverifiable"),
+            ):
+                with self.subTest(language=language, recorded=recorded, effective=effective):
+                    snapshot = {"A_n_per_m": recorded, "B_n_per_m2": "8000"}
+                    project = Project(
+                        crash3_A=effective, crash3_B=8000, ab_source_type="nhtsa_library",
+                        ab_source_snapshot=snapshot,
+                    )
+                    self.assertEqual(regularize_ab_source(project), reason)
+                    self.assertEqual((project.crash3_A, project.crash3_B), (effective, 8000))
+                    if reason != "mismatch":
+                        self.assertEqual(project.ab_source_type, "nhtsa_library")
+                        self.assertEqual(project.ab_source_snapshot, snapshot)
+                    else:
+                        self.assertEqual(project.ab_source_type, "manual")
+                        self.assertEqual(historical_ab_sources(project.ab_source_snapshot)[0]["snapshot"], snapshot)
+
+    def test_ab_source_subnormals_require_equality_and_invalid_numbers_are_unverified(self) -> None:
+        smallest = math.ulp(0.0)
+        for recorded, status in (
+            (smallest, "verified"), ("5e-324", "verified"),
+            (5 * smallest, "mismatch"), (0.0, "unverifiable"), (-smallest, "unverifiable"),
+            ("1e-999", "unverifiable"), ("3e-324", "unverifiable"),
+            ("NaN", "unverifiable"), ("inf", "unverifiable"),
+        ):
+            with self.subTest(recorded=recorded):
+                project = Project.from_dict({
+                    "crash3_units": "SI_N_per_m", "crash3_A": smallest, "crash3_B": 8000.0,
+                    "ab_source_type": "nhtsa_library", "ab_source_snapshot": {
+                        "A_n_per_m": recorded, "B_n_per_m2": 8000.0,
+                    },
+                })
+                self.assertEqual(ab_source_status(project), status)
+                regularize_ab_source(project)
+                self.assertEqual(project.crash3_A, smallest)
+                self.assertEqual(project.ab_source_type, "manual" if status == "mismatch" else "nhtsa_library")
+
+    def test_ab_history_preserves_legacy_keys_and_reads_previous_format(self) -> None:
+        project = Project(crash3_A=2.0, crash3_B=5.0, ab_source_type="nhtsa_library")
+        snapshot = {
+            "A_n_per_m": 1, "B_n_per_m2": 5,
+            LEGACY_HISTORY_KEY: [{"source_type": "nhtsa_library", "extension": {"name": "custom"}}],
+            HISTORICAL_AB_KEY: {"format": HISTORY_FORMAT, "version": 99, "records": ["unknown version"]},
+        }
+        project.ab_source_snapshot = deepcopy(snapshot)
+        self.assertEqual(regularize_ab_source(project), "mismatch")
+        self.assertEqual(project.ab_source_snapshot[HISTORICAL_AB_KEY]["version"], 1)
+        record = historical_ab_sources(project.ab_source_snapshot)[0]
+        self.assertEqual(record["snapshot"], snapshot)
+
+        previous_record = {**record, "snapshot": {"A_n_per_m": 1, "legacy_extension": {"key": True}}}
+        project.ab_source_snapshot = {LEGACY_HISTORY_KEY: [previous_record]}
+        self.assertEqual(historical_ab_sources(project.ab_source_snapshot), [previous_record])
+        replace_ab_snapshot(project, {"A_n_per_m": 2.0})
+        self.assertNotIn(LEGACY_HISTORY_KEY, project.ab_source_snapshot)
+        self.assertEqual(historical_ab_sources(project.ab_source_snapshot), [previous_record])
+
+    def test_ab_history_deduplication_distinguishes_json_types(self) -> None:
+        project = Project(crash3_A=2.0, crash3_B=5.0)
+        for flag in (True, 1, True, 1):
+            project.ab_source_type = "nhtsa_library"
+            project.ab_source_label = "Same source"
+            replace_ab_snapshot(project, {"A_n_per_m": 1, "revision": [{"flags": [flag]}]})
+            self.assertEqual(regularize_ab_source(project), "mismatch")
+        history = historical_ab_sources(project.ab_source_snapshot)
+        self.assertEqual(len(history), 2)
+        self.assertIs(history[0]["snapshot"]["revision"][0]["flags"][0], True)
+        self.assertIs(type(history[1]["snapshot"]["revision"][0]["flags"][0]), int)
+
+    def test_txt_marks_incomplete_declared_sources_unverified_without_archiving(self) -> None:
+        for source in ("nhtsa_library", "nhtsa_file", "nhtsa_report", "generic_class"):
+            for snapshot in (None, {}, {"A_n_per_m": 179048.0, "id": "legacy"}):
+                with self.subTest(source=source, snapshot=snapshot):
+                    project = replace(_compass(), ab_source_type=source, ab_source_snapshot=snapshot)
+                    original = deepcopy(project.to_dict())
+                    self.assertEqual(regularize_ab_source(project), "incomplete")
+                    self.assertEqual(project.to_dict(), original)
+                    report = generate_report(project)
+                    self.assertIn(tr("ab.source.declared_unverified"), report)
+                    self.assertNotIn(tr("ab.history.title"), report)
+
+    def test_ab_history_is_flat_and_deduplicated(self) -> None:
+        project = Project(crash3_A=5.0, crash3_B=10.0)
+        for source in ("nhtsa_library", "nhtsa_file", "nhtsa_library"):
+            project.ab_source_type = source
+            project.ab_source_label = source
+            replace_ab_snapshot(project, {"A_n_per_m": 4.0, "B_n_per_m2": 10.0})
+            self.assertEqual(regularize_ab_source(project), "mismatch")
+        history = historical_ab_sources(project.ab_source_snapshot)
+        self.assertEqual([record["source_type"] for record in history], ["nhtsa_library", "nhtsa_file"])
+        self.assertTrue(all(HISTORICAL_AB_KEY not in record["snapshot"] for record in history))
+        self.assertIsNone(regularize_ab_source(project))
+        self.assertEqual(historical_ab_sources(project.ab_source_snapshot), history)
+
+    def test_txt_distinguishes_effective_and_original_ab_source_for_all_types(self) -> None:
+        source_types = ("nhtsa_library", "nhtsa_file", "nhtsa_report", "generic_class")
+        for source in source_types:
+            compass = replace(_compass(), ab_source_type=source, ab_source_ref="original-id",
+                              ab_source_label="Original label", ab_source_reference="Original document")
+            original_snapshot = {
+                "A_n_per_m": math.nextafter(compass.crash3_A, math.inf),
+                "B_n_per_m2": compass.crash3_B + 1,
+                "report_number": "Historical test",
+                "extension": {"original": ["a", 3]},
+            }
+            compass.ab_source_snapshot = deepcopy(original_snapshot)
+            measurements = {key: compass.to_dict()[key] for key in (
+                "crash3_A", "crash3_B", "total_energy_j", "damage_speed_mps", "damage_speed_kmh",
+            )}
+            self.assertEqual(regularize_ab_source(compass), "mismatch")
+            updated = compass.to_dict()
+            self.assertEqual({key: updated[key] for key in measurements}, measurements)
+            self.assertEqual(historical_ab_sources(compass.ab_source_snapshot), [{
+                "source_type": source, "source_ref": "original-id", "source_label": "Original label",
+                "source_reference": "Original document", "reason": "mismatch", "snapshot": original_snapshot,
+            }])
+            for language in ("pt", "en"):
+                set_language(language)
+                with self.subTest(source=source, language=language):
+                    report = generate_report(compass)
+                    effective, history = report.split(tr("ab.history.title"), 1)
+                    self.assertEqual(_fields(effective)[tr("report.method")], tr("report.method.manual"))
+                    self.assertIn(tr("ab.history.effective_manual"), effective)
+                    self.assertNotIn("Original document", effective)
+                    self.assertIn("Original document", history)
+                    self.assertEqual(_fields(history)[tr("ab.history.method")], tr(f"report.method.{source}"))
+                    self.assertEqual(float(_fields(history)[tr("ab.history.recorded_b")]), original_snapshot["B_n_per_m2"])
+                    self.assertEqual(float(_fields(effective)["A (N/m)"]), compass.crash3_A)
+                    self.assertEqual(float(_fields(effective)["B (N/m²)"]), compass.crash3_B)
+                    self.assertEqual(compass.to_dict(), updated)
 
     def test_txt_reproduces_energy_and_ees_from_full_precision_inputs(self) -> None:
         compass = _compass()

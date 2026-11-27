@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from json import dumps
 from math import hypot
 
+from app.core.ab_provenance import LOCKED_AB_SOURCES, ab_source_status, historical_ab_sources
 from app.core.number_format import parse_float
 from app.core.project import Project
 from app.i18n import tr
@@ -118,18 +120,18 @@ def _test_metadata(snapshot: dict) -> list[str]:
     return lines
 
 
-def _coefficient_source(project: Project) -> list[str]:
-    raw_snapshot = project.ab_source_snapshot
+def _source_lines(
+    source: str | None, raw_snapshot: object, label: object, ref: object, document: object,
+    *, method_key: str = "report.method",
+) -> list[str]:
     snapshot = raw_snapshot if isinstance(raw_snapshot, dict) else {}
-    source = project.ab_source_type
-    test_sources = ("nhtsa_report", "nhtsa_library", "nhtsa_file")
     # Older projects may have stored test metadata without an explicit source type.
     has_test_source = source not in ("manual", "generic_class")
-    method = tr(f"report.method.{source}") if source in (*test_sources, "generic_class", "manual") else "-"
-    lines = [f"{tr('report.method')}: {method}"]
-    label = _text(project.ab_source_label)
-    ref = _text(project.ab_source_ref)
-    document = _text(project.ab_source_reference) or _text(snapshot.get("source_reference"))
+    method = tr(f"report.method.{source}") if source in (*LOCKED_AB_SOURCES, "manual") else "-"
+    lines = [f"{tr(method_key)}: {method}"]
+    label = _text(label)
+    ref = _text(ref)
+    document = _text(document) or _text(snapshot.get("source_reference"))
     shown = set()
     if source == "generic_class":
         class_name = _text(snapshot.get("class_name")) or label or ref
@@ -154,6 +156,47 @@ def _coefficient_source(project: Project) -> list[str]:
 
     if has_test_source and (metadata := _test_metadata(snapshot)):
         lines.extend(["", tr("report.test_description"), *metadata])
+    return lines
+
+
+def historical_ab_lines(project: Project, *, include_full_record: bool = False) -> list[str]:
+    history = historical_ab_sources(project.ab_source_snapshot)
+    if not history:
+        return []
+    lines = [tr("ab.history.title")]
+    for record in history:
+        snapshot = record.get("snapshot")
+        reason = record["reason"]
+        lines.extend([
+            "",
+            tr(f"ab.history.{reason}"),
+            *_source_lines(
+                record["source_type"], snapshot, record.get("source_label"),
+                record.get("source_ref"), record.get("source_reference"),
+                method_key="ab.history.method",
+            ),
+        ])
+        if isinstance(snapshot, dict):
+            for key, label in (("A_n_per_m", "ab.history.recorded_a"), ("B_n_per_m2", "ab.history.recorded_b")):
+                value = snapshot.get(key)
+                if isinstance(value, (str, int, float)):
+                    lines.append(f"{tr(label)}: {value!r}")
+        if include_full_record:
+            lines.extend(["", tr("ab.history.full_record"), dumps(record, ensure_ascii=False, indent=2)])
+    return lines
+
+
+def _coefficient_source(project: Project) -> list[str]:
+    lines = _source_lines(
+        project.ab_source_type, project.ab_source_snapshot, project.ab_source_label,
+        project.ab_source_ref, project.ab_source_reference,
+    )
+    if ab_source_status(project) in ("incomplete", "unverifiable", "mismatch"):
+        lines.insert(1, tr("ab.source.declared_unverified"))
+    if history := historical_ab_lines(project):
+        if project.ab_source_type == "manual":
+            lines.append(tr("ab.history.effective_manual"))
+        lines.extend(["", *history])
     return lines
 
 

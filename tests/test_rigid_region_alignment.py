@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QApplication, QBoxLayout, QDialog, QFileDialog, QGraphicsView, QInputDialog, QMessageBox,
 )
 
+from app.core.ab_provenance import historical_ab_sources
 from app.core.crash3 import compute_energy, compute_ees
 from app.core.number_format import format_display_number
 from app.core.project import InvalidProjectDataError, Project
@@ -573,7 +574,8 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         project.ab_source_reference = None
         panel._refresh_ab_source_ui()
         self.assertTrue(panel.lbl_ab_details.isHidden())
-        self.assertEqual(panel.lbl_ab_source.text(), "A/B source: A/B file")
+        self.assertIn("A/B source: A/B file", panel.lbl_ab_source.text())
+        self.assertIn(tr("ab.source.declared_unverified"), panel.lbl_ab_source.text())
 
     def test_contextual_calculation_actions_reuse_energy_and_stored_result(self) -> None:
         window = self._window()
@@ -1020,10 +1022,11 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         def open_project(path):
             with (
                 patch.object(QFileDialog, "getOpenFileName", return_value=(str(path), "")),
-                patch.object(QMessageBox, "information"),
+                patch.object(QMessageBox, "information") as notification,
             ):
                 window.io.load_project()
             window.workflow_step_labels["calculation"].click()
+            return notification.call_args.args[2]
 
         def save_project(path):
             with (
@@ -1097,17 +1100,98 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             self.assertEqual(window.project.ab_source_snapshot["A_n_per_m"], 200000.0149)
             self.assertEqual(window.project.total_energy_j, expected)
 
-            legacy_data = json.loads(library.read_text(encoding="utf-8"))
-            legacy_data["crash3_A"] = 200000.0149
-            legacy_data["total_energy_j"] = expected
+            library_data = json.loads(library.read_text(encoding="utf-8"))
+            legacy_data = json.loads(source.read_text(encoding="utf-8"))
+            legacy_data.update({
+                key: library_data[key] for key in (
+                    "ref_path", "dam_path", "ab_source_type", "ab_source_ref",
+                    "ab_source_label", "ab_source_reference", "ab_source_snapshot",
+                )
+            })
+            legacy_snapshot = library_snapshot | {
+                "historical_sources": {"old_field": [True, 7]},
+                "unknown_evidence": {"report_fragment": "legacy detail"},
+            }
+            legacy_data["ab_source_snapshot"] = legacy_snapshot
             legacy.write_text(json.dumps(legacy_data), encoding="utf-8")
-            open_project(legacy)
-            self.assertEqual(window.project.crash3_A, 200000.0149)
-            self.assertEqual(window.project.total_energy_j, expected)
+            notice = open_project(legacy)
+            self.assertIn(tr("ab.history.load.mismatch"), notice)
+            self.assertEqual(json.loads(legacy.read_text(encoding="utf-8")), legacy_data)
             self.assertEqual(window.project.ab_source_type, "manual")
-            self.assertIsNone(window.project.ab_source_snapshot)
             self.assertIsNone(window.project.ab_source_reference)
             self.assertFalse(panel.txt_A.isReadOnly())
+            self.assertIn(tr("calc.ab_source_manual"), panel.lbl_ab_source.text())
+            self.assertIn(tr("ab.history.title"), panel.lbl_ab_details.text())
+            self.assertIn(tr("ab.history.full_record"), panel.lbl_ab_details.text())
+            self.assertIn('"report_fragment": "legacy detail"', panel.lbl_ab_details.text())
+            history = historical_ab_sources(window.project.ab_source_snapshot)
+            self.assertEqual(len(history), 1)
+            self.assertEqual(history[0]["snapshot"], legacy_snapshot)
+            self.assertEqual(history[0]["source_ref"], library_data["ab_source_ref"])
+            self.assertEqual(history[0]["source_reference"], "M20240300")
+            result_keys = ("crash3_A", "crash3_B", "total_energy_j", "damage_speed_mps", "damage_speed_kmh")
+            values = {key: legacy_data[key] for key in result_keys}
+            self.assertEqual({key: getattr(window.project, key) for key in result_keys}, values)
+
+            for _ in range(3):
+                save_project(legacy)
+                self.assertNotIn(tr("ab.history.load.mismatch"), open_project(legacy))
+                self.assertEqual(historical_ab_sources(window.project.ab_source_snapshot), history)
+                self.assertEqual({key: getattr(window.project, key) for key in result_keys}, values)
+
+            panel.txt_A.clear()
+            self.assertEqual(historical_ab_sources(window.project.ab_source_snapshot), history)
+            QTest.keyClicks(panel.txt_A, "200000,0149")
+            self.assertEqual(window.project.crash3_A, 200000.0149)
+            panel.btn_compute.click()
+            save_project(legacy)
+            open_project(legacy)
+            self.assertEqual(window.project.ab_source_snapshot["A_n_per_m"], 200000.0149)
+            self.assertEqual(historical_ab_sources(window.project.ab_source_snapshot), history)
+
+    def test_incomplete_ab_record_is_editable_and_archived_only_on_manual_edit(self) -> None:
+        window = self._window()
+        panel = window.calc_panel
+        example = COMPASS / "crash3vision_reference_project.json"
+        project_data = json.loads(example.read_text(encoding="utf-8"))
+        for key in ("ref_path", "dam_path"):
+            project_data[key] = str(COMPASS / project_data[key])
+        snapshot = {"A_n_per_m": project_data["crash3_A"], "unknown": {"report_fragment": 2}}
+        project_data.update(
+            ab_source_type="nhtsa_file", ab_source_ref="old-import",
+            ab_source_reference="legacy report", ab_source_snapshot=snapshot,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "project.json"
+            path.write_text(json.dumps(project_data), encoding="utf-8")
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(path), "")),
+                patch.object(QMessageBox, "information") as notification,
+            ):
+                window.io.load_project()
+                self.assertIn(tr("ab.history.load.incomplete"), notification.call_args.args[2])
+            window.workflow_step_labels["calculation"].click()
+            self.assertEqual(window.project.ab_source_snapshot, snapshot)
+            self.assertEqual(window.project.ab_source_type, "nhtsa_file")
+            self.assertIn(tr("ab.source.declared_unverified"), panel.lbl_ab_source.text())
+            self.assertFalse(panel.txt_A.isReadOnly())
+            self.assertFalse(panel.txt_B.isReadOnly())
+            for key in ("crash3_A", "crash3_B", "total_energy_j", "damage_speed_mps", "damage_speed_kmh"):
+                self.assertEqual(getattr(window.project, key), project_data[key])
+            with (
+                patch.object(QFileDialog, "getSaveFileName", return_value=(str(path), "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                window.io.save_project()
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["ab_source_type"], "nhtsa_file")
+            self.assertEqual(saved["ab_source_snapshot"], snapshot)
+
+            panel.txt_A.setText("180000")
+            self.assertEqual(window.project.crash3_A, 180000)
+            self.assertEqual(window.project.ab_source_type, "manual")
+            self.assertEqual(historical_ab_sources(window.project.ab_source_snapshot)[0]["snapshot"], snapshot)
+            self.assertIn('"report_fragment": 2', panel.lbl_ab_details.text())
 
     def test_measurement_panel_tracks_steps_and_collapses_guide_safely(self) -> None:
         window = self._window()

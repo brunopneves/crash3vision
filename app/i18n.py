@@ -747,6 +747,53 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Application version",
         "pt": "Versão do aplicativo",
     },
+    "ab.history.title": {
+        "en": "Historical A/B reference",
+        "pt": "Referência histórica de A/B",
+    },
+    "ab.history.method": {"en": "Original source type", "pt": "Tipo da origem original"},
+    "ab.history.mismatch": {
+        "en": "The original source record differed from the A/B values saved in the project at the time of review.",
+        "pt": "A ficha original divergia dos valores A/B gravados no projeto no momento da verificação.",
+    },
+    "ab.history.unverifiable": {
+        "en": "The original source record contained A/B values that could not be interpreted unambiguously.",
+        "pt": "A ficha original continha valores A/B cuja interpretação era inválida ou ambígua.",
+    },
+    "ab.history.incomplete": {
+        "en": "The original record lacked the data needed to verify both coefficients before A/B was edited.",
+        "pt": "A ficha original não continha os dados necessários para verificar ambos os coeficientes antes da edição de A/B.",
+    },
+    "ab.source.declared_unverified": {
+        "en": "Declared source, unverified",
+        "pt": "Procedência declarada, não verificada",
+    },
+    "ab.history.full_record": {
+        "en": "Full preserved record (JSON)",
+        "pt": "Ficha integral preservada (JSON)",
+    },
+    "ab.history.effective_manual": {
+        "en": "The coefficients used in the calculation are treated as manual entries. The original record is retained for reference only.",
+        "pt": "Os coeficientes usados no cálculo são tratados como manuais. A ficha original é preservada apenas como referência.",
+    },
+    "ab.history.details_hint": {
+        "en": "Historical A/B reference available in Technical details.",
+        "pt": "Referência histórica de A/B disponível em Detalhes técnicos.",
+    },
+    "ab.history.recorded_a": {"en": "A in original record (N/m)", "pt": "A na ficha original (N/m)"},
+    "ab.history.recorded_b": {"en": "B in original record (N/m²)", "pt": "B na ficha original (N/m²)"},
+    "ab.history.load.mismatch": {
+        "en": "The saved A/B coefficients differ from the original source record. The coefficients were preserved and are now treated as manual entries. The original record remains available as a historical reference in Technical details.",
+        "pt": "Os coeficientes A/B gravados divergem da ficha de origem. Os valores foram preservados e passaram a ser tratados como entrada manual. A ficha original continua disponível como referência histórica em Detalhes técnicos.",
+    },
+    "ab.history.load.unverifiable": {
+        "en": "The source record contains invalid or ambiguous A/B values. The coefficients and declared source were preserved. The source is marked as unverified.",
+        "pt": "A ficha de origem contém valores A/B inválidos ou ambíguos. Os coeficientes e a procedência declarada foram preservados. A procedência está indicada como não verificada.",
+    },
+    "ab.history.load.incomplete": {
+        "en": "The available data are insufficient to verify both A/B coefficients. The coefficients and declared source were preserved. The source is marked as unverified.",
+        "pt": "Os dados disponíveis são insuficientes para verificar os dois coeficientes A/B. Os coeficientes e a procedência declarada foram preservados. A procedência está indicada como não verificada.",
+    },
     "report.number_notation": {
         "en": "Numbers use a decimal point with no thousands separators. A dash (-) marks unavailable data.",
         "pt": "Os números usam ponto decimal sem separadores de milhares. Um traço (-) indica dado indisponível.",
