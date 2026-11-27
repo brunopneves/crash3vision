@@ -61,6 +61,106 @@ COMPASS = ROOT / "examples/nhtsa_jeep_compass_2024_m20240300"
 
 
 class RigidRegionAlignmentTests(unittest.TestCase):
+    def test_welcome_screen_reuses_project_actions_and_tracks_canvas_images(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        window.show()
+        welcome = window.welcome_panel
+        self.assertTrue(welcome.isVisible())
+        self.assertTrue(window.btn_load_dam.isVisible())
+        self.assertTrue(window.btn_load_ref.isVisible())
+        self.assertFalse(welcome.illustration.isHidden())
+
+        def horizontal_bounds(widget):
+            left = widget.mapTo(window, QPoint()).x()
+            return left, left + widget.width()
+
+        for language in ("pt", "en"):
+            window._set_language_and_refresh(language)
+            for width, height in ((1280, 900), (1907, 1020), (640, 460)):
+                window.resize(width, height)
+                QApplication.processEvents()
+                QApplication.processEvents()
+                self.assertEqual(welcome.title.accessibleName(), tr("welcome.title"))
+                self.assertEqual(welcome.subtitle.text(), tr("welcome.subtitle"))
+                compact = width == 640
+                instruction_key = "welcome.instruction_compact" if compact else "welcome.instruction"
+                self.assertEqual(welcome.instruction.text(), tr(instruction_key))
+                reference_key = "welcome.reference_note_compact" if compact else "welcome.reference_note"
+                self.assertEqual(welcome.reference_note.text(), tr(reference_key))
+                self.assertIs(welcome.instruction.parentWidget(), welcome.info)
+                self.assertTrue(welcome.arc.isVisible())
+                self.assertFalse(welcome.info_icon.pixmap().isNull())
+                for key, (_, heading, description) in welcome.steps.items():
+                    self.assertEqual(heading.text(), tr(f"welcome.step.{key}.title"))
+                    self.assertEqual(description.text(), tr(f"welcome.step.{key}.description"))
+                    self.assertTrue(heading.isVisible())
+                    self.assertEqual(description.isVisible(), not compact)
+                self.assertEqual(welcome.load_image.text(), tr("welcome.load_image"))
+                self.assertEqual(welcome.open_project.text(), "Abrir projeto" if language == "pt" else "Open project")
+                self.assertFalse(welcome.load_image.icon().isNull())
+                self.assertFalse(welcome.open_project.icon().isNull())
+                self.assertEqual(welcome.horizontalScrollBar().maximum(), 0)
+                self.assertLessEqual(welcome.card.geometry().right(), welcome.viewport().width())
+                self.assertTrue(window.btn_load_dam.isVisible())
+                canvas_viewport = window.canvas.viewport()
+                canvas_center = sum(horizontal_bounds(canvas_viewport)) / 2
+                for item in (welcome.title, welcome.subtitle, welcome.illustration, welcome.info):
+                    self.assertAlmostEqual(sum(horizontal_bounds(item)) / 2, canvas_center, delta=1)
+                buttons = (horizontal_bounds(welcome.load_image), horizontal_bounds(welcome.open_project))
+                buttons_center = (min(pair[0] for pair in buttons) + max(pair[1] for pair in buttons)) / 2
+                self.assertAlmostEqual(buttons_center, canvas_center, delta=2)
+                if not compact:
+                    group_width = welcome.illustration.width()
+                    self.assertAlmostEqual(group_width, min(1150, canvas_viewport.width() * 0.75), delta=1)
+                    self.assertAlmostEqual(welcome.info.width() / group_width, 0.83, delta=0.002)
+                    self.assertEqual(welcome.actions.direction(), QBoxLayout.Direction.LeftToRight)
+                    self.assertGreater(welcome.load_image.width(), welcome.open_project.width())
+                    panels = [welcome.illustration.panel_rect(i) for i in range(4)]
+                    gaps = [following.left() - previous.right() - 1 for previous, following in zip(panels, panels[1:])]
+                    self.assertTrue(all(22 <= gap <= 30 for gap in gaps))
+                    origin = horizontal_bounds(welcome.illustration)[0]
+                    for panel, (caption, _, _) in zip(panels, welcome.steps.values()):
+                        self.assertEqual(panel.width(), panels[0].width())
+                        start, end = horizontal_bounds(caption)
+                        self.assertAlmostEqual((start + end) / 2, origin + panel.center().x(), delta=1)
+                        self.assertAlmostEqual(end - start, panel.width(), delta=2)
+
+        initial_project = window.project
+        with patch.object(QFileDialog, "getOpenFileName", return_value=("", "")) as dialog:
+            welcome.open_project.click()
+        dialog.assert_called_once()
+        self.assertIs(window.project, initial_project)
+        self.assertTrue(welcome.isVisible())
+
+        with patch.object(window.io, "pick_image_file", return_value=None):
+            welcome.load_image.click()
+        self.assertTrue(welcome.isVisible())
+        damaged = COMPASS / "deformed_vehicle_frame_300.png"
+        with patch.object(window.io, "pick_image_file", return_value=str(damaged)):
+            welcome.load_image.click()
+        self.assertEqual(window.project.dam_path, str(damaged))
+        self.assertFalse(welcome.isVisible())
+        self.assertTrue(window.canvas.isVisible())
+        self.assertEqual(window.stage, window.Stage.LOAD)
+
+        window.canvas.clear_images()
+        self.assertTrue(welcome.isVisible())
+        window.canvas.load_reference(str(COMPASS / "reference_vehicle_frame_000.png"))
+        self.assertFalse(welcome.isVisible())
+        window.canvas.clear_images()
+        self.assertTrue(welcome.isVisible())
+
+        with (
+            patch.object(QFileDialog, "getOpenFileName",
+                         return_value=(str(COMPASS / "crash3vision_reference_project.json"), "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            welcome.open_project.click()
+        self.assertFalse(welcome.isVisible())
+        self.assertTrue(window.canvas.has_both_images())
+        self.assertEqual(window._current_workflow_step(), "result")
+
     def test_failed_image_replacement_and_project_open_preserve_current_data(self) -> None:
         window = self._window()
         source = COMPASS / "crash3vision_reference_project.json"
