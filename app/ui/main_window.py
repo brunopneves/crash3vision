@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QScrollArea,
     QComboBox,
-    QDoubleSpinBox,
     QRadioButton,
     QButtonGroup,
     QBoxLayout,
@@ -60,8 +59,9 @@ from app.ui.styles import (
 )
 from app.ui.widgets.calc_panel import CalcPanel
 from app.ui.widgets.help_dialog import HelpDialog
+from app.ui.widgets.numeric_spin_box import NumericDoubleSpinBox
 from app.report import generate_report
-from app.core.number_format import format_display_number
+from app.core.number_format import format_display_number, relocalize_decimal_input
 from app.i18n import tr, set_language, get_language
 
 
@@ -677,7 +677,7 @@ class MainWindow(QMainWindow):
         self.lbl_step_deg = QLabel(tr("label.step_deg"))
         self.lbl_step_deg.setWordWrap(True)
         advanced_layout.addWidget(self.lbl_step_deg, 1, 0)
-        self.spn_rotate_step = QDoubleSpinBox()
+        self.spn_rotate_step = NumericDoubleSpinBox()
         self.spn_rotate_step.setDecimals(2)
         self.spn_rotate_step.setRange(0.01, 360.0)
         self.spn_rotate_step.setSingleStep(0.1)
@@ -718,7 +718,7 @@ class MainWindow(QMainWindow):
         self.lbl_step_pct = QLabel(tr("label.step_pct"))
         self.lbl_step_pct.setWordWrap(True)
         advanced_layout.addWidget(self.lbl_step_pct, 2, 0)
-        self.spn_scale_step = QDoubleSpinBox()
+        self.spn_scale_step = NumericDoubleSpinBox()
         self.spn_scale_step.setDecimals(2)
         self.spn_scale_step.setRange(0.01, 50.0)
         self.spn_scale_step.setSingleStep(0.1)
@@ -810,7 +810,7 @@ class MainWindow(QMainWindow):
         self.lbl_bumper_offset.setWordWrap(True)
         references_layout.addWidget(self.lbl_bumper_offset)
 
-        self.spn_bumper_offset = QDoubleSpinBox()
+        self.spn_bumper_offset = NumericDoubleSpinBox()
         self.spn_bumper_offset.setDecimals(3)
         self.spn_bumper_offset.setRange(0.0, 2.0)
         self.spn_bumper_offset.setSingleStep(0.01)
@@ -961,7 +961,7 @@ class MainWindow(QMainWindow):
         self.btn_finish_alignment.clicked.connect(self._on_finish_alignment)
 
         self.chk_calibration_mode.toggled.connect(self._on_calibration_mode_toggled)
-        self.txt_real_m.textChanged.connect(self._refresh_calibration_panel)
+        self.txt_real_m.textChanged.connect(self._on_calibration_distance_changed)
         self.btn_confirm_calibration.clicked.connect(self._on_confirm_calibration)
 
         self.chk_set_w_mode.toggled.connect(self._on_set_w_mode_toggled)
@@ -996,6 +996,8 @@ class MainWindow(QMainWindow):
         set_language(lang)
         self.calc_panel.retranslate_numeric_fields(previous_language)
         self._retranslate_calibration_distance(previous_language)
+        for spin in (self.spn_rotate_step, self.spn_scale_step, self.spn_bumper_offset):
+            spin.refresh_numeric_locale()
         self._retranslate_ui()
         self._refresh_summary()
 
@@ -2018,19 +2020,27 @@ class MainWindow(QMainWindow):
             self._refresh_navigation_footer()
 
     def _on_rotate_minus(self) -> None:
+        if self.spn_rotate_step.take_invalid_input():
+            return
         step_deg = float(self.spn_rotate_step.value())
         self.canvas.rotate_selected(-step_deg)
 
     def _on_rotate_plus(self) -> None:
+        if self.spn_rotate_step.take_invalid_input():
+            return
         step_deg = float(self.spn_rotate_step.value())
         self.canvas.rotate_selected(step_deg)
 
     def _on_scale_minus(self) -> None:
+        if self.spn_scale_step.take_invalid_input():
+            return
         step_pct = float(self.spn_scale_step.value())
         factor = max(0.001, 1.0 - (step_pct / 100.0))
         self.canvas.scale_selected(factor)
 
     def _on_scale_plus(self) -> None:
+        if self.spn_scale_step.take_invalid_input():
+            return
         step_pct = float(self.spn_scale_step.value())
         factor = 1.0 + (step_pct / 100.0)
         self.canvas.scale_selected(factor)
@@ -2123,6 +2133,7 @@ class MainWindow(QMainWindow):
         self.lbl_real_distance_m.setWordWrap(True)
         distance_card.layout().addWidget(self.lbl_real_distance_m)
         self.txt_real_m = QLineEdit()
+        self._calibration_distance_language = get_language()
         self.txt_real_m.setObjectName("calibrationDistanceInput")
         self.lbl_real_distance_m.setBuddy(self.txt_real_m)
         distance_card.layout().addWidget(self.txt_real_m)
@@ -2146,15 +2157,27 @@ class MainWindow(QMainWindow):
         self.lbl_real_distance_m.setText(tr("label.real_distance_m"))
         self.txt_real_m.setAccessibleName(self.lbl_real_distance_m.text())
         self.txt_real_m.setPlaceholderText(tr("calibration.distance_example"))
+        self.txt_real_m.setToolTip(tr("number.input_hint"))
         self.lbl_calibration_scale_hint.setText(tr("calibration.preview_hint"))
 
     def _retranslate_calibration_distance(self, previous_language: str) -> None:
-        if self._calibration_px is None or self._m_per_px is None:
-            return
-        real_m = self._calibration_px * self._m_per_px
-        if self.txt_real_m.text() == format_display_number(real_m, None, language=previous_language):
+        text = self.txt_real_m.text()
+        translated = relocalize_decimal_input(text, self._calibration_distance_language)
+        if (
+            self._calibration_distance_language == previous_language
+            and self._calibration_px is not None and self._m_per_px is not None
+        ):
+            real_m = self._calibration_px * self._m_per_px
+            if text == format_display_number(real_m, None, language=previous_language):
+                translated = format_display_number(real_m, None)
+        if translated != text:
+            self._calibration_distance_language = get_language()
             with QSignalBlocker(self.txt_real_m):
-                self.txt_real_m.setText(format_display_number(real_m, None))
+                self.txt_real_m.setText(translated)
+
+    def _on_calibration_distance_changed(self) -> None:
+        self._calibration_distance_language = get_language()
+        self._refresh_calibration_panel()
 
     def _on_calibration_mode_toggled(self, checked: bool) -> None:
         if checked:

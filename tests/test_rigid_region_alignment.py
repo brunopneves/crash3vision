@@ -52,6 +52,7 @@ from app.core.rigid_region_alignment import (
     suggest_rigid_region_anchors,
 )
 from app.ui.main_window import MainWindow
+from app.ui.widgets.nhtsa_ab_dialog import NhtsaAbDialog
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -424,6 +425,136 @@ class RigidRegionAlignmentTests(unittest.TestCase):
         panel.btn_compute.click()
         self.assertGreater(window._damage_speed_kmh, 0)
         self.assertEqual(window._current_workflow_step(), "result")
+
+    def test_numeric_fields_block_malformed_input_and_accept_both_decimal_styles(self) -> None:
+        window = self._window()
+        window.btn_finish_alignment.click()
+        window.show()
+        QApplication.processEvents()
+        self._mark_calibration_points(window)
+        for language, valid_distance, alternate in (
+            ("en", "1.234", "1,234"), ("pt", "1,234", "1.234"),
+        ):
+            window._set_language_and_refresh(language)
+            for invalid in ("1,8,00.00", "1.8.00,00", alternate):
+                window.txt_real_m.setText(invalid)
+                self.assertFalse(window.btn_confirm_calibration.isEnabled())
+                self.assertEqual(
+                    window.lbl_navigation_hint.text(), tr("measurement.error.invalid_real_distance"),
+                )
+            window.txt_real_m.setText(valid_distance)
+            self.assertTrue(window.btn_confirm_calibration.isEnabled())
+            self.assertAlmostEqual(window.meas.calibration_candidate()[0], 1.234 / window._calibration_px)
+
+        scale = window.meas.calibration_candidate()[0]
+        window._set_language_and_refresh("en")
+        self.assertEqual(window.txt_real_m.text(), "1.234")
+        self.assertEqual(window.meas.calibration_candidate()[0], scale)
+        window.txt_real_m.setText("1,234")
+        self.assertIsNone(window.meas.calibration_candidate()[0])
+        window._set_language_and_refresh("pt")
+        self.assertEqual(window.txt_real_m.text(), "1,234")
+        self.assertIsNone(window.meas.calibration_candidate()[0])
+
+        window.workflow.set_stage(window.Stage.DONE)
+        panel = window.calc_panel
+        for language, native, alternate in (
+            ("en", "1.234", "1,234"), ("pt", "1,234", "1.234"),
+        ):
+            window._set_language_and_refresh(language)
+            panel.txt_A.setText("0,0149")
+            panel.txt_B.setText("0.0149")
+            panel.txt_alpha_deg.setText("0")
+            self.assertEqual(panel._parse_ab_alpha(), (0.0149, 0.0149, 0))
+            panel.txt_vehicle_mass.setText("1,800.00")
+            self.assertEqual(panel._parse_mass(), 1800.0)
+            for field, valid in (
+                (panel.txt_A, "0,0149"), (panel.txt_B, "0.0149"),
+                (panel.txt_alpha_deg, "0"), (panel.txt_vehicle_mass, "1800"),
+            ):
+                field.setText(native)
+                value = panel._parse_mass() if field is panel.txt_vehicle_mass else (
+                    panel._parse_ab_alpha()[(panel.txt_A, panel.txt_B, panel.txt_alpha_deg).index(field)]
+                )
+                self.assertEqual(value, 1.234)
+                for invalid in (alternate, "1,8,00.00"):
+                    field.setText(invalid)
+                    with (
+                        patch.object(QMessageBox, "warning") as warning,
+                        patch.object(window.calc, "compute_crash3") as energy,
+                        patch.object(window.calc, "compute_damage_speed") as ees,
+                    ):
+                        panel.btn_compute.click()
+                    warning.assert_called_once()
+                    energy.assert_not_called()
+                    ees.assert_not_called()
+                field.setText(valid)
+
+        panel.txt_vehicle_mass.setText("1,234")
+        panel.txt_alpha_deg.setText("1,234")
+        window._set_language_and_refresh("en")
+        self.assertEqual(panel.txt_vehicle_mass.text(), "1.234")
+        self.assertEqual(panel.txt_alpha_deg.text(), "1.234")
+        self.assertEqual(panel._parse_mass(), 1.234)
+        self.assertEqual(panel._parse_ab_alpha()[2], 1.234)
+
+        window.workflow.set_stage(window.Stage.MARKING)
+        window.btn_toggle_marking_references.setChecked(True)
+        offset = window.spn_bumper_offset
+        offset.setValue(0.5)
+        offset.lineEdit().selectAll()
+        QTest.keyClicks(offset.lineEdit(), "1.234")
+        self.assertEqual(offset.text(), "1.234")
+        window._set_language_and_refresh("pt")
+        self.assertEqual(offset.value(), 0.5)
+        self.assertEqual(offset.text(), "1,234")
+        self.assertFalse(offset.take_invalid_input())
+        self.assertEqual(offset.value(), 1.234)
+
+    def test_nhtsa_spin_box_rejects_malformed_edits_before_calculating(self) -> None:
+        window = self._window()
+        for language, native, alternate in (
+            ("en", "1.234", "1,234"), ("pt", "1,234", "1.234"),
+        ):
+            window._set_language_and_refresh(language)
+            dialog = NhtsaAbDialog()
+            self.addCleanup(dialog.close)
+            spin = dialog.spn_vehicle_mass_kg
+            spin.setValue(1600)
+            for malformed in ("1,8,00.00", "1.8.00,00", "1,234"):
+                spin.lineEdit().selectAll()
+                QTest.keyClicks(spin.lineEdit(), malformed)
+                self.assertFalse(spin.hasAcceptableInput())
+                self.assertEqual(spin.value(), 1600)
+                spin.interpretText()  # As when focus moves to the Calculate button.
+                self.assertEqual(spin.value(), 1600)
+                with (
+                    patch.object(QMessageBox, "warning") as warning,
+                    patch("app.ui.widgets.nhtsa_ab_dialog.compute_ab_from_report") as compute,
+                ):
+                    dialog.btn_compute.click()
+                warning.assert_called_once_with(dialog, tr("msg.warning"), tr("number.error.rejected"))
+                compute.assert_not_called()
+
+            for valid in ("1,800.00", "1.800,00", "1 800"):
+                spin.lineEdit().selectAll()
+                QTest.keyClicks(spin.lineEdit(), valid)
+                self.assertTrue(spin.hasAcceptableInput())
+                spin.interpretText()
+                self.assertEqual(spin.value(), 1800)
+
+            length = dialog.spn_L_m
+            length.lineEdit().selectAll()
+            QTest.keyClicks(length.lineEdit(), native)
+            self.assertTrue(length.hasAcceptableInput())
+            length.interpretText()
+            self.assertEqual(dialog.get_input_data()["L_m"], 1.234)
+            self.assertEqual(length.text(), native)
+            length.lineEdit().selectAll()
+            QTest.keyClicks(length.lineEdit(), alternate)
+            self.assertFalse(length.hasAcceptableInput())
+            length.interpretText()
+            self.assertEqual(length.value(), 1.234)
 
     def test_calculation_and_profile_preserve_full_precision_after_reload(self) -> None:
         window = self._window()

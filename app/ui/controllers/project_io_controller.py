@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 
 from app.core.number_format import format_display_number
 from app.core.project import Project, UnsupportedCrash3UnitsError
-from app.i18n import tr
+from app.i18n import get_language, tr
 
 if TYPE_CHECKING:
     from app.ui.main_window import MainWindow
@@ -279,6 +279,7 @@ class ProjectIOController:
 
             if self.host._m_per_px is not None:
                 real_m = self.host._calibration_px * self.host._m_per_px
+                self.host._calibration_distance_language = get_language()
                 self.host.txt_real_m.setText(format_display_number(real_m, None))
             else:
                 self.host.txt_real_m.setText("")

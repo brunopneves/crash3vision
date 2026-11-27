@@ -957,8 +957,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Perfil de deformação",
     },
     "calc.error.invalid_ab_alpha": {
-        "en": "Enter valid numeric values for A, B and Alpha.",
-        "pt": "Informe valores numéricos válidos para A, B e Alpha.",
+        "en": "Check the numbers in A, B and Alpha. Use an unambiguous format, such as 1234.50.",
+        "pt": "Confira os números em A, B e Alpha. Use um formato inequívoco, como 1234,50.",
     },
     "calc.error.a_positive": {
         "en": "A must be > 0.",
@@ -977,8 +977,16 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Classe selecionada não encontrada na biblioteca de rigidez.",
     },
     "calc.error.invalid_vehicle_mass": {
-        "en": "Enter a finite, positive vehicle mass in kg.",
-        "pt": "Informe uma massa de veículo finita e positiva em kg.",
+        "en": "Enter a valid, positive vehicle mass in kg, such as 1800 or 1800.50.",
+        "pt": "Informe uma massa válida e positiva em kg, como 1800 ou 1800,50.",
+    },
+    "number.error.rejected": {
+        "en": "Number rejected. Check the range, decimal places and separators. The previous value was kept.",
+        "pt": "Número rejeitado. Confira a faixa, as casas decimais e os separadores. O valor anterior foi mantido.",
+    },
+    "number.input_hint": {
+        "en": "1.234 is a decimal in English. For one thousand two hundred thirty-four, use 1234 or 1,234.00.",
+        "pt": "1,234 é um decimal em português. Para mil duzentos e trinta e quatro, use 1234 ou 1.234,00.",
     },
     "calc.error.invalid_energy_result": {
         "en": "A finite, positive energy value is required.",
@@ -1033,8 +1041,8 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "Meça 2 pontos primeiro (distância em px).",
     },
     "measurement.error.invalid_real_distance": {
-        "en": "Enter a valid real distance in m.",
-        "pt": "Informe uma distância real válida em m.",
+        "en": "Enter a valid distance in m, such as 1.234. For thousands, omit grouping or include a decimal part.",
+        "pt": "Informe uma distância válida em m, como 1,234. Para milhares, omita o agrupamento ou inclua a parte decimal.",
     },
     "measurement.error.real_distance_positive": {
         "en": "Real distance must be > 0.",

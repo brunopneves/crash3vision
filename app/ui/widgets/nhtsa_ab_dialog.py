@@ -12,8 +12,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QComboBox,
-    QDoubleSpinBox,
-    QSpinBox,
     QGroupBox,
     QMessageBox,
     QScrollArea,
@@ -21,11 +19,11 @@ from PySide6.QtWidgets import (
     QRadioButton,
 )
 
-from PySide6.QtCore import QLocale
-from app.i18n import tr, get_language
+from app.i18n import tr
 from app.core.number_format import format_display_number, format_float, parse_float
 from app.core.nhtsa_ab_calc import compute_ab_from_report
 from app.core.nhtsa_ab_library import build_record, upsert_record, DEFAULT_LIBRARY_PATH
+from app.ui.widgets.numeric_spin_box import NumericDoubleSpinBox, NumericSpinBox
 
 CONFIG_TO_META = {
     "rigid_frontal_barrier": {
@@ -106,7 +104,7 @@ class NhtsaAbDialog(QDialog):
         self.txt_make = QLineEdit()
         self.txt_model = QLineEdit()
 
-        self.spn_year = QSpinBox()
+        self.spn_year = NumericSpinBox()
         self.spn_year.setRange(1900, 2100)
         self.spn_year.setSpecialValueText("-")
         self.spn_year.setValue(self.spn_year.minimum())
@@ -190,36 +188,36 @@ class NhtsaAbDialog(QDialog):
         grp_input = QGroupBox(tr("nhtsa.group.inputs"))
         input_form = QFormLayout(grp_input)
 
-        self.spn_impact_speed_mps = QDoubleSpinBox()
+        self.spn_impact_speed_mps = NumericDoubleSpinBox()
         self.spn_impact_speed_mps.setRange(0.0, 250.0)
         self.spn_impact_speed_mps.setDecimals(3)
         self.spn_impact_speed_mps.setSingleStep(0.5)
         self.spn_impact_speed_mps.setValue(56.0)
 
-        self.spn_velocity_change_mps = QDoubleSpinBox()
+        self.spn_velocity_change_mps = NumericDoubleSpinBox()
         self.spn_velocity_change_mps.setRange(0.0, 250.0)
         self.spn_velocity_change_mps.setDecimals(3)
         self.spn_velocity_change_mps.setSingleStep(0.5)
         self.spn_velocity_change_mps.setValue(56.0)
 
-        self.spn_impact_angle_deg = QDoubleSpinBox()
+        self.spn_impact_angle_deg = NumericDoubleSpinBox()
         self.spn_impact_angle_deg.setRange(0.0, 360.0)
         self.spn_impact_angle_deg.setDecimals(0)
         self.spn_impact_angle_deg.setSingleStep(5)
         self.spn_impact_angle_deg.setValue(0)
 
-        self.spn_vehicle_mass_kg = QDoubleSpinBox()
+        self.spn_vehicle_mass_kg = NumericDoubleSpinBox()
         self.spn_vehicle_mass_kg.setRange(0.0, 5000.0)
         self.spn_vehicle_mass_kg.setDecimals(0)
         self.spn_vehicle_mass_kg.setSingleStep(10)
 
-        self.spn_b0_mps = QDoubleSpinBox()
+        self.spn_b0_mps = NumericDoubleSpinBox()
         self.spn_b0_mps.setRange(0.0, 20.0)
         self.spn_b0_mps.setDecimals(2)
         self.spn_b0_mps.setSingleStep(0.1)
         self.spn_b0_mps.setValue(2.2)
 
-        self.spn_L_m = QDoubleSpinBox()
+        self.spn_L_m = NumericDoubleSpinBox()
         self.spn_L_m.setRange(0.0, 10.0)
         self.spn_L_m.setDecimals(3)
         self.spn_L_m.setSingleStep(0.01)
@@ -267,17 +265,20 @@ class NhtsaAbDialog(QDialog):
         grp_crush = QGroupBox(tr("nhtsa.group.crush"))
         crush_form = QFormLayout(grp_crush)
 
-        self.c_spins: list[QDoubleSpinBox] = []
+        self.c_spins: list[NumericDoubleSpinBox] = []
         for i in range(1, 7):
-            spn = QDoubleSpinBox()
+            spn = NumericDoubleSpinBox()
             spn.setRange(0.0, 2.0)
             spn.setDecimals(3)
             spn.setSingleStep(0.01)
             self.c_spins.append(spn)
             crush_form.addRow(tr("nhtsa.field.c_value", index=i), spn)
 
-        self._apply_numeric_locale()
-
+        self._numeric_inputs = (
+            self.spn_year, self.spn_impact_speed_mps, self.spn_velocity_change_mps,
+            self.spn_impact_angle_deg, self.spn_vehicle_mass_kg, self.spn_b0_mps,
+            self.spn_L_m, *self.c_spins,
+        )
         root.addWidget(grp_crush)
 
         # ---------- Outputs ----------
@@ -348,23 +349,6 @@ class NhtsaAbDialog(QDialog):
         ):
             spin.valueChanged.connect(self._clear_result)
         self.rb_speed_damage.toggled.connect(self._clear_result)
-
-    def _apply_numeric_locale(self) -> None:
-        locale = QLocale(QLocale.Language.Portuguese, QLocale.Country.Brazil)
-
-        if get_language() == "en":
-            locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
-
-        for spn in (
-            self.spn_impact_speed_mps,
-            self.spn_velocity_change_mps,
-            self.spn_impact_angle_deg,
-            self.spn_vehicle_mass_kg,
-            self.spn_b0_mps,
-            self.spn_L_m,
-            *self.c_spins,
-        ):
-            spn.setLocale(locale)
 
     def _sync_meta_from_config(self) -> None:
         config_key = self.cmb_test_configuration.currentData()
@@ -476,7 +460,16 @@ class NhtsaAbDialog(QDialog):
         for label in (self.lbl_area, self.lbl_cmean, self.lbl_b1, self.lbl_A, self.lbl_B):
             label.setText("-")
 
+    def _reject_invalid_numbers(self) -> bool:
+        if not any([spin.take_invalid_input() for spin in self._numeric_inputs]):
+            return False
+        self._clear_result()
+        QMessageBox.warning(self, tr("msg.warning"), tr("number.error.rejected"))
+        return True
+
     def _on_compute(self) -> None:
+        if self._reject_invalid_numbers():
+            return
         self._clear_result()
         try:
             data = self.get_input_data()
@@ -529,6 +522,8 @@ class NhtsaAbDialog(QDialog):
             QMessageBox.warning(self, tr("msg.error"), str(e))
 
     def _on_apply(self) -> None:
+        if self._reject_invalid_numbers():
+            return
         if self._last_result is None:
             QMessageBox.warning(
                 self, tr("msg.warning"), tr("nhtsa.error.compute_first")
@@ -538,6 +533,8 @@ class NhtsaAbDialog(QDialog):
         self.accept()
 
     def _on_save(self) -> None:
+        if self._reject_invalid_numbers():
+            return
         if self._last_result is None:
             QMessageBox.warning(
                 self, tr("msg.warning"), tr("nhtsa.error.compute_first")

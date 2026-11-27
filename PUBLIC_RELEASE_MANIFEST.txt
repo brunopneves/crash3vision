@@ -61,6 +61,7 @@ app/ui/widgets/help_dialog.py
 app/ui/widgets/image_panel.py
 app/ui/widgets/marking_panel.py
 app/ui/widgets/nhtsa_ab_dialog.py
+app/ui/widgets/numeric_spin_box.py
 app/version.py
 docs/images/crash3vision-overview.png
 docs/methodology.md

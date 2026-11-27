@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QSignalBlocker
 from PySide6.QtWidgets import QMessageBox
 
-from app.core.number_format import format_display_number
+from app.core.number_format import format_display_number, parse_float
 from app.i18n import tr
 
 if TYPE_CHECKING:
@@ -34,7 +34,9 @@ class MeasurementController:
         if not math.isfinite(dist_px) or dist_px <= 0:
             return None, "measurement.error.measure_2_points_first"
         try:
-            real_m = float(self.host.txt_real_m.text().replace(",", "."))
+            real_m = parse_float(
+                self.host.txt_real_m.text(), language=self.host._calibration_distance_language,
+            )
         except ValueError:
             return None, "measurement.error.invalid_real_distance"
         if not math.isfinite(real_m) or real_m <= 0:

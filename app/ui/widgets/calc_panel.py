@@ -34,7 +34,7 @@ from app.core.nhtsa_ab_library import (
     save_record_file,
 )
 from app.i18n import tr
-from app.core.number_format import format_display_number, parse_float
+from app.core.number_format import format_display_number, parse_float, relocalize_decimal_input
 from app.ui.widgets.crush_profile_dialog import CrushProfileDialog
 from app.ui.widgets.nhtsa_ab_dialog import NhtsaAbDialog
 
@@ -373,13 +373,16 @@ class CalcPanel(QGroupBox):
         project = self.main.project
         for field, attribute in self._parameter_fields:
             value = getattr(project, attribute)
-            # Keep unfinished and manually entered text as-is if it differs from
-            # the representation used to populate the field.
-            if value is not None and field.text() == self._format_parameter(
-                attribute, value, previous_language
-            ):
+            if value is None:
+                continue
+            text = field.text()
+            if text == self._format_parameter(attribute, value, previous_language):
+                translated = self._format_parameter(attribute, value)
+            else:
+                translated = relocalize_decimal_input(text, previous_language)
+            if translated != text:
                 with QSignalBlocker(field):
-                    field.setText(self._format_parameter(attribute, value))
+                    field.setText(translated)
 
     def _refresh_details_visibility(self) -> None:
         expanded = self.btn_toggle_details.isChecked()
@@ -1132,9 +1135,11 @@ class CalcPanel(QGroupBox):
             self.cmb_class.setCurrentIndex(index)
         for field, attribute in self._parameter_fields:
             value = getattr(project, attribute)
-            field.setToolTip(
-                "" if value is None else tr("calc.exact_value", value=format_display_number(value, None))
+            exact_value = "" if value is None else tr(
+                "calc.exact_value", value=format_display_number(value, None)
             )
+            hint = "" if field.isReadOnly() else tr("number.input_hint")
+            field.setToolTip("\n".join(filter(None, (exact_value, hint))))
         source_key = {
             "nhtsa_library": "calc.ab_source_nhtsa",
             "nhtsa_report": "calc.ab_source_nhtsa_report",

@@ -5,11 +5,10 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QPushButton,
     QLabel,
-    QSpinBox,
-    QDoubleSpinBox,
 )
 
 from app.i18n import tr
+from app.ui.widgets.numeric_spin_box import NumericDoubleSpinBox, NumericSpinBox
 
 
 class AlignmentPanel(QWidget):
@@ -32,7 +31,7 @@ class AlignmentPanel(QWidget):
         self.btn_up = QPushButton("↑")
         self.btn_down = QPushButton("↓")
 
-        self.spin_step = QSpinBox()
+        self.spin_step = NumericSpinBox()
         self.spin_step.setRange(1, 200)
         self.spin_step.setValue(5)
 
@@ -56,7 +55,7 @@ class AlignmentPanel(QWidget):
         self.grp_rotate = QGroupBox(tr("alignment.rotate"))
         rotate_layout = QHBoxLayout()
 
-        self.spin_rotate = QDoubleSpinBox()
+        self.spin_rotate = NumericDoubleSpinBox()
         self.spin_rotate.setRange(-180.0, 180.0)
         self.spin_rotate.setDecimals(2)
         self.spin_rotate.setSingleStep(0.5)
@@ -77,7 +76,7 @@ class AlignmentPanel(QWidget):
         self.grp_scale = QGroupBox(tr("alignment.scale"))
         scale_layout = QHBoxLayout()
 
-        self.spin_scale = QDoubleSpinBox()
+        self.spin_scale = NumericDoubleSpinBox()
         self.spin_scale.setRange(0.1, 10.0)
         self.spin_scale.setDecimals(3)
         self.spin_scale.setSingleStep(0.01)
