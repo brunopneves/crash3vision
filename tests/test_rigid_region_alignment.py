@@ -1531,6 +1531,74 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             self.assertIn(f"EES (km/h): {window.project.damage_speed_kmh:.2f}", text)
             self.assertIn(f"{window.project.total_energy_j:.2f}", text)
 
+    def test_png_export_reports_only_committed_files_and_preserves_project(self) -> None:
+        window = self._window()
+        source = COMPASS / "crash3vision_reference_project.json"
+        with (
+            patch.object(QFileDialog, "getOpenFileName", return_value=(str(source), "")),
+            patch.object(QMessageBox, "information"),
+        ):
+            window.io.load_project()
+        window.show()
+        QApplication.processEvents()
+        before = window.project.to_dict()
+        overlay = window.canvas.get_overlay_state()
+        stage = window.stage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            directory = folder / "directory.png"
+            directory.mkdir()
+            existing = folder / "existing.png"
+            existing.write_bytes(b"previous contents")
+
+            for language in ("pt", "en"):
+                window._set_language_and_refresh(language)
+                for name, export in (
+                    ("annotated", window.io.export_png),
+                    ("viewport", window.io.export_current_view_png),
+                ):
+                    def run_export(path):
+                        with (
+                            patch.object(QFileDialog, "getSaveFileName", return_value=(str(path), "")),
+                            patch.object(QMessageBox, "information") as success,
+                            patch.object(QMessageBox, "critical") as error,
+                        ):
+                            export()
+                        return success, error
+
+                    with self.subTest(language=language, export=name):
+                        valid = folder / f"{language}_{name}"
+                        success, error = run_export(valid)
+                        success.assert_called_once()
+                        error.assert_not_called()
+                        self.assertFalse(QImage(str(valid.with_suffix(".png"))).isNull())
+
+                        missing = folder / "missing" / "test.png"
+                        for invalid in (missing, directory):
+                            success, error = run_export(invalid)
+                            success.assert_not_called()
+                            error.assert_called_once()
+                            self.assertIn(str(invalid), error.call_args.args[2])
+                            self.assertIn(
+                                "Não foi possível gravar" if language == "pt" else "Could not save",
+                                error.call_args.args[2],
+                            )
+                        self.assertFalse(missing.exists())
+                        self.assertTrue(directory.is_dir())
+
+                        for method in ("QImageWriter.write", "QSaveFile.commit"):
+                            with patch(f"app.ui.canvas.canvas_export.{method}", return_value=False):
+                                success, error = run_export(existing)
+                            success.assert_not_called()
+                            error.assert_called_once()
+                            self.assertEqual(existing.read_bytes(), b"previous contents")
+
+                        self.assertEqual(window.project.to_dict(), before)
+                        self.assertEqual(window.canvas.get_overlay_state(), overlay)
+                        self.assertEqual(window.stage, stage)
+                        self.assertEqual(window._current_project_path, str(source))
+
     def test_step_consultation_preserves_project_and_disables_tools(self) -> None:
         window = self._window()
         steps = window.workflow_step_labels

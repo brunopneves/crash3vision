@@ -5,6 +5,8 @@ from PySide6.QtGui import QMouseEvent, QPixmap
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsView
 
 from app.ui.canvas.canvas_controller import CanvasController
+from app.ui.canvas.canvas_export import save_png
+from app.i18n import tr
 
 
 class CanvasView(QGraphicsView):
@@ -217,8 +219,9 @@ class CanvasView(QGraphicsView):
 
     def export_current_view_png(self, path: str) -> None:
         pixmap = self.viewport().grab()
-        if pixmap.isNull() or not pixmap.save(path):
-            raise OSError(f"Failed to export current view: {path}")
+        if pixmap.isNull():
+            raise OSError(tr("project.export_current_view.capture_failed"))
+        save_png(pixmap.toImage(), path)
 
     def get_overlay_state(self):
         return self.ctrl.get_overlay_state()

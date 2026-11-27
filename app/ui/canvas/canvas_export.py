@@ -2,12 +2,25 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPainter
+from PySide6.QtCore import QIODevice, QSaveFile, Qt
+from PySide6.QtGui import QImage, QImageWriter, QPainter
 from PySide6.QtWidgets import QGraphicsScene
 
 from app.ui.overlay.state import OverlayState
 from app.ui.overlay.renderer import OverlayRenderer
+
+
+def save_png(image: QImage, path: str) -> None:
+    output = QSaveFile(path)
+    if not output.open(QIODevice.OpenModeFlag.WriteOnly):
+        raise OSError(output.errorString())
+
+    writer = QImageWriter(output, b"PNG")
+    if not writer.write(image):
+        output.cancelWriting()
+        raise OSError(writer.errorString())
+    if not output.commit():
+        raise OSError(output.errorString())
 
 
 class CanvasExport:
@@ -36,7 +49,7 @@ class CanvasExport:
             painter.end()
             self.renderer.apply_scaling()
 
-        img.save(path)
+        save_png(img, path)
 
     def get_overlay_state(self) -> dict[str, Any]:
         return self.state.to_dict()

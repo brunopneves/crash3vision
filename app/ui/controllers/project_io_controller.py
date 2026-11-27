@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import suppress
 import json
 import math
@@ -416,35 +417,16 @@ class ProjectIOController:
         )
 
     def export_png(self) -> None:
-        out_path, _ = QFileDialog.getSaveFileName(
-            self.host,
-            tr("project.export_png.dialog_title"),
-            "",
-            "PNG Image (*.png)",
-        )
-        if not out_path:
-            return
-        if not out_path.lower().endswith(".png"):
-            out_path += ".png"
-
-        try:
-            self.host.canvas.export_scene_png(out_path)
-            QMessageBox.information(
-                self.host,
-                tr("project.export_png.dialog_title"),
-                tr("project.export_png.saved", path=out_path),
-            )
-        except Exception as e:
-            QMessageBox.critical(
-                self.host,
-                tr("project.export_png.dialog_title"),
-                str(e),
-            )
+        self._export_png(self.host.canvas.export_scene_png, "project.export_png")
 
     def export_current_view_png(self) -> None:
+        self._export_png(self.host.canvas.export_current_view_png, "project.export_current_view")
+
+    def _export_png(self, export: Callable[[str], None], translation_prefix: str) -> None:
+        title = tr(f"{translation_prefix}.dialog_title")
         out_path, _ = QFileDialog.getSaveFileName(
             self.host,
-            tr("project.export_current_view.dialog_title"),
+            title,
             "",
             "PNG Image (*.png)",
         )
@@ -454,18 +436,16 @@ class ProjectIOController:
             out_path += ".png"
 
         try:
-            self.host.canvas.export_current_view_png(out_path)
-            QMessageBox.information(
-                self.host,
-                tr("project.export_current_view.dialog_title"),
-                tr("project.export_current_view.saved", path=out_path),
-            )
-        except Exception as e:
+            export(out_path)
+        except Exception as error:
             QMessageBox.critical(
                 self.host,
-                tr("project.export_current_view.dialog_title"),
-                str(e),
+                title,
+                tr("project.export_png.failed", path=out_path, error=error),
             )
+            return
+
+        QMessageBox.information(self.host, title, tr(f"{translation_prefix}.saved", path=out_path))
 
     def pick_image_file(self) -> str | None:
         path, _ = QFileDialog.getOpenFileName(

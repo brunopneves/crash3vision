@@ -1212,6 +1212,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "PNG exported: {path}",
         "pt": "PNG exportado: {path}",
     },
+    "project.export_png.failed": {
+        "en": "Could not save the PNG at {path}. Check that the folder exists, that you have write permission, and that the file is not in use.\n\nDetails: {error}",
+        "pt": "Não foi possível gravar o PNG em {path}. Confira se a pasta existe, se você tem permissão de gravação e se o arquivo está fechado em outros programas.\n\nDetalhes: {error}",
+    },
     "project.export_current_view.dialog_title": {
         "en": "Export current view",
         "pt": "Exportar visualização atual",
@@ -1219,6 +1223,10 @@ STRINGS: dict[str, dict[str, str]] = {
     "project.export_current_view.saved": {
         "en": "Current view exported: {path}",
         "pt": "Visualização atual exportada: {path}",
+    },
+    "project.export_current_view.capture_failed": {
+        "en": "The current view could not be captured.",
+        "pt": "Não foi possível capturar a visualização atual.",
     },
     "project.select_image.dialog_title": {
         "en": "Select image",
