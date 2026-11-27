@@ -8,11 +8,11 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
 
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QImageReader, QPixmap
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 
 from app.core.number_format import format_display_number
-from app.core.project import Project, UnsupportedCrash3UnitsError
+from app.core.project import InvalidProjectDataError, Project, UnsupportedCrash3UnitsError
 from app.i18n import get_language, tr
 
 if TYPE_CHECKING:
@@ -41,6 +41,24 @@ def _resolve_project_image_path(
     if not path.is_absolute():
         path = project_dir / path
     return str(path.resolve())
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise InvalidProjectDataError("duplicate_key", field=key)
+        result[key] = value
+    return result
+
+
+def _read_project_image(path: str) -> QPixmap:
+    # Read the file again rather than accepting a copy from the pixmap cache.
+    image = QImageReader(path).read()
+    pixmap = QPixmap.fromImage(image)
+    if pixmap.isNull():
+        raise InvalidProjectDataError("image_unavailable", field=path)
+    return pixmap
 
 
 class ProjectIOController:
@@ -140,15 +158,28 @@ class ProjectIOController:
 
         temporary_path = None
         try:
+            Project.from_dict(project_data)
+            for key in ("ref_path", "dam_path"):
+                image_path = _resolve_project_image_path(project_data[key], project_dir)
+                if image_path:
+                    if Path(image_path) == destination.resolve():
+                        raise InvalidProjectDataError("image_is_save_destination", field=image_path)
+                    _read_project_image(image_path)
             with NamedTemporaryFile(
                 mode="w", encoding="utf-8", dir=project_dir, suffix=".tmp", delete=False
             ) as stream:
                 temporary_path = Path(stream.name)
-                json.dump(project_data, stream, ensure_ascii=False, indent=2)
+                json.dump(project_data, stream, ensure_ascii=False, indent=2, allow_nan=False)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary_path, destination)
             temporary_path = None
+        except InvalidProjectDataError as error:
+            QMessageBox.critical(
+                self.host, tr("project.save.dialog_title"),
+                tr("project.save.invalid_data", error=tr(f"project.data.{error.reason}", **error.details)),
+            )
+            return
         except (OSError, ValueError, TypeError) as error:
             QMessageBox.critical(
                 self.host, tr("project.save.dialog_title"),
@@ -182,13 +213,18 @@ class ProjectIOController:
 
         try:
             with open(path, "r", encoding="utf-8") as stream:
-                data = json.load(stream)
+                data = json.load(stream, object_pairs_hook=_unique_json_object)
             if not isinstance(data, dict):
                 raise ValueError(tr("project.load.invalid_structure"))
             project_dir = Path(path).parent
             for key in ("ref_path", "dam_path"):
                 data[key] = _resolve_project_image_path(data.get(key), project_dir)
             project = Project.from_dict(data)
+            prepared_images = {
+                slot: _read_project_image(image_path)
+                for slot, image_path in (("ref", project.ref_path), ("dam", project.dam_path))
+                if image_path
+            }
             opacity_percent = int(project.opacity * 100)
             ci_px = {int(k.replace("C", "")): v for k, v in (project.c_px or {}).items()}
             ci_m = {int(k.replace("C", "")): v for k, v in (project.c_m or {}).items()}
@@ -199,25 +235,18 @@ class ProjectIOController:
                 tr("project.load.unsupported_crash3_units", units=repr(e.units)),
             )
             return
-        except (OSError, ValueError, TypeError, AttributeError, KeyError, OverflowError) as error:
+        except InvalidProjectDataError as error:
+            QMessageBox.warning(
+                self.host, tr("project.load.dialog_title"),
+                tr("project.load.invalid_data", error=tr(f"project.data.{error.reason}", **error.details)),
+            )
+            return
+        except (OSError, ValueError, TypeError, AttributeError, KeyError, OverflowError, RecursionError) as error:
             QMessageBox.warning(
                 self.host, tr("project.load.dialog_title"),
                 tr("project.load.failed", error=error),
             )
             return
-
-        prepared_images = {}
-        for slot, image_path in (("ref", project.ref_path), ("dam", project.dam_path)):
-            if image_path:
-                pixmap = QPixmap(image_path)
-                if pixmap.isNull():
-                    QMessageBox.warning(
-                        self.host,
-                        tr("project.load.dialog_title"),
-                        tr("project.load.images_failed", error=image_path),
-                    )
-                    return
-                prepared_images[slot] = pixmap
 
         self.host.project = project
         self.host._update_window_title()
@@ -290,18 +319,9 @@ class ProjectIOController:
 
         self.host._w_px = self.host.project.w_px
         self.host._w_m = self.host.project.w_m
-
-        self.host._delta_w_px = (
-            float(self.host._w_px) / 5.0 if self.host._w_px is not None else None
-        )
-        self.host._delta_w_m = (
-            float(self.host._w_m) / 5.0 if self.host._w_m is not None else None
-        )
-
-        self.host.project.delta_w_px = self.host._delta_w_px
-        self.host.project.delta_w_m = self.host._delta_w_m
-
-        self.host.meas.refresh_w_labels()
+        self.host._delta_w_px = self.host.project.delta_w_px
+        self.host._delta_w_m = self.host.project.delta_w_m
+        self.host.meas.refresh_w_display()
 
         self.host._ci_px.clear()
         self.host._ci_m.clear()

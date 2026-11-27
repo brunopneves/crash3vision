@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 from app.core.crash3 import compute_energy, compute_ees
 from app.core.number_format import format_display_number
-from app.core.project import Project
+from app.core.project import InvalidProjectDataError, Project
 from app.i18n import tr
 from app.core.rigid_region_alignment import (
     REGION_DEFAULT_HEIGHT_FRACTION,
@@ -102,6 +102,399 @@ class RigidRegionAlignmentTests(unittest.TestCase):
                 self.assertEqual(project.to_dict(), before)
                 self.assertEqual(window.canvas.get_overlay_state(), overlay)
                 self.assertEqual(window._current_project_path, str(source))
+
+    def test_project_rejects_invalid_measurements_and_parameters(self) -> None:
+        for data, field in (
+            ({"c_m": {"C1": -0.01}}, "c_m.C1"),
+            ({"c_px": {"C2": -1}}, "c_px.C2"),
+            ({"c_cm": {"C3": -1}}, "c_cm.C3"),
+            ({"c_m": {"C4": float("nan")}}, "c_m.C4"),
+            ({"c_px": {"C5": float("inf")}}, "c_px.C5"),
+            ({"c_m": {"C6": "NaN"}}, "c_m.C6"),
+            ({"c_m": []}, "c_m"),
+            ({"c_m": {"C7": 0.1}}, "c_m.C7"),
+            ({"m_per_px": 0}, "m_per_px"),
+            ({"cm_per_px": -1}, "cm_per_px"),
+            ({"w_px": -1}, "w_px"),
+            ({"w_m": 0}, "w_m"),
+            ({"vehicle_mass_kg": True}, "vehicle_mass_kg"),
+            ({"vehicle_mass_kg": 0}, "vehicle_mass_kg"),
+            ({"crash3_A": -1}, "crash3_A"),
+            ({"crash3_B": "1e999"}, "crash3_B"),
+            ({"crash3_alpha_deg": 89}, "crash3_alpha_deg"),
+            ({"total_energy_j": -1}, "total_energy_j"),
+            ({"damage_speed_kmh": -1}, "damage_speed_kmh"),
+            ({"dam_transform": {"scale": 0}}, "dam_transform.scale"),
+            ({"cal_p1": {"x": "-inf", "y": 5}}, "cal_p1.x"),
+            ({"slice_x": [1, float("-inf")]}, "slice_x[1]"),
+            ({"m_per_px": 0.01, "w_px": 100, "w_m": 2}, "W"),
+            ({"m_per_px": 0.01, "c_px": {"C1": 10}, "c_m": {"C1": 0.5}}, "C1"),
+            ({"w_m": 1, "delta_w_m": 0.25}, "delta_w_m"),
+        ):
+            with self.subTest(field=field, data=data):
+                with self.assertRaises(InvalidProjectDataError) as error:
+                    Project.from_dict(data)
+                self.assertEqual(error.exception.details["field"], field)
+
+    def test_partial_and_legacy_project_data_remain_valid(self) -> None:
+        self.assertIsNone(Project.from_dict({}).w_m)
+        incomplete = Project.from_dict({
+            "crash3_units": "SI_N_per_m",
+            "crash3_A": "0.0149",
+            "c_m": {"C1": 0, "C3": 0.125},
+        })
+        self.assertEqual(incomplete.c_m, {"C1": 0.0, "C3": 0.125})
+        self.assertEqual(incomplete.crash3_A, 0.0149)
+        self.assertIsNone(incomplete.crash3_B)
+        self.assertIsNone(incomplete.total_energy_j)
+
+        legacy = Project.from_dict({
+            "cm_per_px": 0.5, "w_cm": 100, "w_px": 200,
+            "c_cm": {"1": 5}, "c_px": {"C1": 10},
+            "total_energy_j": 90000, "vehicle_mass_kg": 1800, "damage_speed_kmh": 36,
+        })
+        self.assertEqual(legacy.m_per_px, 0.005)
+        self.assertEqual(legacy.w_m, 1.0)
+        self.assertEqual(legacy.c_m, {"C1": 0.05})
+        self.assertEqual(legacy.damage_speed_kmh, 36.0)
+        self.assertIsNone(legacy.damage_speed_mps)
+
+    def test_project_validates_ees_without_changing_stored_values(self) -> None:
+        data = {
+            "total_energy_j": 0.5 * 1800 * 10.00499**2, "vehicle_mass_kg": 1800,
+            "damage_speed_mps": 10.0, "damage_speed_kmh": 36.02,
+        }
+        project = Project.from_dict(data)
+        for field, value in data.items():
+            self.assertEqual(getattr(project, field), value)
+        for changes, reason in (
+            ({"damage_speed_kmh": 36.03}, "ees_energy_mismatch"),
+            ({"damage_speed_mps": 999, "damage_speed_kmh": 55.85}, "ees_units_mismatch"),
+            ({"damage_speed_mps": 20, "damage_speed_kmh": 72}, "ees_energy_mismatch"),
+            ({"damage_speed_mps": None, "damage_speed_kmh": 72}, "ees_energy_mismatch"),
+            ({"vehicle_mass_kg": 2000}, "ees_energy_mismatch"),
+        ):
+            with self.subTest(changes=changes):
+                with self.assertRaises(InvalidProjectDataError) as error:
+                    Project.from_dict(data | changes)
+                self.assertEqual(error.exception.reason, reason)
+
+    def test_project_accepts_field_specific_rounding_and_rejects_nearby_tampering(self) -> None:
+        source = COMPASS / "crash3vision_reference_project.json"
+        original = json.loads(source.read_text(encoding="utf-8"))
+        energy = original["total_energy_j"]
+        original_width = original["w_m"]
+        # Simulate different output precisions without altering the sample file.
+        for speed_fields in (
+            {"damage_speed_mps": 15.5, "damage_speed_kmh": 55.85},
+            {"damage_speed_mps": 15.5, "damage_speed_kmh": 55.8},
+            {"damage_speed_mps": None, "damage_speed_kmh": 55.8},
+        ):
+            restored = Project.from_dict(original | speed_fields)
+            self.assertEqual(restored.damage_speed_mps, speed_fields["damage_speed_mps"])
+            self.assertEqual(restored.damage_speed_kmh, speed_fields["damage_speed_kmh"])
+            self.assertEqual(restored.total_energy_j, energy)
+
+        speed = math.sqrt(2 * energy / 800.49)
+        whole_mass = Project.from_dict(original | {
+            "vehicle_mass_kg": 800,
+            "total_energy_j": round(energy),
+            "damage_speed_mps": round(speed, 2),
+            "damage_speed_kmh": round(speed * 3.6, 2),
+        })
+        self.assertEqual(whole_mass.vehicle_mass_kg, 800)
+        self.assertEqual(whole_mass.total_energy_j, round(energy))
+
+        legacy_cm = original | {
+            "m_per_px": None,
+            "cm_per_px": round(original["m_per_px"] * 100, 3),
+            "w_m": None,
+            "w_cm": round(original_width * 100),
+            "delta_w_m": None,
+            "delta_w_cm": round(original["delta_w_m"] * 100),
+            "w_px": round(original["w_px"]),
+            "c_m": None,
+            "c_cm": {key: round(value * 100) for key, value in original["c_m"].items()},
+            "damage_speed_mps": None,
+        }
+        for contents in (legacy_cm, legacy_cm | {"delta_w_cm": None}):
+            restored = Project.from_dict(contents)
+            self.assertEqual(restored.w_m, 1.22)
+            self.assertEqual(restored.c_m["C1"], 0.29)
+            self.assertEqual(restored.total_energy_j, energy)
+            self.assertEqual(Project.from_dict(restored.to_dict()).to_dict(), restored.to_dict())
+        self.assertEqual(Project.from_dict(legacy_cm).delta_w_m, 0.24)
+
+        for edited, reason in (
+            ({"damage_speed_mps": None, "damage_speed_kmh": 55.87}, "ees_energy_mismatch"),
+            ({"total_energy_j": energy + 1}, "energy_mismatch"),
+            ({
+                "total_energy_j": energy * 4,
+                "damage_speed_mps": original["damage_speed_mps"] * 2,
+                "damage_speed_kmh": original["damage_speed_kmh"] * 2,
+            }, "energy_mismatch"),
+        ):
+            with self.subTest(edited=edited):
+                with self.assertRaises(InvalidProjectDataError) as error:
+                    Project.from_dict(original | edited)
+                self.assertEqual(error.exception.reason, reason)
+
+    def test_project_energy_bounds_use_b_endpoints_and_interior_minimum(self) -> None:
+        original = json.loads((COMPASS / "crash3vision_reference_project.json").read_text(encoding="utf-8"))
+        sample = original | {"crash3_A": 0.01, "crash3_B": 0.01}
+        reported = 0.04120714847457931
+        speed = math.sqrt(2 * reported / sample["vehicle_mass_kg"])
+        arguments = (sample["w_m"], *(sample["c_m"][f"C{i}"] for i in range(1, 7)), 0.015)
+        maximum = max(compute_energy(*arguments, b, 0.005) for b in (0.005, 0.015))
+        self.assertAlmostEqual(maximum, 0.03411948050286942, places=12)
+        with self.assertRaises(InvalidProjectDataError) as error:
+            Project.from_dict(sample | {
+                "total_energy_j": reported, "damage_speed_mps": speed, "damage_speed_kmh": speed * 3.6,
+            })
+        self.assertEqual(error.exception.reason, "energy_mismatch")
+        self.assertEqual(Project.from_dict(sample | {
+            "total_energy_j": maximum, "damage_speed_mps": None, "damage_speed_kmh": None,
+        }).total_energy_j, maximum)
+
+        # For constant crush, the stationary B at the lower inputs is A / C.
+        minimum = compute_energy(0.995, *([0.495] * 6), 0.005, 0.005 / 0.495, 0.0)
+        interior = {
+            "w_m": 1.0,
+            "c_m": {f"C{i}": 0.5 for i in range(1, 7)},
+            "crash3_A": 0.01, "crash3_B": 0.01, "crash3_units": "SI_N_per_m",
+        }
+        self.assertEqual(Project.from_dict(interior | {"total_energy_j": minimum}).total_energy_j, minimum)
+        with self.assertRaises(InvalidProjectDataError) as error:
+            Project.from_dict(interior | {"total_energy_j": minimum * 0.99})
+        self.assertEqual(error.exception.reason, "energy_mismatch")
+
+    def test_project_requires_common_scale_and_six_equally_spaced_positions(self) -> None:
+        original = json.loads((COMPASS / "crash3vision_reference_project.json").read_text(encoding="utf-8"))
+        disjoint = {
+            "m_per_px": 0.002, "w_m": 1.198, "w_px": 600.123456,
+            "delta_w_m": None, "delta_w_px": None, "slice_x": None,
+            "c_m": {f"C{i}": 0.802 for i in range(1, 7)},
+            "c_px": {f"C{i}": 400.123456 for i in range(1, 7)},
+            "total_energy_j": 905075.4040271024,
+            "damage_speed_mps": 113.68981645226205 / 3.6,
+            "damage_speed_kmh": 113.68981645226205,
+        }
+        with self.assertRaises(InvalidProjectDataError) as error:
+            Project.from_dict(original | disjoint)
+        self.assertEqual(error.exception.reason, "shared_scale_mismatch")
+        self.assertEqual(error.exception.details["field"], "C1")
+
+        for unequal in (
+            [483.1112175883253, 484, 500, 600, 800, 1047.24108657345],
+            [0, 100, 200, 300, 400, 500],  # equal spacing but incompatible with the stored W
+        ):
+            with self.assertRaises(InvalidProjectDataError) as error:
+                Project.from_dict(original | {"slice_x": unequal})
+            self.assertEqual(error.exception.reason, "slice_spacing_mismatch")
+
+        rounded = [round(x) for x in original["slice_x"]]
+        self.assertEqual(Project.from_dict(original | {"slice_x": rounded}).slice_x, rounded)
+        self.assertEqual(Project.from_dict({"slice_x": [-10, -9]}).slice_x, [-10, -9])
+
+    def test_project_propagates_rounded_width_and_scale_to_derived_width(self) -> None:
+        original = json.loads((COMPASS / "crash3vision_reference_project.json").read_text(encoding="utf-8"))
+        # W was omitted. The independently stored metric W/5 is precise, while
+        # its pixel width and scale use the older rounding convention.
+        data = original | {"w_m": None, "w_px": 564, "m_per_px": 0.00217}
+        project = Project.from_dict(data)
+        self.assertAlmostEqual(project.w_m, 1.22388)
+        self.assertEqual(project.delta_w_m, 0.2446400311762699)
+        self.assertEqual(project.total_energy_j, original["total_energy_j"])
+        restored = Project.from_dict(json.loads(json.dumps(project.to_dict())))
+        self.assertEqual(restored.to_dict(), project.to_dict())
+
+    def test_rejected_project_preserves_open_project_and_valid_results_round_trip(self) -> None:
+        window = self._window()
+        source = COMPASS / "crash3vision_reference_project.json"
+        data = json.loads(source.read_text(encoding="utf-8"))
+        for key in ("ref_path", "dam_path"):
+            data[key] = str(COMPASS / data[key])
+        data.update(
+            damage_speed_mps=15.51, damage_speed_kmh=55.85,
+            w_m=round(data["w_m"], 3), delta_w_m=round(data["delta_w_m"], 3),
+        )
+
+        def open_project(path):
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(path), "")),
+                patch.object(QMessageBox, "information"),
+                patch.object(QMessageBox, "warning") as warning,
+            ):
+                window.io.load_project()
+            return warning
+
+        with tempfile.TemporaryDirectory() as tmp:
+            valid = Path(tmp) / "valid.json"
+            saved = Path(tmp) / "saved.json"
+            invalid = Path(tmp) / "invalid.json"
+            valid.write_text(json.dumps(data), encoding="utf-8")
+            open_project(valid).assert_not_called()
+            self.assertEqual(window._current_workflow_step(), "result")
+            with (
+                patch.object(QFileDialog, "getSaveFileName", return_value=(str(saved), "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                window.io.save_project()
+            open_project(saved).assert_not_called()
+            for field in ("damage_speed_mps", "damage_speed_kmh", "total_energy_j", "w_m", "delta_w_m"):
+                self.assertEqual(getattr(window.project, field), data[field])
+
+            project = window.project
+            before = project.to_dict()
+            overlay = window.canvas.get_overlay_state()
+            for changes, diagnostic in (
+                ({"damage_speed_mps": 999}, "999.0 m/s"),
+                ({"c_m": {"C2": -0.1}}, "c_m.C2"),
+                ({"c_m": {"C2": float("nan")}}, "c_m.C2"),
+                ({"vehicle_mass_kg": float("inf")}, "vehicle_mass_kg"),
+            ):
+                with self.subTest(changes=changes):
+                    content = json.dumps(data | changes)
+                    invalid.write_text(content, encoding="utf-8")
+                    warning = open_project(invalid)
+                    warning.assert_called_once()
+                    self.assertIn(diagnostic, warning.call_args.args[2])
+                    self.assertIs(window.project, project)
+                    self.assertEqual(project.to_dict(), before)
+                    self.assertEqual(window.canvas.get_overlay_state(), overlay)
+                    self.assertEqual(window._current_project_path, str(saved))
+                    self.assertEqual(window._current_workflow_step(), "result")
+                    self.assertEqual(invalid.read_text(encoding="utf-8"), content)
+
+            for content, key in (
+                (json.dumps(data).replace('"damage_speed_mps":', '"damage_speed_mps": 999, "damage_speed_mps":'),
+                 "damage_speed_mps"),
+                (json.dumps(data).replace('"c_m": {', '"c_m": {"C2": -1, '), "C2"),
+            ):
+                invalid.write_text(content, encoding="utf-8")
+                warning = open_project(invalid)
+                warning.assert_called_once()
+                self.assertIn(tr("project.data.duplicate_key", field=key), warning.call_args.args[2])
+                self.assertEqual(invalid.read_text(encoding="utf-8"), content)
+                self.assertIs(window.project, project)
+                self.assertEqual(project.to_dict(), before)
+                self.assertEqual(window.canvas.get_overlay_state(), overlay)
+                self.assertEqual(window._current_project_path, str(saved))
+
+    def test_project_validates_derived_width_on_load_and_before_writing(self) -> None:
+        window = self._window()
+        with tempfile.TemporaryDirectory() as tmp:
+            invalid = Path(tmp) / "invalid.json"
+            destination = Path(tmp) / "existing.json"
+            destination.write_bytes(b"previous project")
+            incomplete = {"dam_path": window.project.dam_path, "m_per_px": 0.01, "w_px": 100}
+            invalid.write_text(json.dumps(incomplete | {"delta_w_m": 0.9}), encoding="utf-8")
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(invalid), "")),
+                patch.object(QMessageBox, "warning") as error,
+            ):
+                window.io.load_project()
+            error.assert_called_once()
+            self.assertIn("delta_w_m", error.call_args.args[2])
+            self.assertIsNone(window._current_project_path)
+
+            window._w_px = 100
+            window._m_per_px = 0.01
+            for delta, coefficient, field in ((0.9, None, "delta_w_m"), (None, -1, "crash3_A")):
+                window._delta_w_m = delta
+                window.project.crash3_A = coefficient
+                with (
+                    patch.object(QFileDialog, "getSaveFileName", return_value=(str(destination), "")),
+                    patch.object(QMessageBox, "critical") as error,
+                    patch("app.ui.controllers.project_io_controller.NamedTemporaryFile") as temporary,
+                ):
+                    window.io.save_project()
+                error.assert_called_once()
+                self.assertIn(field, error.call_args.args[2])
+                temporary.assert_not_called()
+                self.assertEqual(destination.read_bytes(), b"previous project")
+                self.assertIsNone(window._current_project_path)
+
+            window.project.crash3_A = 0.0149
+            with (
+                patch.object(QFileDialog, "getSaveFileName", return_value=(str(destination), "")),
+                patch.object(QMessageBox, "information"),
+                patch.object(QMessageBox, "critical") as error,
+            ):
+                window.io.save_project()
+            error.assert_not_called()
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(destination), "")),
+                patch.object(QMessageBox, "information"),
+                patch.object(QMessageBox, "warning") as error,
+            ):
+                window.io.load_project()
+            error.assert_not_called()
+            self.assertEqual(window.project.w_m, 1.0)
+            self.assertEqual(window.project.delta_w_m, 0.2)
+            self.assertEqual(window.project.crash3_A, 0.0149)
+            self.assertIsNone(window.project.crash3_B)
+
+    def test_save_requires_all_referenced_images_to_be_available_and_decodable(self) -> None:
+        window = self._window()
+        canvas_before = window.canvas.get_overlay_state()
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp) / "existing.json"
+            destination.write_bytes(b"previous project")
+            damaged = Path(tmp) / "damaged.png"
+            reference = Path(tmp) / "reference.png"
+            damaged_bytes = Path(window.project.dam_path).read_bytes()
+            reference_bytes = Path(window.project.ref_path).read_bytes()
+
+            def save(target=destination):
+                with (
+                    patch.object(QFileDialog, "getSaveFileName", return_value=(str(target), "")),
+                    patch.object(QMessageBox, "information"),
+                    patch.object(QMessageBox, "critical") as error,
+                ):
+                    window.io.save_project()
+                return error
+
+            window.project.dam_path = str(damaged)
+            window.project.ref_path = str(reference)
+            reference.write_bytes(reference_bytes)
+            # The live pixmap still exists, but its external file is missing.
+            error = save()
+            error.assert_called_once()
+            self.assertIn(str(damaged), error.call_args.args[2])
+            self.assertEqual(destination.read_bytes(), b"previous project")
+            self.assertIsNone(window._current_project_path)
+            self.assertEqual(window.canvas.get_overlay_state(), canvas_before)
+
+            damaged.write_bytes(damaged_bytes)
+            reference.write_bytes(b"corrupt image")
+            error = save()
+            error.assert_called_once()
+            self.assertIn(str(reference), error.call_args.args[2])
+            self.assertEqual(destination.read_bytes(), b"previous project")
+            self.assertIsNone(window._current_project_path)
+
+            reference.write_bytes(reference_bytes)
+            error = save(damaged)
+            error.assert_called_once()
+            self.assertIn(tr("project.data.image_is_save_destination", field=str(damaged)), error.call_args.args[2])
+            self.assertEqual(damaged.read_bytes(), damaged_bytes)
+
+            for with_reference in (False, True):
+                if with_reference:
+                    reference.write_bytes(reference_bytes)
+                window.project.ref_path = str(reference) if with_reference else None
+                save().assert_not_called()
+                with (
+                    patch.object(QFileDialog, "getOpenFileName", return_value=(str(destination), "")),
+                    patch.object(QMessageBox, "information"),
+                    patch.object(QMessageBox, "warning") as warning,
+                ):
+                    window.io.load_project()
+                warning.assert_not_called()
+                self.assertEqual(window.project.dam_path, str(damaged))
+                self.assertEqual(window.project.ref_path, str(reference) if with_reference else None)
+                self.assertEqual(window.canvas.has_both_images(), with_reference)
 
     def test_failed_atomic_save_keeps_existing_file_name_and_path(self) -> None:
         window = self._window()

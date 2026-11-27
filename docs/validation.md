@@ -252,3 +252,29 @@ Future work should include:
 **B. P. Neves, J. G. Silva Neto, R. de O. Mapele**  
 *Metodologia semiassistida por imagem para mensuração de deformações veiculares e estimativa da EES pelo método CRASH3.*  
 XXVIII Congresso Nacional de Criminalística — CNC 2026, Brazil.
+
+## 13. Stored project consistency
+
+Opening and saving a project apply the same checks to the scientific fields. The checks use the existing CRASH3 and EES functions. When their inputs are available, the stored energy and speed must be compatible with those inputs and with each other. Accepted results retain their stored values.
+
+The project format has no precision metadata. For each field, the validator uses half of the rounding increment suggested by the shortest decimal representation of its value, subject to these maximum increments.
+
+| Field | Maximum rounding increment |
+| --- | ---: |
+| EES in m/s | 0.1 m/s |
+| EES in km/h | 0.1 km/h |
+| Energy | 1 J |
+| Mass | 1 kg |
+| Width, W/5 intervals and crush in pixels | 1 px |
+| Width, W/5 intervals and crush in meters | 0.01 m |
+| Calibration scale | 0.00001 m/px |
+| A and B | 0.01 in the respective SI units |
+| Angle | 0.01° |
+
+Legacy centimeter fields are converted to SI before checking their intervals. A W value derived from pixel width and scale inherits both input intervals. An interval derived directly as W/5 contributes no additional precision. The six stored positions, when available, must admit five equal spacings, and W and C1–C6 must admit a common scale wherever both units are available.
+
+EES intervals are converted to a common unit and, when energy and mass are available, compared with the range implied by those two inputs. The CRASH3 inputs bound the energy range when the width, six crush values and coefficients are available. The upper energy bound evaluates the existing formula at the two ends of the admissible B interval. A convex minimization brackets the lower bound in B.
+
+Saving checks that each referenced image is decodable at the path that will be used when reopening the project. A successful save depends on those images remaining available at their referenced paths.
+
+The inferred decimal resolution can differ from the original measurement precision. Exact decimal values and trailing zeroes can be indistinguishable after reading the numbers. Files rounded more coarsely than these limits can be rejected. Small discrepancies within a compatible interval can be accepted. These bounds address storage rounding and do not describe measurement uncertainty.

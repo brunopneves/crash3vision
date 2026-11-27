@@ -1124,6 +1124,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Could not save the project: {error}",
         "pt": "Não foi possível salvar o projeto: {error}",
     },
+    "project.save.invalid_data": {
+        "en": "Could not save the project. {error}\n\nThe destination file was left unchanged.",
+        "pt": "Não foi possível salvar o projeto. {error}\n\nO arquivo de destino foi preservado.",
+    },
     "project.load.failed": {
         "en": "Could not open the project: {error}",
         "pt": "Não foi possível abrir o projeto: {error}",
@@ -1131,6 +1135,66 @@ STRINGS: dict[str, dict[str, str]] = {
     "project.load.invalid_structure": {
         "en": "The JSON root must be an object.",
         "pt": "O JSON deve conter um objeto na raiz.",
+    },
+    "project.load.invalid_data": {
+        "en": "Could not open the project. {error}\n\nThe file and the current project were left unchanged.",
+        "pt": "Não foi possível abrir o projeto. {error}\n\nO arquivo e o projeto atual foram preservados.",
+    },
+    "project.data.invalid_number": {
+        "en": "The field {field} must contain a finite number. Stored value: {value}.",
+        "pt": "O campo {field} deve conter um número finito. Valor gravado: {value}.",
+    },
+    "project.data.positive_number": {
+        "en": "The field {field} must be greater than zero. Stored value: {value}.",
+        "pt": "O campo {field} deve ser maior que zero. Valor gravado: {value}.",
+    },
+    "project.data.nonnegative_number": {
+        "en": "The field {field} cannot be negative. Stored value: {value}.",
+        "pt": "O campo {field} não pode ser negativo. Valor gravado: {value}.",
+    },
+    "project.data.out_of_range": {
+        "en": "The field {field} must satisfy {minimum} <= value {upper_bound} {maximum}. Stored value: {value}.",
+        "pt": "O campo {field} deve satisfazer {minimum} <= valor {upper_bound} {maximum}. Valor gravado: {value}.",
+    },
+    "project.data.invalid_field": {
+        "en": "The field {field} has an invalid structure or identifier.",
+        "pt": "O campo {field} contém uma estrutura ou um identificador inválido.",
+    },
+    "project.data.duplicate_key": {
+        "en": "The JSON key {field} is repeated in the same object.",
+        "pt": "A chave JSON {field} aparece mais de uma vez no mesmo objeto.",
+    },
+    "project.data.shared_scale_mismatch": {
+        "en": "No common scale fits the stored measurements in pixels and meters. The {field} measurement conflicts with the available scale or other measurements.",
+        "pt": "Nenhuma escala comum é compatível com as medições gravadas em pixels e metros. A medição de {field} diverge da escala disponível ou das demais medições.",
+    },
+    "project.data.slice_spacing_mismatch": {
+        "en": "The six stored slice positions are incompatible with five equal W/5 intervals.",
+        "pt": "As seis posições de fatias gravadas são incompatíveis com cinco intervalos iguais de W/5.",
+    },
+    "project.data.image_unavailable": {
+        "en": "Could not read the image {field}. Check that the file exists, is accessible and is a valid image.",
+        "pt": "Não foi possível ler a imagem {field}. Confira se o arquivo existe, está acessível e é uma imagem válida.",
+    },
+    "project.data.image_is_save_destination": {
+        "en": "The destination {field} is an image referenced by the project. Choose a different file.",
+        "pt": "O destino {field} é uma imagem referenciada pelo projeto. Escolha outro arquivo.",
+    },
+    "project.data.width_interval_mismatch": {
+        "en": "The stored interval {field} ({value}) disagrees with W/5 ({expected}).",
+        "pt": "O intervalo gravado {field} ({value}) é incompatível com W/5 ({expected}).",
+    },
+    "project.data.ees_units_mismatch": {
+        "en": "The stored EES values disagree: {mps} m/s and {kmh} km/h.",
+        "pt": "Os valores gravados de EES são incompatíveis: {mps} m/s e {kmh} km/h.",
+    },
+    "project.data.energy_mismatch": {
+        "en": "The stored energy ({value} J) is inconsistent with the CRASH3 inputs (calculated value: {expected} J).",
+        "pt": "A energia gravada ({value} J) é incompatível com os parâmetros CRASH3 (valor calculado: {expected} J).",
+    },
+    "project.data.ees_energy_mismatch": {
+        "en": "The stored EES ({field} = {value}) is inconsistent with the stored energy ({energy} J) and mass ({mass} kg).",
+        "pt": "A EES gravada ({field} = {value}) é incompatível com a energia ({energy} J) e a massa ({mass} kg) gravadas.",
     },
     "project.load.images_failed": {
         "en": "Cannot load project: failed to read image {error}. The current project has not been changed.",
