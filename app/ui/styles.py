@@ -67,6 +67,54 @@ QPushButton[uiRole]:disabled, QToolButton[uiRole="disclosure"]:disabled {
 """
 
 WORKFLOW_PANEL_STYLES = """
+QScrollArea#welcomePanel { background: #eef5fd; }
+QFrame#welcomeCard {
+    background: transparent;
+    border: none;
+}
+QLabel#welcomeTitle { color: #103562; font-size: 60px; font-weight: 800; font-style: italic; }
+QLabel#welcomeTitle[compact="true"] { font-size: 24px; }
+QLabel#welcomeSubtitle { color: #315b89; font-size: 21px; }
+QLabel#welcomeSubtitle[compact="true"] { font-size: 14px; }
+QFrame#welcomeStep {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #f0f6fd, stop: 1 #e8f1fc);
+    border: none;
+    border-radius: 10px;
+}
+QLabel#welcomeStepTitle { color: #123b6b; font-size: 14px; font-weight: bold; }
+QLabel#welcomeStepTitle[compact="true"] { font-size: 11px; }
+QLabel#welcomeStepDescription { color: #294d73; font-size: 12px; }
+QFrame#welcomeInfoCard {
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1, stop: 0 #edf5fe, stop: 1 #dceafb);
+    border: none;
+    border-radius: 12px;
+}
+QLabel#welcomeInstruction { color: #163e6b; font-size: 15px; font-weight: bold; }
+QLabel#welcomeInstruction[compact="true"] { font-size: 12px; }
+QLabel#welcomeReferenceNote { color: #234d77; font-size: 13px; }
+QLabel#welcomeReferenceNote[compact="true"] { font-size: 11px; }
+QFrame#welcomeCard QPushButton[uiRole] {
+    padding: 4px 13px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 9px;
+}
+QFrame#welcomeCard QPushButton[uiRole="primary"] {
+    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #0973ca, stop: 1 #075099);
+    color: white;
+    border: 1px solid #07549d;
+}
+QFrame#welcomeCard QPushButton[uiRole="primary"]:hover { background: #0964ae; }
+QFrame#welcomeCard QPushButton[uiRole="primary"]:pressed { background: #084980; }
+QFrame#welcomeCard QPushButton[uiRole="primary"]:focus { border: 2px solid #98cdfb; }
+QFrame#welcomeCard QPushButton[uiRole="secondary"] {
+    background: #fbfdff;
+    color: #123b6b;
+    border: 1px solid #2876bd;
+}
+QFrame#welcomeCard QPushButton[uiRole="secondary"]:hover { background: #e7f2fe; }
+QFrame#welcomeCard QPushButton[uiRole="secondary"]:pressed { background: #dcecff; }
+QFrame#welcomeCard QPushButton[uiRole="secondary"]:focus { border: 2px solid #245b96; }
 QDialog#helpDialog { background: #f6f8fb; }
 QTextBrowser#helpArticle {
     background: #ffffff;

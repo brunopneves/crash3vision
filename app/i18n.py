@@ -17,6 +17,53 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "File",
         "pt": "Arquivo",
     },
+    "welcome.title": {"en": "CRASH3Vision", "pt": "CRASH3Vision"},
+    "welcome.subtitle": {
+        "en": "Semi-assisted analysis of vehicle deformation",
+        "pt": "Análise semiassistida de deformações veiculares",
+    },
+    "welcome.instruction": {
+        "en": "Load an image of the damaged vehicle to get started.",
+        "pt": "Carregue a imagem do veículo danificado para iniciar.",
+    },
+    "welcome.instruction_compact": {
+        "en": "Damaged vehicle image required.",
+        "pt": "Imagem do veículo danificado obrigatória.",
+    },
+    "welcome.reference_note": {
+        "en": "A reference image is optional.",
+        "pt": "A imagem de referência é opcional.",
+    },
+    "welcome.reference_note_compact": {
+        "en": "Reference optional.",
+        "pt": "Referência opcional.",
+    },
+    "welcome.illustration": {
+        "en": "Process illustration showing images, alignment and calibration, measurement, and calculation.",
+        "pt": "Ilustração do processo com imagens, alinhamento e calibração, medição e cálculo.",
+    },
+    "welcome.step.images.title": {"en": "Images", "pt": "Imagens"},
+    "welcome.step.images.description": {
+        "en": "Load the vehicle photographs.",
+        "pt": "Carregue as fotografias do veículo.",
+    },
+    "welcome.step.calibration.title": {"en": "Calibration", "pt": "Calibração"},
+    "welcome.step.calibration.description": {
+        "en": "Align if needed and set the scale.",
+        "pt": "Alinhe se necessário e defina a escala.",
+    },
+    "welcome.step.measurement.title": {"en": "Measurement", "pt": "Medição"},
+    "welcome.step.measurement.description": {
+        "en": "Measure width W and crush C1–C6.",
+        "pt": "Meça a largura W e as deformações C1–C6.",
+    },
+    "welcome.step.calculation.title": {"en": "Calculation", "pt": "Cálculo"},
+    "welcome.step.calculation.description": {
+        "en": "Calculate deformation energy and EES.",
+        "pt": "Calcule a energia de deformação e a EES.",
+    },
+    "welcome.load_image": {"en": "Load image", "pt": "Carregar imagem"},
+    "welcome.open_project": {"en": "Open project", "pt": "Abrir projeto"},
     "menu.new": {
         "en": "New project...",
         "pt": "Novo projeto...",

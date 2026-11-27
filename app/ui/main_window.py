@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QLineEdit,
     QScrollArea,
+    QStackedLayout,
     QComboBox,
     QRadioButton,
     QButtonGroup,
@@ -61,6 +62,7 @@ from app.ui.styles import (
 from app.ui.widgets.calc_panel import CalcPanel
 from app.ui.widgets.help_dialog import HelpDialog
 from app.ui.widgets.numeric_spin_box import NumericDoubleSpinBox
+from app.ui.widgets.welcome_panel import WelcomePanel
 from app.report import generate_report
 from app.core.number_format import format_display_number, relocalize_decimal_input
 from app.i18n import tr, set_language, get_language
@@ -390,7 +392,15 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(self.canvas, 1)
+        canvas_stack = QStackedLayout()
+        canvas_stack.setStackingMode(QStackedLayout.StackingMode.StackAll)
+        canvas_stack.addWidget(self.canvas)
+        self.welcome_panel = WelcomePanel(self.canvas.viewport())
+        self.welcome_panel.load_image.clicked.connect(self._on_load_dam)
+        self.welcome_panel.open_project.clicked.connect(self._on_load_project)
+        canvas_stack.addWidget(self.welcome_panel)
+        canvas_stack.setCurrentWidget(self.welcome_panel)
+        layout.addLayout(canvas_stack, 1)
 
         self.canvas_view_bar = QWidget()
         self.canvas_view_bar.setObjectName("canvasViewBar")
@@ -1005,6 +1015,7 @@ class MainWindow(QMainWindow):
     def _retranslate_ui(self) -> None:
         self._update_window_title()
         self._retranslate_menus()
+        self.welcome_panel.retranslate_ui()
 
         self._controls_dock.setWindowTitle(tr("dock.controls"))
         self.btn_return_to_current_step.setText(tr("progress.return_current"))
@@ -1446,6 +1457,7 @@ class MainWindow(QMainWindow):
             self._discard_rigid_region_state(restore=False, clear_visuals=True)
 
     def _on_images_changed(self) -> None:
+        self.welcome_panel.setVisible(not self.canvas.has_images())
         self._auto_alignment_undo_transform = None
         self._last_applied_rigid_reference_regions = ()
         self._set_rigid_instruction(None)
