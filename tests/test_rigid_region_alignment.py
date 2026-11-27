@@ -2739,6 +2739,98 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             window.btn_finish_alignment.click()
             self.assertEqual(window.stage, window.Stage.CALIBRATION)
 
+    def test_fractional_overlay_preference_round_trips_until_slider_is_edited(self) -> None:
+        window = MainWindow()
+        self.addCleanup(window.close)
+        window.show()
+
+        def open_project(path):
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(path), "")),
+                patch.object(QMessageBox, "information"),
+                patch.object(QMessageBox, "warning") as warning,
+            ):
+                window.io.load_project()
+            warning.assert_not_called()
+            QApplication.processEvents()
+
+        def save_project(path):
+            with (
+                patch.object(QFileDialog, "getSaveFileName", return_value=(str(path), "")),
+                patch.object(QMessageBox, "information") as success,
+                patch.object(QMessageBox, "critical") as error,
+            ):
+                window.io.save_project()
+            success.assert_called_once()
+            error.assert_not_called()
+            return json.loads(path.read_text(encoding="utf-8"))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            source = folder / "source.json"
+            saved = folder / "saved.json"
+            damaged = folder / "dam.png"
+            reference = folder / "ref.png"
+            for path, color in ((damaged, Qt.GlobalColor.red), (reference, Qt.GlobalColor.blue)):
+                image = QImage(320, 240, QImage.Format.Format_RGB32)
+                image.fill(color)
+                self.assertTrue(image.save(str(path)))
+
+            for opacity, percent in ((0.575, 58), (0.595, 60), (0.58, 58)):
+                for paired in (False, True):
+                    with self.subTest(opacity=opacity, paired=paired):
+                        data = {"dam_path": damaged.name, "opacity": opacity}
+                        if paired:
+                            data["ref_path"] = reference.name
+                        source.write_text(json.dumps(data), encoding="utf-8")
+                        open_project(source)
+                        for language in ("pt", "en"):
+                            window._set_language_and_refresh(language)
+                            self.assertEqual(window.opacity_slider.value(), percent)
+                            self.assertEqual(window.lbl_opacity_percent.text(), f"{percent}%")
+                            self.assertEqual(window.opacity_slider.isEnabled(), paired)
+                        self.assertEqual(window.canvas.ctrl.dam_item.opacity(), opacity if paired else 1.0)
+                        self.assertEqual(save_project(saved)["opacity"], opacity)
+                        open_project(saved)
+                        self.assertEqual(window.project.opacity, opacity)
+                        self.assertEqual(window.canvas.ctrl.dam_item.opacity(), opacity if paired else 1.0)
+
+                        for name, export in (
+                            ("annotated", window.canvas.export_scene_png),
+                            ("viewport", window.canvas.export_current_view_png),
+                        ):
+                            path = folder / f"{name}.png"
+                            export(str(path))
+                            png = QImage(str(path))
+                            self.assertFalse(png.isNull())
+                            pixel = png.pixelColor(png.rect().center())
+                            if paired:
+                                self.assertGreater(pixel.blue(), 0)
+                                self.assertGreater(pixel.red(), 0)
+                            else:
+                                self.assertEqual(pixel.getRgb(), (255, 0, 0, 255))
+                        self.assertEqual(window.project.opacity, opacity)
+
+                        if not paired:
+                            with patch.object(window.io, "pick_image_file", return_value=str(reference)):
+                                window.io.load_ref()
+                            self.assertEqual(window.canvas.ctrl.dam_item.opacity(), opacity)
+                        with (
+                            patch.object(window.io, "pick_image_file", return_value=str(damaged)),
+                            patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes),
+                        ):
+                            window.io.load_dam()
+                        self.assertEqual(window.canvas.ctrl.dam_item.opacity(), opacity)
+
+                        QTest.keyClick(window.opacity_slider, Qt.Key.Key_Right)
+                        edited = (percent + 1) / 100
+                        self.assertEqual(window.project.opacity, edited)
+                        self.assertEqual(window.canvas.ctrl.dam_item.opacity(), edited)
+                        self.assertEqual(save_project(saved)["opacity"], edited)
+                        open_project(saved)
+                        self.assertEqual(window.project.opacity, edited)
+                        self.assertEqual(window.lbl_opacity_percent.text(), f"{percent + 1}%")
+
     def test_resizing_left_dock_preserves_overlay_and_png_exports(self) -> None:
         window = self._window()
         window.show()

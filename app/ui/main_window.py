@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, ROUND_HALF_UP
 from enum import Enum
 import logging
 import math
@@ -1181,6 +1182,15 @@ class MainWindow(QMainWindow):
     # ---------------- Opacity ----------------
     def _refresh_opacity_percentage(self) -> None:
         self.lbl_opacity_percent.setText(f"{self.opacity_slider.value()}%")
+
+    def _restore_project_opacity(self) -> None:
+        opacity = self.project.opacity
+        # Round only the slider position. The canvas and JSON use the stored value.
+        percent = int(Decimal(str(opacity)).scaleb(2).to_integral_value(rounding=ROUND_HALF_UP))
+        with QSignalBlocker(self.opacity_slider):
+            self.opacity_slider.setValue(percent)
+        self._refresh_opacity_percentage()
+        self.canvas.set_deformed_opacity(opacity)
 
     def _on_opacity_changed(self, value: int) -> None:
         self._refresh_opacity_percentage()
@@ -2383,7 +2393,6 @@ class MainWindow(QMainWindow):
 
     # ---------------- Project sync + summary ----------------
     def _sync_ui_to_project(self) -> None:
-        self.project.opacity = self.opacity_slider.value() / 100.0
         self.project.m_per_px = self._m_per_px
 
         self.project.w_px = self._w_px

@@ -113,6 +113,7 @@ class ProjectIOController:
 
         self.host.workflow.reset_canvas_tools()
         self.host.canvas.clear_images()
+        self.host._restore_project_opacity()
         self.host.canvas.set_alignment_target("dam")
         self.host._update_auto_align_availability()
 
@@ -226,7 +227,6 @@ class ProjectIOController:
                 for slot, image_path in (("ref", project.ref_path), ("dam", project.dam_path))
                 if image_path
             }
-            opacity_percent = int(project.opacity * 100)
             ci_px = {int(k.replace("C", "")): v for k, v in (project.c_px or {}).items()}
             ci_m = {int(k.replace("C", "")): v for k, v in (project.c_m or {}).items()}
         except UnsupportedCrash3UnitsError as e:
@@ -259,11 +259,11 @@ class ProjectIOController:
         self.host._damage_speed_kmh = self.host.project.damage_speed_kmh
 
         self.host.canvas.clear_images()
+        self.host._restore_project_opacity()
         if "ref" in prepared_images:
             self.host.canvas.load_reference(prepared_images["ref"])
         if "dam" in prepared_images:
             self.host.canvas.load_deformed(prepared_images["dam"])
-            self.host.canvas.set_deformed_opacity(self.host.project.opacity)
         self.host._update_auto_align_availability()
 
         ref_tr = self.host.project.ref_transform
@@ -275,11 +275,6 @@ class ProjectIOController:
         self.host.canvas.set_deformed_transform(
             dam_tr.x, dam_tr.y, dam_tr.scale, dam_tr.rotation_deg
         )
-
-        self.host.opacity_slider.blockSignals(True)
-        self.host.opacity_slider.setValue(opacity_percent)
-        self.host.opacity_slider.blockSignals(False)
-        self.host._refresh_opacity_percentage()
 
         self.host._m_per_px = self.host.project.m_per_px
         if self.host._m_per_px is not None:
@@ -520,9 +515,7 @@ class ProjectIOController:
                 raise ValueError(tr("project.load.images_failed", error=path))
             self.host.workflow.invalidate_from_alignment(target_stage=self.host.Stage.LOAD)
             self.host.canvas.load_deformed(pixmap)
-            self.host.canvas.set_deformed_opacity(
-                self.host.opacity_slider.value() / 100.0
-            )
+            self.host.canvas.set_deformed_opacity(self.host.project.opacity)
             self.host.project.dam_path = path
 
             self.host._refresh_summary()
