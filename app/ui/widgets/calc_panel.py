@@ -57,6 +57,8 @@ class CalcPanel(QGroupBox):
 
     LIB_PATH = resource_path("app/data/stiffness_library.json")
     NHTSA_LIB_PATH = DEFAULT_LIBRARY_PATH
+    NHTSA_AB_SOURCES = ("nhtsa_library", "nhtsa_file", "nhtsa_report")
+    LOCKED_AB_SOURCES = (*NHTSA_AB_SOURCES, "generic_class")
 
     def __init__(self, main_window):
         super().__init__()
@@ -97,6 +99,7 @@ class CalcPanel(QGroupBox):
 
         self.lbl_generic_class = QLabel(tr("calc.generic_class"))
         self.cmb_class = QComboBox()
+        self.cmb_class.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.lbl_generic_class.setBuddy(self.cmb_class)
         self.cmb_class.addItem(tr("calc.manual_entry"), None)
         for class_name in sorted(self._stiffness_classes):
@@ -217,15 +220,16 @@ class CalcPanel(QGroupBox):
         self.btn_compute_ab_nhtsa.clicked.connect(self._on_compute_ab_from_nhtsa)
         self.btn_edit_ab_nhtsa.clicked.connect(self._on_edit_ab_from_nhtsa)
 
-        self._on_class_changed()
-        self.retranslate_ui()
-
-        for field, attribute in (
+        self._parameter_fields = (
             (self.txt_A, "crash3_A"),
             (self.txt_B, "crash3_B"),
             (self.txt_alpha_deg, "crash3_alpha_deg"),
             (self.txt_vehicle_mass, "vehicle_mass_kg"),
-        ):
+        )
+        self._on_class_changed()
+        self.retranslate_ui()
+
+        for field, attribute in self._parameter_fields:
             field.textChanged.connect(
                 lambda text, attribute=attribute: self._on_parameter_changed(attribute, text)
             )
@@ -234,9 +238,60 @@ class CalcPanel(QGroupBox):
         self.main.project.crash3_A = a
         self.main.project.crash3_B = b
         with QSignalBlocker(self.txt_A), QSignalBlocker(self.txt_B):
-            self.txt_A.setText(format_display_number(a))
-            self.txt_B.setText(format_display_number(b))
+            self.txt_A.setText(self._format_parameter("crash3_A", a))
+            self.txt_B.setText(self._format_parameter("crash3_B", b))
         self.main.workflow.invalidate_energy()
+
+    @staticmethod
+    def _format_parameter(attribute: str, value: float, language: str | None = None) -> str:
+        if attribute in ("crash3_A", "crash3_B") and math.isfinite(value):
+            compact = f"{value:.10g}"
+            # Keep a decimal separator in grouped integers so they can be edited
+            # unambiguously in either language.
+            if "e" in compact or ("." in compact and round(value, 2) != value):
+                return format_display_number(
+                    value, 10, language=language, significant_digits=True,
+                )
+        return format_display_number(value, language=language)
+
+    def restore_parameter_fields(self) -> None:
+        project = self.main.project
+        snapshot = project.ab_source_snapshot
+        if project.ab_source_type in self.LOCKED_AB_SOURCES and isinstance(snapshot, dict):
+            for attribute, key in (("crash3_A", "A_n_per_m"), ("crash3_B", "B_n_per_m2")):
+                recorded = snapshot.get(key)
+                if recorded is None:
+                    continue
+                try:
+                    recorded = parse_float(recorded)
+                except (ValueError, OverflowError):
+                    recorded = math.nan
+                if getattr(project, attribute) != recorded:
+                    # Older projects could contain edited values with an unchanged source.
+                    self._set_manual_ab_source()
+                    break
+        for field, attribute in self._parameter_fields:
+            value = getattr(project, attribute)
+            with QSignalBlocker(field):
+                field.setText("" if value is None else self._format_parameter(attribute, value))
+        self._refresh_ab_source_ui()
+
+    def _set_manual_ab_source(self) -> None:
+        project = self.main.project
+        project.ab_source_type = "manual"
+        project.ab_source_ref = None
+        project.ab_source_label = "Manual entry"
+        project.ab_source_reference = None
+        project.ab_source_snapshot = None
+
+    def _update_manual_snapshot(self) -> None:
+        project = self.main.project
+        try:
+            a, b, alpha = self._parse_ab_alpha()
+        except ValueError:
+            project.ab_source_snapshot = None
+        else:
+            project.ab_source_snapshot = {"A_n_per_m": a, "B_n_per_m2": b, "alpha_deg": alpha}
 
     def _on_parameter_changed(self, attribute: str, text: str) -> None:
         try:
@@ -250,20 +305,18 @@ class CalcPanel(QGroupBox):
             self.main._vehicle_mass_kg = value
             self.main.workflow.invalidate_speed()
         else:
+            if self.main.project.ab_source_type == "manual":
+                self._update_manual_snapshot()
             self.main.workflow.invalidate_energy()
-        if attribute in ("vehicle_mass_kg", "crash3_alpha_deg"):
-            self._refresh_ab_source_ui()
+        self._refresh_ab_source_ui()
 
     def retranslate_ui(self) -> None:
         self.lbl_title.setText(tr("calc.group.title"))
         self.setAccessibleName(self.lbl_title.text())
         self.lbl_generic_class.setText(tr("calc.generic_class"))
 
-        current_data = self.cmb_class.currentData()
         self.cmb_class.setItemText(0, tr("calc.manual_entry"))
-        idx = self.cmb_class.findData(current_data)
-        if idx >= 0:
-            self.cmb_class.setCurrentIndex(idx)
+        self.cmb_class.setPlaceholderText(tr("calc.ab_source_selected"))
 
         self.btn_ab_menu.setText(tr("calc.ab_menu"))
         self.btn_ab_menu.setToolTip(self.btn_ab_menu.text())
@@ -318,19 +371,15 @@ class CalcPanel(QGroupBox):
 
     def retranslate_numeric_fields(self, previous_language: str) -> None:
         project = self.main.project
-        for field, value in (
-            (self.txt_A, project.crash3_A),
-            (self.txt_B, project.crash3_B),
-            (self.txt_alpha_deg, project.crash3_alpha_deg or 0.0),
-            (self.txt_vehicle_mass, self.main._vehicle_mass_kg),
-        ):
+        for field, attribute in self._parameter_fields:
+            value = getattr(project, attribute)
             # Keep unfinished and manually entered text as-is if it differs from
             # the representation used to populate the field.
-            if value is not None and field.text() == format_display_number(
-                value, language=previous_language
+            if value is not None and field.text() == self._format_parameter(
+                attribute, value, previous_language
             ):
                 with QSignalBlocker(field):
-                    field.setText(format_display_number(value))
+                    field.setText(self._format_parameter(attribute, value))
 
     def _refresh_details_visibility(self) -> None:
         expanded = self.btn_toggle_details.isChecked()
@@ -381,20 +430,19 @@ class CalcPanel(QGroupBox):
         return normalized
 
     def _on_class_changed(self):
+        if self.cmb_class.currentIndex() < 0:
+            return
         class_name = self.cmb_class.currentData()
 
         if not class_name:
-            self.txt_A.setText("")
-            self.txt_B.setText("")
-            self.txt_A.setReadOnly(False)
-            self.txt_B.setReadOnly(False)
-
-            self.main.project.ab_source_type = "manual"
-            self.main.project.ab_source_ref = None
-            self.main.project.ab_source_label = "Manual entry"
-            self.main.project.ab_source_reference = None
-            self.main.project.ab_source_snapshot = None
-
+            project = self.main.project
+            if project.ab_source_type == "generic_class":
+                project.crash3_A = project.crash3_B = None
+                with QSignalBlocker(self.txt_A), QSignalBlocker(self.txt_B):
+                    self.txt_A.clear()
+                    self.txt_B.clear()
+                self.main.workflow.invalidate_energy()
+            self._set_manual_ab_source()
             self._refresh_ab_source_ui()
             return
 
@@ -408,9 +456,6 @@ class CalcPanel(QGroupBox):
             return
 
         self._set_coefficients(params["A"], params["B"])
-        self.txt_A.setReadOnly(True)
-        self.txt_B.setReadOnly(True)
-
         self.main.project.ab_source_type = "generic_class"
         self.main.project.ab_source_ref = class_name
         self.main.project.ab_source_label = class_name
@@ -634,9 +679,6 @@ class CalcPanel(QGroupBox):
         B_n_per_m2 = self._to_float(b_val)
 
         self._set_coefficients(A_n_per_m, B_n_per_m2)
-        self.txt_A.setReadOnly(True)
-        self.txt_B.setReadOnly(True)
-
         self.main.project.ab_source_type = "nhtsa_file"
         self.main.project.ab_source_ref = rec.get("id")
         self.main.project.ab_source_label = rec.get("test_label") or rec.get("id")
@@ -860,21 +902,9 @@ class CalcPanel(QGroupBox):
         self.main.project.damage_speed_mps = None
         self.main.project.damage_speed_kmh = None
 
-        if self.main.project.ab_source_type not in (
-            "nhtsa_library",
-            "nhtsa_file",
-            "generic_class",
-            "nhtsa_report",
-        ):
-            self.main.project.ab_source_type = "manual"
-            self.main.project.ab_source_ref = None
-            self.main.project.ab_source_label = "Manual entry"
-            self.main.project.ab_source_reference = None
-            self.main.project.ab_source_snapshot = {
-                "A_n_per_m": A,
-                "B_n_per_m2": B,
-                "alpha_deg": alpha_deg,
-            }
+        if self.main.project.ab_source_type not in self.LOCKED_AB_SOURCES:
+            self._set_manual_ab_source()
+            self._update_manual_snapshot()
             self._refresh_ab_source_ui()
 
         self.main._refresh_summary()
@@ -1092,6 +1122,19 @@ class CalcPanel(QGroupBox):
         snap = project.ab_source_snapshot
         snap = snap if isinstance(snap, dict) else {}
         source_type = project.ab_source_type
+        locked = source_type in self.LOCKED_AB_SOURCES
+        self.txt_A.setReadOnly(locked)
+        self.txt_B.setReadOnly(locked)
+        index = self.cmb_class.findData(project.ab_source_ref) if source_type == "generic_class" else (
+            -1 if locked else 0
+        )
+        with QSignalBlocker(self.cmb_class):
+            self.cmb_class.setCurrentIndex(index)
+        for field, attribute in self._parameter_fields:
+            value = getattr(project, attribute)
+            field.setToolTip(
+                "" if value is None else tr("calc.exact_value", value=format_display_number(value, None))
+            )
         source_key = {
             "nhtsa_library": "calc.ab_source_nhtsa",
             "nhtsa_report": "calc.ab_source_nhtsa_report",
@@ -1113,7 +1156,7 @@ class CalcPanel(QGroupBox):
                 lines.append(f"{tr('calc.generic_class')}: {class_name}")
             if reference and reference != class_name:
                 lines.append(f"{tr('report.ab_source_reference')}: {reference}")
-        elif source_type in ("nhtsa_library", "nhtsa_file", "nhtsa_report"):
+        elif source_type in self.NHTSA_AB_SOURCES:
             vehicle = " ".join(
                 value for key in ("make", "model", "year")
                 if (value := self._metadata_text(snap.get(key)))

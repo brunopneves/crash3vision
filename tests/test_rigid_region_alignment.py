@@ -381,6 +381,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             with patch.object(QFileDialog, "getOpenFileName", return_value=(ab_path, "")):
                 panel.act_import_ab_file.trigger()
         self.assertEqual(window.project.ab_source_type, "nhtsa_file")
+        self.assertTrue(panel.txt_A.isReadOnly())
+        self.assertTrue(panel.txt_B.isReadOnly())
+        self.assertEqual(panel.cmb_class.currentIndex(), -1)
 
         with patch(
             "app.ui.widgets.calc_panel.NhtsaAbDialog.exec",
@@ -403,6 +406,9 @@ class RigidRegionAlignmentTests(unittest.TestCase):
             panel.btn_edit_ab_nhtsa.click()
         warning.assert_not_called()
         self.assertEqual(window.project.ab_source_type, "nhtsa_report")
+        self.assertTrue(panel.txt_A.isReadOnly())
+        self.assertTrue(panel.txt_B.isReadOnly())
+        self.assertEqual(panel.cmb_class.currentIndex(), -1)
         self.assertGreater(window._total_energy, 0)
         self.assertIsNone(window._damage_speed_kmh)
 
@@ -441,9 +447,17 @@ class RigidRegionAlignmentTests(unittest.TestCase):
                 ):
                     window.io.load_project()
                 before = window.project.to_dict()
-                for language, shown in (("pt", "0,01"), ("en", "0.01")):
+                for language, shown, exact_angle, exact_mass in (
+                    ("pt", "0,0149", "0,0049", "1815,123456"),
+                    ("en", "0.0149", "0.0049", "1815.123456"),
+                ):
                     window._set_language_and_refresh(language)
                     self.assertEqual(window.calc_panel.txt_A.text(), shown)
+                    self.assertEqual(window.calc_panel.txt_B.text(), shown)
+                    self.assertIn(shown, window.calc_panel.txt_A.toolTip())
+                    self.assertIn(shown, window.calc_panel.txt_B.toolTip())
+                    self.assertIn(exact_angle, window.calc_panel.txt_alpha_deg.toolTip())
+                    self.assertIn(exact_mass, window.calc_panel.txt_vehicle_mass.toolTip())
                 self.assertEqual(window.project.to_dict(), before)
                 window.workflow_step_labels["calculation"].click()
                 with patch("app.ui.widgets.calc_panel.CrushProfileDialog.exec") as profile:
@@ -473,6 +487,103 @@ class RigidRegionAlignmentTests(unittest.TestCase):
                 window._w_m, *(window._ci_m[i] for i in range(1, 7)), 0.016799, 0.017899, angle
             )
             self.assertEqual(window.project.total_energy_j, expected)
+
+    def test_compass_library_locks_coefficients_until_manual_entry_and_preserves_source_on_reload(self) -> None:
+        window = self._window()
+        panel = window.calc_panel
+        source = COMPASS / "crash3vision_reference_project.json"
+
+        def open_project(path):
+            with (
+                patch.object(QFileDialog, "getOpenFileName", return_value=(str(path), "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                window.io.load_project()
+            window.workflow_step_labels["calculation"].click()
+
+        def save_project(path):
+            with (
+                patch.object(QFileDialog, "getSaveFileName", return_value=(str(path), "")),
+                patch.object(QMessageBox, "information"),
+            ):
+                window.io.save_project()
+
+        def select_compass(_parent, _title, _label, options, *_args):
+            return next(item for item in options if "Compass" in item), True
+
+        open_project(source)
+        self.assertEqual(panel.cmb_class.currentIndex(), 0)
+        with (
+            patch.object(panel, "NHTSA_LIB_PATH", ROOT / "app/data/nhtsa_ab_library.json"),
+            patch.object(QInputDialog, "getItem", side_effect=select_compass),
+        ):
+            panel.act_load_ab_library.trigger()
+        a, b = 179048.05781761295, 1876070.8731583252
+        project = window.project
+        library_snapshot = project.ab_source_snapshot.copy()
+        for language, shown_a, shown_b, exact_a, exact_b in (
+            ("en", "179,048.0578", "1,876,070.873", "179048.05781761295", "1876070.8731583252"),
+            ("pt", "179.048,0578", "1.876.070,873", "179048,05781761295", "1876070,8731583252"),
+        ):
+            window._set_language_and_refresh(language)
+            self.assertEqual(panel.cmb_class.currentIndex(), -1)
+            self.assertEqual(panel.txt_A.text(), shown_a)
+            self.assertEqual(panel.txt_B.text(), shown_b)
+            self.assertEqual(panel.txt_A.toolTip(), tr("calc.exact_value", value=exact_a))
+            self.assertEqual(panel.txt_B.toolTip(), tr("calc.exact_value", value=exact_b))
+            self.assertTrue(panel.txt_A.isReadOnly())
+            self.assertTrue(panel.txt_B.isReadOnly())
+            panel.txt_A.selectAll()
+            QTest.keyClicks(panel.txt_A, "200000")
+            self.assertEqual((project.crash3_A, project.crash3_B), (a, b))
+            self.assertEqual(project.ab_source_snapshot, library_snapshot)
+        self.assertAlmostEqual(project.total_energy_j, 218416.51112526422, places=7)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            library = Path(tmp) / "library.json"
+            manual = Path(tmp) / "manual.json"
+            legacy = Path(tmp) / "legacy.json"
+            save_project(library)
+            open_project(library)
+            self.assertTrue(panel.txt_A.isReadOnly())
+            self.assertEqual(window.project.ab_source_snapshot, library_snapshot)
+            self.assertEqual((window.project.crash3_A, window.project.crash3_B), (a, b))
+
+            panel.cmb_class.setCurrentIndex(0)
+            self.assertFalse(panel.txt_A.isReadOnly())
+            self.assertFalse(panel.txt_B.isReadOnly())
+            self.assertEqual((window.project.crash3_A, window.project.crash3_B), (a, b))
+            self.assertIsNone(window.project.ab_source_snapshot)
+            self.assertIsNone(window.project.ab_source_reference)
+            panel.txt_A.selectAll()
+            QTest.keyClicks(panel.txt_A, "200000,0149")
+            self.assertEqual(window.project.crash3_A, 200000.0149)
+            self.assertIsNone(window.project.total_energy_j)
+            panel.btn_compute.click()
+            expected = compute_energy(
+                window._w_m, *(window._ci_m[i] for i in range(1, 7)),
+                200000.0149, b, window.project.crash3_alpha_deg,
+            )
+            self.assertEqual(window.project.total_energy_j, expected)
+            save_project(manual)
+            open_project(manual)
+            self.assertEqual(window.project.ab_source_type, "manual")
+            self.assertIsNone(window.project.ab_source_ref)
+            self.assertFalse(panel.txt_A.isReadOnly())
+            self.assertEqual(window.project.ab_source_snapshot["A_n_per_m"], 200000.0149)
+            self.assertEqual(window.project.total_energy_j, expected)
+
+            legacy_data = json.loads(library.read_text(encoding="utf-8"))
+            legacy_data["crash3_A"] = 200000.0149
+            legacy_data["total_energy_j"] = expected
+            legacy.write_text(json.dumps(legacy_data), encoding="utf-8")
+            open_project(legacy)
+            self.assertEqual(window.project.crash3_A, 200000.0149)
+            self.assertEqual(window.project.total_energy_j, expected)
+            self.assertEqual(window.project.ab_source_type, "manual")
+            self.assertIsNone(window.project.ab_source_snapshot)
+            self.assertIsNone(window.project.ab_source_reference)
+            self.assertFalse(panel.txt_A.isReadOnly())
 
     def test_measurement_panel_tracks_steps_and_collapses_guide_safely(self) -> None:
         window = self._window()

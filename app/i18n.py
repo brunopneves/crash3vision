@@ -874,6 +874,14 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "(manual entry)",
         "pt": "(entrada manual)",
     },
+    "calc.ab_source_selected": {
+        "en": "Coefficients from selected source",
+        "pt": "Coeficientes da fonte selecionada",
+    },
+    "calc.exact_value": {
+        "en": "Full value used in calculation: {value}",
+        "pt": "Valor integral usado no cálculo: {value}",
+    },
     "calc.apply_class_values": {
         "en": "Apply class values",
         "pt": "Aplicar valores da classe",

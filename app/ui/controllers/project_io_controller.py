@@ -8,7 +8,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QSignalBlocker
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
 
@@ -106,16 +105,7 @@ class ProjectIOController:
         if hasattr(self.host, "calc_panel"):
             self.host.calc_panel.lbl_energy.setText(tr("calc.total_energy_default"))
             self.host.calc_panel.lbl_speed.setText(tr("calc.damage_speed_default"))
-            self.host.calc_panel.txt_vehicle_mass.setText("")
-            self.host.calc_panel.txt_A.setText("")
-            self.host.calc_panel.txt_B.setText("")
-            self.host.calc_panel.cmb_class.blockSignals(True)
-            self.host.calc_panel.cmb_class.setCurrentIndex(0)
-            self.host.calc_panel.cmb_class.blockSignals(False)
-            self.host.calc_panel.txt_A.setReadOnly(False)
-            self.host.calc_panel.txt_B.setReadOnly(False)
-            self.host.calc_panel.txt_alpha_deg.setText(format_display_number(0.0))
-            self.host.calc_panel._refresh_ab_source_ui()
+            self.host.calc_panel.restore_parameter_fields()
 
         self.host.workflow.apply_stage_gating()
         self.host._refresh_summary()
@@ -394,78 +384,8 @@ class ProjectIOController:
             self.host.canvas.set_alignment_target("dam")
 
         if hasattr(self.host, "calc_panel"):
-            if self.host._total_energy is None:
-                self.host.calc_panel.lbl_energy.setText(tr("calc.total_energy_default"))
-            else:
-                self.host.calc_panel.lbl_energy.setText(
-                    tr(
-                        "calc.total_energy_value",
-                        value=format_display_number(self.host._total_energy),
-                        unit="J",
-                    )
-                )
-
-            # Restoring inputs must not invalidate the saved calculation results.
-            with QSignalBlocker(self.host.calc_panel.txt_A):
-                self.host.calc_panel.txt_A.setText(
-                    ""
-                    if self.host.project.crash3_A is None
-                    else format_display_number(self.host.project.crash3_A)
-                )
-            with QSignalBlocker(self.host.calc_panel.txt_B):
-                self.host.calc_panel.txt_B.setText(
-                    ""
-                    if self.host.project.crash3_B is None
-                    else format_display_number(self.host.project.crash3_B)
-                )
-
-            ab_type = self.host.project.ab_source_type
-            if ab_type in ("nhtsa_library", "nhtsa_file"):
-                self.host.calc_panel.txt_A.setReadOnly(True)
-                self.host.calc_panel.txt_B.setReadOnly(True)
-            elif ab_type == "generic_class":
-                self.host.calc_panel.txt_A.setReadOnly(True)
-                self.host.calc_panel.txt_B.setReadOnly(True)
-                # Restaurar seleção no combo
-                ref = self.host.project.ab_source_ref or ""
-                idx = self.host.calc_panel.cmb_class.findData(ref)
-                if idx >= 0:
-                    self.host.calc_panel.cmb_class.blockSignals(True)
-                    self.host.calc_panel.cmb_class.setCurrentIndex(idx)
-                    self.host.calc_panel.cmb_class.blockSignals(False)
-            else:
-                self.host.calc_panel.txt_A.setReadOnly(False)
-                self.host.calc_panel.txt_B.setReadOnly(False)
-
-            alpha_deg = self.host.project.crash3_alpha_deg
-            with QSignalBlocker(self.host.calc_panel.txt_alpha_deg):
-                self.host.calc_panel.txt_alpha_deg.setText(
-                    format_display_number(0.0 if alpha_deg is None else alpha_deg)
-                )
-
-            with QSignalBlocker(self.host.calc_panel.txt_vehicle_mass):
-                self.host.calc_panel.txt_vehicle_mass.setText(
-                    ""
-                    if self.host._vehicle_mass_kg is None
-                    else format_display_number(self.host._vehicle_mass_kg)
-                )
-
-            if self.host._damage_speed_kmh is None:
-                self.host.calc_panel.lbl_speed.setText(tr("calc.damage_speed_default"))
-            else:
-                self.host.calc_panel.lbl_speed.setText(
-                    tr(
-                        "calc.damage_speed_value",
-                        value=format_display_number(self.host._damage_speed_kmh),
-                        unit="km/h",
-                    )
-                )
-
-            if hasattr(self.host.calc_panel, "retranslate_ui"):
-                self.host.calc_panel.retranslate_ui()
-
-            if hasattr(self.host.calc_panel, "_refresh_ab_source_ui"):
-                self.host.calc_panel._refresh_ab_source_ui()
+            self.host.calc_panel.restore_parameter_fields()
+            self.host.calc_panel.retranslate_ui()
 
         self.host.workflow.sync_stage_after_load()
         QMessageBox.information(
