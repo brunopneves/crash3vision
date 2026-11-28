@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0] - Release date pending
+## [1.1.0] - 2026-11-28 (planned)
 
 - Redesigned the bilingual interface with a welcome screen, stage navigation, contextual panels and a fixed navigation footer.
 - Simplified optional alignment, calibration and damage marking. Completing W generates six measurement positions and activates C1.

@@ -6,7 +6,7 @@ CRASH3Vision is experimental research software developed to support the extracti
 
 The project combines **forensic engineering, digital image analysis, vehicle collision reconstruction and reproducible research software**.
 
-> **Current status:** v1.1.0 — public research release in preparation
+> **Current status:** v1.1.0 — public research release planned for 2026-11-28
 > **Research stage:** preliminary experimental validation / proof-of-concept  
 > **Current validation scope:** frontal vehicle deformation  
 > **License:** PolyForm Noncommercial License 1.0.0
@@ -199,7 +199,7 @@ For the complete methodological description, see [docs/methodology.md](docs/meth
 
 ### Windows executable
 
-The v1.1.0 Windows x64 portable package and per-user installer have been prepared and tested on the development computer. They include the Python runtime and the Jeep Compass reference project with both images. Public distribution remains pending clean Windows validation and authorization to redistribute the Microsoft runtimes.
+The v1.1.0 Windows x64 portable package and per-user installer include the Python runtime and the Jeep Compass reference project with both images. The installer was successfully tested on a second Windows computer. Public distribution of the Windows binaries remains pending authorization to redistribute the Microsoft runtimes.
 
 The [Windows installer guide](docs/windows-installer.md) documents the pinned build environment, packaging, validation, and cleanup procedure.
 
