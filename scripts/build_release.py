@@ -173,14 +173,25 @@ def publish(stage: Path, dist: Path, stem: str) -> None:
             item.rename(backup / item.name)
             moved.append(item)
         for name in sorted(names):
-            (stage / name).rename(dist / name)
-            promoted.append(name)
+            source = stage / name
+            target = dist / name
+            promoted.append(target)
+            if source.is_dir():
+                shutil.copytree(source, target)
+            else:
+                shutil.copy2(source, target)
         for artifact in artifact_names:
             check_hash(dist / artifact)
         check_example(dist / stem)
+        verify_zip(dist / f"{stem}.zip", dist / stem)
     except (Exception, KeyboardInterrupt):
-        for name in reversed(promoted):
-            (dist / name).rename(stage / name)
+        for target in reversed(promoted):
+            if target.resolve().parent != dist or target.is_symlink() or target.is_junction():
+                raise ValueError(f"Unsafe partial output: {target}")
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink(missing_ok=True)
         for item in reversed(moved):
             (backup / item.name).rename(item)
         backup.rmdir()
@@ -189,7 +200,14 @@ def publish(stage: Path, dist: Path, stem: str) -> None:
         raise ValueError("Unsafe rollback directory.")
     list(tree_files(backup))
     shutil.rmtree(backup)
-    receipt.unlink()
+    # Keep the stage intact until promotion and rollback cleanup have succeeded.
+    for item in stage.iterdir():
+        if item.resolve().parent != stage or item.is_symlink() or item.is_junction():
+            raise ValueError(f"Unsafe staged output: {item}")
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
     stage.rmdir()
     print(f"Published locally: {dist}. Removed {len(old)} replaced or obsolete outputs.")
 
