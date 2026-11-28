@@ -6,7 +6,7 @@ CRASH3Vision is experimental research software developed to support the extracti
 
 The project combines **forensic engineering, digital image analysis, vehicle collision reconstruction and reproducible research software**.
 
-> **Current status:** v1.0.5 — public research release
+> **Current status:** v1.1.0 — public research release in preparation
 > **Research stage:** preliminary experimental validation / proof-of-concept  
 > **Current validation scope:** frontal vehicle deformation  
 > **License:** PolyForm Noncommercial License 1.0.0
@@ -24,7 +24,7 @@ The project combines **forensic engineering, digital image analysis, vehicle col
 - [Citation metadata](CITATION.cff)
 - [License](LICENSE)
 - [Third-party notices](THIRD_PARTY_NOTICES)
-- [Release v1.0.5](https://github.com/brunopneves/crash3vision/releases/tag/v1.0.5)
+- [Public releases](https://github.com/brunopneves/crash3vision/releases)
 
 ---
 
@@ -197,10 +197,16 @@ For the complete methodological description, see [docs/methodology.md](docs/meth
 
 ## Installation
 
-### Requirements
+### Windows executable
+
+The v1.1.0 Windows x64 portable package and per-user installer have been prepared and tested on the development computer. They include the Python runtime and the Jeep Compass reference project with both images. Public distribution remains pending clean Windows validation and authorization to redistribute the Microsoft runtimes.
+
+The [Windows installer guide](docs/windows-installer.md) documents the pinned build environment, packaging, validation, and cleanup procedure.
+
+### Run from source
 
 - Python 3.10+
-- PySide6
+- PySide6, NumPy and OpenCV, installed from [`requirements.txt`](requirements.txt)
 
 Clone the repository:
 
@@ -384,7 +390,7 @@ GitHub supports the repository's [`CITATION.cff`](CITATION.cff) file through the
 
 Suggested software citation:
 
-> Neves, B. P. (2026). **CRASH3Vision (Version 1.0.5)**. Research software for semi-assisted image-based vehicle deformation measurement and CRASH3/EES estimation.
+> Neves, B. P. **CRASH3Vision (Version 1.1.0)**. Research software for semi-assisted image-based vehicle deformation measurement and CRASH3/EES estimation.
 
 The associated scientific study should also be cited when the methodology itself is used.
 

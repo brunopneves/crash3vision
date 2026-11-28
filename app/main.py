@@ -22,6 +22,7 @@ def main():
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
 
     app = QApplication(sys.argv)
+    app.setApplicationVersion(__version__)
 
     icon_path = resource_path("app/assets/crash3_icon.ico")
     app_icon = QIcon(icon_path)

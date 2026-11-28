@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0] - Release date pending
+
+- Redesigned the bilingual interface with a welcome screen, stage navigation, contextual panels and a fixed navigation footer.
+- Simplified optional alignment, calibration and damage marking. Completing W generates six measurement positions and activates C1.
+- Preserved full-precision A/B inputs and historical source records. The interface distinguishes manually entered coefficients and declared sources that could not be verified.
+- Reorganized the TXT technical summary around full-precision inputs and results, calibration, source-test units and the interpretation of EES.
+- Improved project validation and compatibility, atomic saves, recovery from failed image loads and reporting of PNG export failures.
+- Updated the scientific documentation and in-app help with the complete deformation-energy equation, methodological limitations and guidance on acquiring images.
+- Prepared Windows x64 portable and installer packages with the offline Jeep Compass example and reproducible build scripts.
+
 ## [1.0.5] - 2026-11-22
 
 ### Added
