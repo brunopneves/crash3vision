@@ -1,5 +1,7 @@
 # CRASH3Vision
 
+🇺🇸 [**English**](README.md) | 🇧🇷 [**Português (Brasil)**](README.pt-BR.md)
+
 **Semi-assisted image-based vehicle deformation measurement and CRASH3/EES estimation**
 
 CRASH3Vision is experimental research software developed to support the extraction of vehicle structural deformation parameters from digital images and their application to deformation-energy and Energy Equivalent Speed (EES) estimation using CRASH3-derived methods.
