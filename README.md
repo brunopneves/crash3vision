@@ -8,7 +8,7 @@ CRASH3Vision is experimental research software developed to support the extracti
 
 The project combines **forensic engineering, digital image analysis, vehicle collision reconstruction and reproducible research software**.
 
-> **Current status:** v1.1.0 — public research release planned for 2026-11-28
+> **Current status:** v1.1.0 — public research release published on 28 November 2026
 > **Research stage:** preliminary experimental validation / proof-of-concept  
 > **Current validation scope:** frontal vehicle deformation  
 > **License:** PolyForm Noncommercial License 1.0.0
